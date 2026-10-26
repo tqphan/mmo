@@ -7,3 +7,5 @@ publish.workspace = true
 [dependencies]
 spacetimedb-sdk = "=2.13.0"
 sim = { path = "../../server/sim" }
+# Pinned to the version already in Cargo.lock (ADR 0009). The swarm runs every bot on one runtime.
+tokio = { version = "=1.48.0", features = ["rt-multi-thread", "time", "sync"] }

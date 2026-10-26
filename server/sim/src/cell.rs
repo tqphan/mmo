@@ -1,7 +1,7 @@
 //! World partitioning: 64 m cells over a 16×16 km map centred on the origin (PLAN §4.3).
 //!
-//! A cell key packs `(instance, cy, cx)` into one `u64`, laid out row by row so that one row of a
-//! subscription window is a single contiguous key range.
+//! A cell key packs `(instance, cy, cx)` into one `u64`, laid out row by row. Clients subscribe to a
+//! window cell by cell (`window_cells`), since SpacetimeDB prunes equality queries but not ranges.
 
 pub const CELL_SIZE_M: f32 = 64.0;
 pub const WORLD_SIZE_M: f32 = 16_000.0;
@@ -49,6 +49,13 @@ pub fn window_rows(center: u64, radius: u16) -> Vec<(u64, u64)> {
     (lo..=hi).map(|y| row_range(instance, y, cx, radius)).collect()
 }
 
+/// Every cell key of the window around `center`, clipped to the map. Clients subscribe with one
+/// `cell = key` query per cell: SpacetimeDB prunes equality queries when it works out who gets a
+/// change, but checks range queries against every change (docs/spikes/throughput.md).
+pub fn window_cells(center: u64, radius: u16) -> Vec<u64> {
+    window_rows(center, radius).into_iter().flat_map(|(lo, hi)| lo..=hi).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,5 +101,15 @@ mod tests {
         let corner = window_rows(pack(0, 0, CELLS_PER_SIDE - 1), 2);
         assert_eq!(corner.len(), 3);
         assert_eq!(corner[0], (pack(0, 0, CELLS_PER_SIDE - 3), pack(0, 0, CELLS_PER_SIDE - 1)));
+    }
+
+    #[test]
+    fn window_cells_list_every_cell_once() {
+        let cells = window_cells(pack(0, 100, 100), 2);
+        assert_eq!(cells.len(), 25);
+        assert_eq!(cells[0], pack(0, 98, 98));
+        assert_eq!(cells[24], pack(0, 102, 102));
+        assert!(cells.contains(&pack(0, 100, 100)));
+        assert_eq!(window_cells(pack(0, 0, 0), 2).len(), 9);
     }
 }

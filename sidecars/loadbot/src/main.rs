@@ -1,11 +1,13 @@
 //! Headless bots that play scripted scenarios against a running server and check what they see.
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
+//! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
 mod metrics;
+mod swarm;
 
 use std::time::{Duration, Instant};
 
@@ -22,39 +24,50 @@ struct Args {
     scenario: String,
 }
 
-fn parse_args() -> Args {
+fn parse_args() -> (Args, swarm::SwarmArgs) {
     let mut a = Args { uri: "http://127.0.0.1:3000".into(), db: "mmo-world".into(), scenario: "help".into() };
+    let mut sw = swarm::SwarmArgs::default();
     let mut it = std::env::args().skip(1);
+    fn num<T: std::str::FromStr>(flag: &str, v: Option<String>) -> T {
+        v.and_then(|v| v.parse().ok()).unwrap_or_else(|| panic!("{flag} needs a number"))
+    }
     while let Some(arg) = it.next() {
         match arg.as_str() {
             "--uri" => a.uri = it.next().expect("--uri needs a value"),
             "--db" => a.db = it.next().expect("--db needs a value"),
+            "--bots" => sw.bots = num("--bots", it.next()),
+            "--combat" => sw.combat = num("--combat", it.next()),
+            "--area" => sw.area = num("--area", it.next()),
+            "--secs" => sw.secs = num("--secs", it.next()),
             s => a.scenario = s.into(),
         }
     }
-    a
+    (a, sw)
 }
 
 fn main() {
-    let args = parse_args();
-    let result = match args.scenario.as_str() {
+    let (args, sw) = parse_args();
+    let scenario = args.scenario.clone();
+    let result = match scenario.as_str() {
         "see-each-other" => see_each_other(&args),
         "tick" => tick(&args),
         "metrics" => metrics::read(&args.uri, &args.db).map(|r| print!("{r}")),
+        "swarm" => swarm::swarm(args, sw),
         _ => {
             eprintln!(
                 "scenarios:\n  \
                  see-each-other   two bots enter, see each other move, get corrected, leave\n  \
                  tick             the world tick runs at 10 Hz and its timings can be read\n  \
-                 metrics          print the server's tick timings and reducer counts"
+                 metrics          print the server's tick timings and reducer counts\n  \
+                 swarm            the throughput spike: many bots moving and fighting, measured"
             );
             std::process::exit(2);
         }
     };
     match result {
-        Ok(()) => println!("PASS {}", args.scenario),
+        Ok(()) => println!("PASS {scenario}"),
         Err(e) => {
-            eprintln!("FAIL {}: {e}", args.scenario);
+            eprintln!("FAIL {scenario}: {e}");
             std::process::exit(1);
         }
     }
@@ -104,9 +117,9 @@ impl Bot {
             "SELECT * FROM my_presence".to_string(),
             "SELECT * FROM character_public".to_string(),
         ];
-        for (lo, hi) in sim::cell::window_rows(cell, 2) {
-            queries.push(format!("SELECT * FROM entity WHERE cell >= {lo} AND cell <= {hi}"));
-            queries.push(format!("SELECT * FROM transform WHERE cell >= {lo} AND cell <= {hi}"));
+        for c in sim::cell::window_cells(cell, 2) {
+            queries.push(format!("SELECT * FROM entity WHERE cell = {c}"));
+            queries.push(format!("SELECT * FROM transform WHERE cell = {c}"));
         }
         let applied = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let flag = applied.clone();

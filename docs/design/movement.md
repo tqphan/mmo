@@ -27,9 +27,9 @@ Our speed numbers are placeholders until the research is done. They live in `sim
 
 ### Cells (PLAN §4.3)
 - 64 m cells, 250 × 250 over 16 km, origin at the map centre; anything outside the map is clamped to the edge cells.
-- `key = instance << 32 | cy << 16 | cx`, where `cy` comes from z and `cx` from x. The x index varies fastest, so one row of a subscription window is one key range: `cell >= lo AND cell <= hi`.
+- `key = instance << 32 | cy << 16 | cx`, where `cy` comes from z and `cx` from x. The x index varies fastest, so one row of a window is a contiguous run of keys.
 - `entity.cell` and `transform.cell` are indexed and updated whenever a move crosses a cell boundary.
-- Near tier = the 5×5 window: 5 range queries per table (`sim::cell::window_rows(center, 2)`).
+- Near tier = the 5×5 window: one `cell = key` query per cell and table (`sim::cell::window_cells(center, 2)`). Range queries (`cell >= lo AND cell <= hi`) work too, but SpacetimeDB checks every range subscription against every change, which cost 7× the database time at 250 players (docs/spikes/throughput.md).
 
 ### Movement events (PLAN §4.2)
 - `move_event(seq, x, y, z, yaw, speed_cm_s, mode)`. The client sends one on start, stop, turn, jump and mode change, plus a heartbeat every 0.5 s while moving.

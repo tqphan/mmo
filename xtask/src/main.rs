@@ -15,7 +15,9 @@ cargo xtask <task> [options]
   publish [--prod] [--clear]
                        build and publish to the local server; --clear wipes the database
   generate             regenerate client bindings (Rust for loadbot, C# for the Godot client)
-  bot <scenario>       run a loadbot scenario against the local server
+  bot <scenario> [args]
+                       run a loadbot scenario against the local server; `bot help` lists them
+                       (`bot swarm --bots N --combat F --area M --secs S` is the throughput spike)
   check                test, then publish --clear and run every bot scenario (needs `server`)
 ";
 
@@ -34,7 +36,7 @@ fn main() -> ExitCode {
         Some("publish") => publish(flag("--prod"), flag("--clear")),
         Some("generate") => generate(),
         Some("bot") => match args.get(1) {
-            Some(s) => bot(s),
+            Some(s) => bot(s, &args[2..]),
             None => Err(format!("scenarios: {}", SCENARIOS.join(", "))),
         },
         Some("check") => check(),
@@ -141,12 +143,19 @@ fn generate() -> Task {
         .args(["--bin-path", WASM, "--yes"]))
 }
 
-fn bot(scenario: &str) -> Task {
-    run(cargo().args(["run", "--quiet", "-p", "loadbot", "--", scenario]))
+/// Extra arguments go to loadbot. The swarm runs a release build, so the bots' own overhead
+/// doesn't skew what it measures.
+fn bot(scenario: &str, extra: &[String]) -> Task {
+    let mut cmd = cargo();
+    cmd.args(["run", "--quiet", "-p", "loadbot"]);
+    if scenario == "swarm" {
+        cmd.arg("--release");
+    }
+    run(cmd.args(["--", scenario]).args(extra))
 }
 
 fn check() -> Task {
     test()?;
     publish(false, true)?;
-    SCENARIOS.iter().try_for_each(|s| bot(s))
+    SCENARIOS.iter().try_for_each(|s| bot(s, &[]))
 }

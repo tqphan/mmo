@@ -1,5 +1,7 @@
 //! The `world` SpacetimeDB module: the whole game world in one database (PLAN §4, §5).
 
+#[cfg(feature = "dev")]
+mod dev;
 mod movement;
 mod session;
 mod tick;

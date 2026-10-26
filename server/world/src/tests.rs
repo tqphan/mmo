@@ -366,3 +366,44 @@ fn dev_view_shows_the_tick_state() {
     let s = crate::tick::dev_tick(&t.view_context(auth(1))).unwrap();
     assert_eq!(s.ticks, 1);
 }
+
+#[cfg(feature = "dev")]
+#[test]
+fn dev_teleport_moves_and_restarts_the_move_clock() {
+    use crate::dev::dev_teleport;
+    let t = world();
+    let p = arrive(&t, 1, "Mira");
+    advance_ms(&t, 10_000);
+    call(&t, 1, |ctx| dev_teleport(ctx, 300.0, -200.0)).unwrap();
+    let tr = transform_of(&t, p.entity_id);
+    assert_eq!((tr.x, tr.z, tr.cell), (300.0, -200.0, sim::cell::cell_of(0, 300.0, -200.0)));
+    let e = read(&t, |ctx| ctx.db.entity().id().find(p.entity_id).unwrap());
+    assert_eq!(e.cell, tr.cell);
+    // The next legal step counts from the new place and time, not the 10 s gap.
+    advance_ms(&t, 500);
+    step(&t, 1, 1, 302.0, -200.0);
+    assert_eq!(presence_of(&t, 1).corrections, 0);
+    assert!(call(&t, 1, |ctx| dev_teleport(ctx, f32::NAN, 0.0)).is_err());
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn dev_swing_needs_a_target_in_range() {
+    use crate::dev::{combat_event, dev_swing};
+    let t = world();
+    let a = arrive(&t, 1, "Mira");
+    let b = arrive(&t, 2, "Tobin");
+    call(&t, 1, |ctx| dev_swing(ctx, b.entity_id)).unwrap();
+    assert!(call(&t, 1, |ctx| dev_swing(ctx, a.entity_id)).is_err(), "not yourself");
+    assert!(call(&t, 1, |ctx| dev_swing(ctx, 999)).is_err(), "no such target");
+    call(&t, 2, |ctx| crate::dev::dev_teleport(ctx, 30.0, 0.0)).unwrap();
+    assert!(call(&t, 1, |ctx| dev_swing(ctx, b.entity_id)).is_err(), "out of range");
+    // Event rows are only visible inside the transaction that inserts them.
+    let seen = call(&t, 2, |ctx| {
+        crate::dev::dev_teleport(ctx, 10.0, 0.0)?;
+        dev_swing(ctx, a.entity_id)?;
+        Ok(ctx.db.combat_event().count())
+    })
+    .unwrap();
+    assert_eq!(seen, 1);
+}

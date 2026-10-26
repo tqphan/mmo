@@ -28,6 +28,7 @@ namespace SpacetimeDB.Types
         public RemoteTables(DbConnection conn)
         {
             AddTable(CharacterPublic = new(conn));
+            AddTable(CombatEvent = new(conn));
             AddTable(DevTick = new(conn));
             AddTable(Entity = new(conn));
             AddTable(MyCharacters = new(conn));
@@ -530,6 +531,7 @@ namespace SpacetimeDB.Types
         internal static string[] AllTablesSqlQueries() => new string[]
         {
             new QueryBuilder().From.CharacterPublic().ToSql(),
+            new QueryBuilder().From.CombatEvent().ToSql(),
             new QueryBuilder().From.DevTick().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
@@ -542,6 +544,7 @@ namespace SpacetimeDB.Types
     public sealed class From
     {
         public global::SpacetimeDB.Table<CharacterPublic, CharacterPublicCols, CharacterPublicIxCols> CharacterPublic() => new("character_public", new CharacterPublicCols("character_public"), new CharacterPublicIxCols("character_public"));
+        public global::SpacetimeDB.Table<CombatEvent, CombatEventCols, CombatEventIxCols> CombatEvent() => new("combat_event", new CombatEventCols("combat_event"), new CombatEventIxCols("combat_event"));
         public global::SpacetimeDB.Table<TickState, DevTickCols, DevTickIxCols> DevTick() => new("dev_tick", new DevTickCols("dev_tick"), new DevTickIxCols("dev_tick"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
@@ -630,6 +633,8 @@ namespace SpacetimeDB.Types
             {
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
+                Reducer.DevSwing args => Reducers.InvokeDevSwing(eventContext, args),
+                Reducer.DevTeleport args => Reducers.InvokeDevTeleport(eventContext, args),
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),

@@ -190,7 +190,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
 
 - **Cells.** The map is split into 64 m cells, 250×250 in total. Each cell key packs the instance id, the cell's y index and its x index into one `u64`. Instance 0 is the open world. Dungeons, arenas, the prison and the courthouse each get their own instance id, so they're separated for free.
 - **Every public table with a world position has an indexed `cell` column.** Data that hangs off an entity goes inside a row that already has `cell` (for example, the buff list lives inside `status`), or is fetched with a join subscription if the pinned version supports it (verify in M0).
-- **Cell keys are laid out row by row.** Each row of a subscription window is then one indexed range query. Benchmark this against per-cell equality queries in M0.
+- **Subscribe cell by cell.** Use one `cell = key` query per cell and table, not a range per row. SpacetimeDB 2.13 prunes equality queries when it works out who receives a change, and shares identical queries between clients, but it checks every range query against every change. The M0 throughput spike measured 7× less database time this way (docs/spikes/throughput.md).
 - **Subscription tiers:**
 
   | Tier | Contents | Radius | Write rate |

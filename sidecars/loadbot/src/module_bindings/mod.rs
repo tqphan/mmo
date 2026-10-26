@@ -10,9 +10,13 @@ pub mod account_type;
 pub mod character_private_type;
 pub mod character_public_table;
 pub mod character_public_type;
+pub mod combat_event_table;
+pub mod combat_event_type;
 pub mod create_character_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_clock_type;
+pub mod dev_swing_reducer;
+pub mod dev_teleport_reducer;
 pub mod dev_tick_table;
 pub mod enter_world_reducer;
 pub mod entity_table;
@@ -32,9 +36,13 @@ pub use account_type::Account;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
+pub use combat_event_table::*;
+pub use combat_event_type::CombatEvent;
 pub use create_character_reducer::create_character;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_clock_type::DevClock;
+pub use dev_swing_reducer::dev_swing;
+pub use dev_teleport_reducer::dev_teleport;
 pub use dev_tick_table::*;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
@@ -64,6 +72,13 @@ pub enum Reducer {
     DevAdvanceClock {
         micros: i64,
     },
+    DevSwing {
+        target: u64,
+    },
+    DevTeleport {
+        x: f32,
+        z: f32,
+    },
     EnterWorld {
         char_id: u64,
     },
@@ -88,6 +103,8 @@ impl __sdk::Reducer for Reducer {
         match self {
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevSwing { .. } => "dev_swing",
+            Reducer::DevTeleport { .. } => "dev_teleport",
             Reducer::EnterWorld { .. } => "enter_world",
             Reducer::LeaveWorld => "leave_world",
             Reducer::MoveEvent { .. } => "move_event",
@@ -105,6 +122,17 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevAdvanceClock { micros } => {
                 __sats::bsatn::to_vec(&dev_advance_clock_reducer::DevAdvanceClockArgs {
                     micros: micros.clone(),
+                })
+            }
+            Reducer::DevSwing { target } => {
+                __sats::bsatn::to_vec(&dev_swing_reducer::DevSwingArgs {
+                    target: target.clone(),
+                })
+            }
+            Reducer::DevTeleport { x, z } => {
+                __sats::bsatn::to_vec(&dev_teleport_reducer::DevTeleportArgs {
+                    x: x.clone(),
+                    z: z.clone(),
                 })
             }
             Reducer::EnterWorld { char_id } => {
@@ -140,6 +168,7 @@ impl __sdk::Reducer for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     character_public: __sdk::TableUpdate<CharacterPublic>,
+    combat_event: __sdk::TableUpdate<CombatEvent>,
     dev_tick: __sdk::TableUpdate<TickState>,
     entity: __sdk::TableUpdate<Entity>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
@@ -156,6 +185,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "character_public" => db_update
                     .character_public
                     .append(character_public_table::parse_table_update(table_update)?),
+                "combat_event" => db_update
+                    .combat_event
+                    .append(combat_event_table::parse_table_update(table_update)?),
                 "dev_tick" => db_update
                     .dev_tick
                     .append(dev_tick_table::parse_table_update(table_update)?),
@@ -200,6 +232,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.character_public = cache
             .apply_diff_to_table::<CharacterPublic>("character_public", &self.character_public)
             .with_updates_by_pk(|row| &row.char_id);
+        diff.combat_event = self.combat_event.into_event_diff();
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
@@ -219,6 +252,9 @@ impl __sdk::DbUpdate for DbUpdate {
             match &table_rows.table[..] {
                 "character_public" => db_update
                     .character_public
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "combat_event" => db_update
+                    .combat_event
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "dev_tick" => db_update
                     .dev_tick
@@ -251,6 +287,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "character_public" => db_update
                     .character_public
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "combat_event" => db_update
+                    .combat_event
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "dev_tick" => db_update
                     .dev_tick
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -282,6 +321,7 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     character_public: __sdk::TableAppliedDiff<'r, CharacterPublic>,
+    combat_event: __sdk::TableAppliedDiff<'r, CombatEvent>,
     dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
@@ -303,6 +343,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CharacterPublic>(
             "character_public",
             &self.character_public,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<CombatEvent>(
+            "combat_event",
+            &self.combat_event,
             event,
         );
         callbacks.invoke_table_row_callbacks::<TickState>("dev_tick", &self.dev_tick, event);
@@ -975,6 +1020,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         character_public_table::register_table(client_cache);
+        combat_event_table::register_table(client_cache);
         dev_tick_table::register_table(client_cache);
         entity_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
@@ -983,6 +1029,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "character_public",
+        "combat_event",
         "dev_tick",
         "entity",
         "my_characters",

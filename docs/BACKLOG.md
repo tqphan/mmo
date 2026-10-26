@@ -4,12 +4,12 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 
 ## M0: Foundations and risk spikes
 
-1. **Spike 1: throughput** (PLAN §11)
-   Add `loadbot swarm --bots N --combat 0.3`: N bots, each with its own connection, sending movement events plus 2 Hz heartbeats, with a Near-tier subscription. Measure tick time (from `loadbot metrics`, ADR 0010), p99 reducer latency (call to row update), bytes per client per second, and server CPU and RSS per bot.
-   *Done when:* there's a go/no-go result written up in `docs/spikes/throughput.md`. If this laptop (14 GB RAM) can't host 500 bots plus the server, also run it on the Windows PC.
+1. **Spike 2: mass fight and send rates** (PLAN §11)
+   The throughput spike found crowds cost about 0.35 KB/s per visible player, so the 40 KB/s budget runs out at about 110 (docs/spikes/throughput.md). Try, in order: batching movement into `world_tick` (one message per tick), distance-based send rates, a smaller `transform` row, and a cap on how many players are shown at full rate.
+   *Done when:* `loadbot swarm --bots 150 --area 200` stays at 40 KB/s or less per client with reducer p99 at 100 ms or less, and the send-rate and level-of-detail policy is written into `docs/spikes/mass-fight.md` and PLAN §4.3.
 
 2. **Cell switching with hysteresis**
-   A subscription director in `loadbot` (later mirrored in C#): subscribe to the new window before dropping the old one, with a hysteresis margin of about 8 m.
+   A subscription director in `loadbot` (later mirrored in C#): subscribe to the new window before dropping the old one, with a hysteresis margin of about 8 m. The swarm already does subscribe-then-drop, without hysteresis; move it into a shared director.
    *Done when:* a `cross-cells` scenario walks 300 m through several cells with no gap in what it sees and no resubscribe flapping at a border.
 
 3. **`contentgen` v0**
@@ -33,9 +33,8 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
    *Done when:* the user has reviewed captures and decided flat low-poly vs hand-painted.
 
 8. **Spike 4: world scale** (needs 6): a 16 km Terrain3D map with water and streaming, within budget at mid-range settings.
-9. **Spike 2: mass fight** (needs 1): 150 bots in a 3×3-cell area. Output: a send-rate and level-of-detail policy.
-10. **World exporter v0** (needs 6): Godot plugin → heightmap and land-use raster → `terrain_chunk` upload.
-11. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, and check that `cargo xtask check` passes.
+9. **World exporter v0** (needs 6): Godot plugin → heightmap and land-use raster → `terrain_chunk` upload.
+10. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, and check that `cargo xtask check` passes.
 
 ## Research backlog
 - Original on-foot speeds (walk, run, swim, sprint) and the pack-carrying slowdown. Needed before M1 tuning (docs/design/movement.md §1).
@@ -47,3 +46,4 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 - 2026-10-25 **Test clock and loadbot skeleton**: `now(ctx)` with a dev offset and `dev_advance_clock`; the `loadbot see-each-other` scenario passes against a live server.
 - 2026-10-25 **World tick and server metrics**: 10 Hz `world_tick` with a measured, capped `dt`; timings from the host's `/v1/metrics` via `loadbot metrics` instead of a module table (ADR 0010); `tick` scenario.
 - 2026-10-25 **Client toolchain on the Linux machine**: .NET SDK 8.0.132 and 10.0.113 (pacman), Godot 4.7.2 .NET in `~/.local`; `cargo xtask generate` formats the C# bindings; a throwaway Godot project with `SpacetimeDB.ClientSDK.Godot` 2.13.0 built and connected headless.
+- 2026-10-25 **Spike 1: throughput**: `loadbot swarm`; go for 500 players spread out (DB 13% busy, reducer p99 2.7 ms, busiest client 9.2 KB/s), no-go for crowds above about 110 in view (bandwidth); Near tier now subscribed cell by cell, which cut database time 7× (docs/spikes/throughput.md).
