@@ -16,6 +16,7 @@ Status: v0.3, 2026-10-25. The research is in [RESEARCH.md](RESEARCH.md); referen
 | Art look | Placeholder geometry until the game systems are built; the look (flat or gradient low-poly, or hand-painted) is chosen then | User, 2026-10-25, amended 2026-10-26 (ADR 0004) |
 | Dev machines | Arch Linux laptop and Windows PC; tooling must be cross-platform (`cargo xtask`) | User, 2026-10-25 (ADR 0008) |
 | Commits | Claude commits and pushes to `main` after each finished task | User, 2026-10-25 (ADR 0005) |
+| M0 closed; M1 order | Labor, items, gathering, crafting, land, farming, trade packs, combat, NPCs, vehicles, crime, chat, the coast, then the playtest (BACKLOG) | Proposed by Claude, user said continue, 2026-10-26 |
 
 Decision records live in [adr/](adr/README.md).
 
@@ -835,7 +836,8 @@ Progress is tracked in [STATUS.md](STATUS.md) and [BACKLOG.md](BACKLOG.md) from 
   - The Linux laptop has the full server and client toolchain (STATUS).
   - On the Windows PC, the CLI upgrade, the wasm target and Godot are still to do.
 - **Git:** Claude commits and pushes freely (ADR 0005).
-- **M0 progress (2026-10-26):** every deliverable and all five spikes are done, and the client plays on the world's terrain, on ships, and through a reconnect. What's left is the check on the Windows PC (BACKLOG). STATUS has the details.
+- **M0 closed (2026-10-26):** every deliverable and all five spikes are done, and the client plays on the world's terrain, on ships, and through a reconnect. The check on the Windows PC carries over as its own task.
+- **M1 started (2026-10-26):** the tasks and their order are in BACKLOG, beginning with labor.
 
 ---
 

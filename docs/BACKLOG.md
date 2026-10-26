@@ -2,11 +2,26 @@
 
 In order. Each task should fit in one session and has acceptance criteria. Tasks marked **[needs OK]** wait for a user decision. Done tasks move to the bottom with their date.
 
-## M0: Foundations and risk spikes
+## Any time
+- **Verify on the Windows PC** (needs the user at that machine): upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, install Godot 4.7.2 .NET, and check that `cargo xtask check` passes and `cargo xtask client` runs. Also run the world test's routes there (docs/spikes/world-scale.md) for a second GPU's numbers. Carried over from M0; not part of M0's exit.
 
-1. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, install Godot 4.7.2 .NET, and check that `cargo xtask check` passes and `cargo xtask client` runs. Also run the world test's routes there (docs/spikes/world-scale.md) for a second GPU's numbers.
+## M1: "One Coast" (PLAN §11)
+Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<system>.md`). PLAN Q3 is still open; it can reorder later tasks, not these first ones.
 
-2. **Close M0 and plan M1** [needs OK]: check M0's exit (§13: every spike passed or has a mitigation), update PLAN, and break M1 "One Coast" into session-sized tasks here, starting with the specs it needs (labor, gathering, crafting). The user confirms the M1 order and answers PLAN Q3 first.
+1. **Labor**: account-wide pool, 10 points every 5 minutes online and offline, cap 5,000, computed from a timestamp (never ticked); rules in `content/labor.toml`; `sim::labor` ported to C# and checked against vectors; private table and `my_labor` view; HUD shows it counting up; a dev spend reducer; `labor` bot scenario with the test clock. Accept: module tests for regen, cap, remainder-keeping spends and refusals; the client shows the same value as the server.
+2. **Items and inventory**: item definitions in content; private `item` rows read through `my_inventory`; a bag with slots and stacks; move, split, merge and destroy; a minimal bag window. Accept: module tests for every operation and its refusals; a client moves and splits stacks.
+3. **Gathering**: resource nodes placed in the world (three kinds: plants, ore, trees), a timed gather costing labor, yields into the bag, nodes regrow from timestamps; client interaction and a progress bar. Accept: out-of-range, no-labor and already-taken gathers refused; a bot gathers through a node's cycle.
+4. **Crafting**: two workstations and about 20 recipes in content; a timed craft that costs labor and materials; a craft window. Accept: recipes checked by contentgen; crafts refused without materials, labor or a station in reach.
+5. **Land**: 8 × 8 garden and 16 × 16 farm deeds, placed only on housing land without overlaps; weekly tax, a demolition timer when it lapses, and a public marker; access settings. Accept: land-rush test (two placements, one wins), tax and demolition by test clock.
+6. **Farming**: six crops, two trees and one animal; growth from planting time and climate; harvest with labor; harvesting off your plot gives crime points (wired up in task 9). Accept: growth by test clock, no ticking.
+7. **Trade packs**: two pack recipes at a specialty bench; carried on the back with the slowdown and no gliding; three outposts, one across water; demand that falls with sales and recovers from timestamps; selling. Accept: a bot crafts, carries and sells a pack; the speed check enforces the slowdown.
+8. **Combat basics**: health and mana, targeting, `use_skill` with casts and impacts, death and respawn; three skillsets of about eight skills with two cross-skillset combos; levels 1–15. May split into two sessions.
+9. **NPCs**: about ten types, spawns near players, a simple brain, loot.
+10. **Vehicles**: a cart with pack slots, a rowboat, and the clipper built at a shipyard from a design and materials; packs loaded on ships.
+11. **Crime**: evidence (bloodstains, footprints), crime points from attacks, pack theft and crop theft, and witness reports.
+12. **Party and local chat.**
+13. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests.
+14. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
 
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.
@@ -37,3 +52,4 @@ Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without t
 - 2026-10-26 **Loadbot: unstick terrain walkers**: walker physics split from the connection (`Body`) so it can be unit-tested; a slide counts once per fall; a slide that gets under 1 m in 1.5 s tries two random headings, then respawns on walkable ground with `dev_teleport`; tests for a steep pit and a steep bank. A 30-minute, 16-walker run: 151 km, 17 slides, 0 respawns, no false corrections (docs/design/terrain.md).
 - 2026-10-26 **Client: reconnect**: the SDK's `WithAutomaticReconnect` (1–15 s backoff); on a drop the player stops and `Session` forgets its presence, and after recovery it enters again even with the old presence still cached; the director takes replayed applies as no-ops; `presence.connection_id`, so only the entering connection's disconnect despawns (ADR 0020). Killing and restarting the server under two clients: both re-entered and saw each other, with zero corrections (docs/design/client.md).
 - 2026-10-26 **Research: movement and ship numbers**: run 5.4 m/s and sprint 8 m/s (B), early swimming about 6.8 m/s (C), pack-carrying mounts (horse 1.8, donkey 4 m/s), clipper 11.1 m/s with one cannon and 7,000–9,000 HP, schooner 10 m/s and 42,000 HP, rowboat 4 m/s, and a clipper add-on cannon (48 m, 4 m splash, 700 damage, 88 m/s, 3 s); jump, fall damage, ship handling and the stock cannon not found. Recorded in RESEARCH §2A.4 and the three specs; content unchanged until M1 tuning.
+- 2026-10-26 **Close M0 and plan M1**: every spike passed (STATUS); the Windows check moved to "Any time"; M1 broken into the tasks above, in the order proposed to the user and taken as confirmed. PLAN Q3 still open.

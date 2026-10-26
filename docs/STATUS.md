@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (research: movement and ship numbers).
+**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-10-26 (M1 planned).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -69,9 +69,10 @@
 | Blender | none | none |
 
 ## Next
-1. Verify on the Windows PC (top of BACKLOG).
-2. **After pulling:** `presence` gained a column, so run `cargo xtask publish --clear` and then `cargo xtask world` once.
-3. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
+1. **M1 task 1, labor** (BACKLOG), then items, gathering and crafting.
+2. Verify on the Windows PC when you're at it (BACKLOG, "Any time").
+3. **After pulling:** `presence` gained a column, so run `cargo xtask publish --clear` and then `cargo xtask world` once.
+4. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
 
 ## Research
 Original movement and ship numbers were searched on 2026-10-26 (RESEARCH §2A.4). Our run speed and clipper speed match. Known differences, left for M1 tuning: our clipper has 12,000 HP and two cannons against the original's 7,000–9,000 and one, and our swim speed (3.5 m/s) is well under the early original's (about 6.8 m/s, later nerfed). Jump height, fall damage and ship handling remain unknown.
