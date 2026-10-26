@@ -157,6 +157,48 @@ namespace Mmo.Tests
             Assert.True(n >= 30 && none >= 1, $"{n} flights, {none} from the water");
         }
 
+        // Labor is integer arithmetic, so it must match exactly.
+
+        [Fact]
+        public void LaborSettles()
+        {
+            int n = 0, full = 0;
+            foreach (var v in Lines("labor"))
+            {
+                var pool = new LaborPool(int.Parse(v[1]), long.Parse(v[2]));
+                long now = long.Parse(v[3]);
+                Assert.Equal(new LaborPool(int.Parse(v[4]), long.Parse(v[5])), pool.Settle(GameContent.Labor, now));
+                var next = pool.NextRegenAt(GameContent.Labor, now);
+                Assert.Equal(v[6] == "none" ? null : long.Parse(v[6]), next);
+                full += next is null ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 60 && full >= 3, $"{n} vectors, {full} full");
+        }
+
+        [Fact]
+        public void LaborSpends()
+        {
+            int n = 0, short_ = 0;
+            foreach (var v in Lines("labor_spend"))
+            {
+                var pool = new LaborPool(int.Parse(v[1]), long.Parse(v[2]));
+                var got = pool.Spend(GameContent.Labor, long.Parse(v[3]), int.Parse(v[4]), out int have);
+                if (v[5] == "short")
+                {
+                    Assert.Null(got);
+                    Assert.Equal(int.Parse(v[6]), have);
+                    short_++;
+                }
+                else
+                {
+                    Assert.Equal(new LaborPool(int.Parse(v[5]), long.Parse(v[6])), got);
+                }
+                n++;
+            }
+            Assert.True(n >= 60 && short_ >= 10, $"{n} vectors, {short_} short");
+        }
+
         [Fact]
         public void YawFacingRoundTrips()
         {

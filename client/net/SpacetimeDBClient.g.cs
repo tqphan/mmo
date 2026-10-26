@@ -31,7 +31,9 @@ namespace SpacetimeDB.Types
             AddTable(CombatEvent = new(conn));
             AddTable(DevTick = new(conn));
             AddTable(Entity = new(conn));
+            AddTable(GameClock = new(conn));
             AddTable(MyCharacters = new(conn));
+            AddTable(MyLabor = new(conn));
             AddTable(MyPresence = new(conn));
             AddTable(TerrainInfo = new(conn));
             AddTable(Transform = new(conn));
@@ -536,7 +538,9 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.CombatEvent().ToSql(),
             new QueryBuilder().From.DevTick().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
+            new QueryBuilder().From.GameClock().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
+            new QueryBuilder().From.MyLabor().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
             new QueryBuilder().From.TerrainInfo().ToSql(),
             new QueryBuilder().From.Transform().ToSql(),
@@ -551,7 +555,9 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<CombatEvent, CombatEventCols, CombatEventIxCols> CombatEvent() => new("combat_event", new CombatEventCols("combat_event"), new CombatEventIxCols("combat_event"));
         public global::SpacetimeDB.Table<TickState, DevTickCols, DevTickIxCols> DevTick() => new("dev_tick", new DevTickCols("dev_tick"), new DevTickIxCols("dev_tick"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
+        public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
+        public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
         public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
         public global::SpacetimeDB.Table<Transform, TransformCols, TransformIxCols> Transform() => new("transform", new TransformCols("transform"), new TransformIxCols("transform"));
@@ -643,7 +649,9 @@ namespace SpacetimeDB.Types
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
                 Reducer.DevRemoveShip args => Reducers.InvokeDevRemoveShip(eventContext, args),
                 Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
+                Reducer.DevSetLabor args => Reducers.InvokeDevSetLabor(eventContext, args),
                 Reducer.DevSpawnShip args => Reducers.InvokeDevSpawnShip(eventContext, args),
+                Reducer.DevSpendLabor args => Reducers.InvokeDevSpendLabor(eventContext, args),
                 Reducer.DevSwing args => Reducers.InvokeDevSwing(eventContext, args),
                 Reducer.DevTeleport args => Reducers.InvokeDevTeleport(eventContext, args),
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),

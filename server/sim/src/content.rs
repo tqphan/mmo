@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x9a1205fde59b4b39;
+pub const CONTENT_HASH: u64 = 0xdb0daaaa592d3e4e;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -204,3 +204,18 @@ impl Climate {
         CLIMATE_IDS[self as usize]
     }
 }
+
+/// Labor rules (`content/labor.toml`, docs/design/labor.md).
+#[derive(Debug, PartialEq)]
+pub struct LaborRules {
+    /// The most a pool holds by regenerating.
+    pub cap: i32,
+    /// Points added at the end of each period.
+    pub regen_points: i32,
+    /// The regeneration period, s.
+    pub regen_period_s: i32,
+    /// What a new account starts with.
+    pub start_points: i32,
+}
+
+pub static LABOR: LaborRules = LaborRules { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 };

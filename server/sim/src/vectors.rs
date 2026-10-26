@@ -49,7 +49,9 @@ pub fn generate() -> String {
          # ship_pose <x> <y> <z> <yaw> <local x> <y> <z> <world x> <y> <z>\n\
          # ship_step <hull> <x> <z> <yaw> <speed> <throttle> <rudder> <dt> <x> <z> <yaw> <speed>\n\
          # ship_sail <hull> <throttle> <rudder> <10 Hz steps from rest at the origin> <x> <z> <yaw> <speed>\n\
-         # cannon_flight <x> <y> <z> <yaw> <pitch> <speed> <secs> <landing x> <landing z>, or none\n",
+         # cannon_flight <x> <y> <z> <yaw> <pitch> <speed> <secs> <landing x> <landing z>, or none\n\
+         # labor <points> <at> <now> <settled points> <settled at> <next regen at, or none>, with the content rules\n\
+         # labor_spend <points> <at> <now> <cost> <points> <at>, or short <have>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -141,7 +143,48 @@ pub fn generate() -> String {
     let total = terrain::terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())));
     out.push_str(&format!("terrain_hash {total}\n"));
     ships(&mut out, &mut rng);
+    labor(&mut out, &mut rng);
     out
+}
+
+/// `sim::labor` with the content rules, for the client's port.
+fn labor(out: &mut String, rng: &mut Lcg) {
+    use crate::labor::{LABOR, Pool};
+    let period = i64::from(LABOR.regen_period_s) * 1_000_000;
+    let t0: i64 = 1_800_000_000_000_000;
+    let cap = LABOR.cap;
+    let mut pools = vec![
+        (Pool { points: 0, at: t0 }, t0),
+        (Pool { points: cap, at: t0 }, t0 + 5),
+        (Pool { points: cap - 5, at: t0 }, t0 + period),
+        (Pool { points: 100, at: t0 }, t0 + period - 1),
+        (Pool { points: 100, at: t0 }, t0 - period),
+        (Pool { points: 0, at: t0 }, i64::MAX),
+        (Pool { points: cap + 100, at: t0 }, t0 + 3 * period),
+    ];
+    for _ in 0..60 {
+        let points = (rng.next() * (cap + 1) as f32) as i32;
+        let elapsed = (rng.next() as f64 * 40.0 * period as f64) as i64;
+        pools.push((Pool { points, at: t0 }, t0 + elapsed));
+    }
+    for (p, now) in &pools {
+        let s = p.settle(&LABOR, *now);
+        let next = p.next_regen_at(&LABOR, *now).map_or("none".to_string(), |n| n.to_string());
+        out.push_str(&format!("labor {} {} {now} {} {} {next}\n", p.points, p.at, s.points, s.at));
+    }
+    for (k, (p, now)) in pools.iter().enumerate() {
+        let cost = match k % 4 {
+            0 => 1,
+            1 => p.current(&LABOR, *now) + 1,
+            2 => 0,
+            _ => (rng.next() * 300.0) as i32 + 1,
+        };
+        let line = format!("labor_spend {} {} {now} {cost}", p.points, p.at);
+        match p.spend(&LABOR, *now, cost) {
+            Ok(n) => out.push_str(&format!("{line} {} {}\n", n.points, n.at)),
+            Err(e) => out.push_str(&format!("{line} short {}\n", e.have)),
+        }
+    }
 }
 
 /// `sim::ship`'s frames, step and cannon flight, for the client's port.

@@ -1,15 +1,16 @@
 //! All game time goes through `now(ctx)` (CLAUDE.md). Dev builds add a test-clock offset that
-//! an admin reducer can push forward; production builds compile the offset out.
+//! a dev reducer can push forward; production builds compile the offset out.
 
 use spacetimedb::{ReducerContext, Timestamp};
 
 #[cfg(feature = "dev")]
 use spacetimedb::{Table, TimeDuration};
 
-/// Single-row, private: how far the dev clock runs ahead of real time.
-#[cfg(feature = "dev")]
-#[spacetimedb::table(accessor = dev_clock)]
-pub struct DevClock {
+/// Single row, public: how far game time runs ahead of real time, so clients can compute values
+/// that come from timestamps, such as labor (docs/design/labor.md). It exists in every build, but
+/// only dev builds ever write it; with no row, the offset is 0.
+#[spacetimedb::table(accessor = game_clock, public)]
+pub struct GameClock {
     #[primary_key]
     pub id: u8,
     pub offset_micros: i64,
@@ -17,7 +18,7 @@ pub struct DevClock {
 
 #[cfg(feature = "dev")]
 pub fn now(ctx: &ReducerContext) -> Timestamp {
-    let offset = ctx.db.dev_clock().id().find(0).map_or(0, |c| c.offset_micros);
+    let offset = ctx.db.game_clock().id().find(0).map_or(0, |c| c.offset_micros);
     ctx.timestamp + TimeDuration::from_micros(offset)
 }
 
@@ -34,10 +35,10 @@ pub fn dev_advance_clock(ctx: &ReducerContext, micros: i64) -> Result<(), String
     if micros < 0 {
         return Err("the dev clock only moves forward".into());
     }
-    let offset = ctx.db.dev_clock().id().find(0).map_or(0, |c| c.offset_micros);
+    let offset = ctx.db.game_clock().id().find(0).map_or(0, |c| c.offset_micros);
     let offset_micros = offset.checked_add(micros).ok_or("dev clock offset overflow")?;
-    ctx.db.dev_clock().id().delete(0);
-    ctx.db.dev_clock().insert(DevClock { id: 0, offset_micros });
+    ctx.db.game_clock().id().delete(0);
+    ctx.db.game_clock().insert(GameClock { id: 0, offset_micros });
     log::info!("dev clock now {offset_micros} µs ahead");
     Ok(())
 }

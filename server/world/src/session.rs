@@ -159,6 +159,7 @@ pub fn on_connect(ctx: &ReducerContext) {
     if ctx.db.account().identity().find(ctx.sender()).is_none() {
         ctx.db.account().insert(Account { identity: ctx.sender(), created_at: now(ctx), gm_level: 0 });
     }
+    crate::labor::open(ctx, ctx.sender());
 }
 
 /// Called by `init`: the publisher becomes the owner.

@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 3";
+const FORMAT: &str = "contentgen 4";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -26,6 +26,7 @@ pub struct Sources {
     pub movement: String,
     pub ships: String,
     pub land: String,
+    pub labor: String,
 }
 
 impl Sources {
@@ -33,7 +34,12 @@ impl Sources {
         let read = |name: &str| {
             std::fs::read_to_string(dir.join(name)).map_err(|e| vec![format!("{name}: {e}")])
         };
-        Ok(Self { movement: read("movement.toml")?, ships: read("ships.toml")?, land: read("land.toml")? })
+        Ok(Self {
+            movement: read("movement.toml")?,
+            ships: read("ships.toml")?,
+            land: read("land.toml")?,
+            labor: read("labor.toml")?,
+        })
     }
 }
 
@@ -122,6 +128,16 @@ pub struct ClimateDef {
     pub wire: u8,
 }
 
+/// `labor.toml`: the labor pool's rules (docs/design/labor.md).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LaborDef {
+    pub cap: i32,
+    pub regen_points: i32,
+    pub regen_period_s: i32,
+    pub start_points: i32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -132,6 +148,7 @@ pub struct Content {
     /// Sorted by `wire`, like the modes.
     pub land_uses: Vec<LandUseDef>,
     pub climates: Vec<ClimateDef>,
+    pub labor: LaborDef,
     pub hash: u64,
 }
 
@@ -141,9 +158,12 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let movement: Result<MovementFile, _> = from_toml("movement.toml", &src.movement);
     let ships: Result<ShipsFile, _> = from_toml("ships.toml", &src.ships);
     let land: Result<LandFile, _> = from_toml("land.toml", &src.land);
-    let (mut modes, mut hulls, mut land) = match (movement, ships, land) {
-        (Ok(m), Ok(s), Ok(l)) => (m.mode, s.hull, l),
-        (m, s, l) => return Err(m.err().into_iter().chain(s.err()).chain(l.err()).flatten().collect()),
+    let labor: Result<LaborDef, _> = from_toml("labor.toml", &src.labor);
+    let (mut modes, mut hulls, mut land, labor) = match (movement, ships, land, labor) {
+        (Ok(m), Ok(s), Ok(l), Ok(b)) => (m.mode, s.hull, l, b),
+        (m, s, l, b) => {
+            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).flatten().collect());
+        }
     };
     modes.sort_by_key(|m| m.wire);
     hulls.sort_by_key(|h| h.wire);
@@ -152,10 +172,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &mut errors);
+    check_labor(&labor, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, hash: 0 };
+    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, hash: 0 };
     c.hash = hash(&canonical(&c));
     Ok(c)
 }
@@ -262,6 +283,22 @@ fn check_land(land: &LandFile, errors: &mut Vec<String>) {
     }
 }
 
+fn check_labor(l: &LaborDef, errors: &mut Vec<String>) {
+    let at = "labor.toml";
+    if !(1..=1_000_000).contains(&l.cap) {
+        errors.push(format!("{at}: cap must be from 1 to 1000000"));
+    }
+    if !(1..=l.cap.max(1)).contains(&l.regen_points) {
+        errors.push(format!("{at}: regen_points must be from 1 to the cap"));
+    }
+    if !(1..=86_400).contains(&l.regen_period_s) {
+        errors.push(format!("{at}: regen_period_s must be from 1 to 86400"));
+    }
+    if !(0..=l.cap).contains(&l.start_points) {
+        errors.push(format!("{at}: start_points must be from 0 to the cap"));
+    }
+}
+
 fn is_id(s: &str) -> bool {
     let mut chars = s.chars();
     chars.next().is_some_and(|c| c.is_ascii_lowercase())
@@ -294,6 +331,11 @@ fn canonical(c: &Content) -> String {
     for cl in &c.climates {
         writeln!(s, "climate\t{}\t{}", cl.id, cl.wire).unwrap();
     }
+    s += "labor";
+    for f in labor_fields(&c.labor) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
     s
 }
 
@@ -391,6 +433,17 @@ fn mount_fields(m: &MountDef) -> Vec<Field> {
         f("x", "Ship-local x, m.", F32(m.x)),
         f("z", "Ship-local z, m.", F32(m.z)),
         f("facing_deg", "Yaw on deck: 0 the bow, 90 port, -90 starboard.", F32(m.facing_deg)),
+    ]
+}
+
+fn labor_fields(l: &LaborDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    vec![
+        f("cap", "The most a pool holds by regenerating.", I32(l.cap)),
+        f("regen_points", "Points added at the end of each period.", I32(l.regen_points)),
+        f("regen_period_s", "The regeneration period, s.", I32(l.regen_period_s)),
+        f("start_points", "What a new account starts with.", I32(l.start_points)),
     ]
 }
 
@@ -543,7 +596,13 @@ pub fn render_rust(c: &Content) -> String {
         writeln!(s, "            {} => Some(Self::{}),", cl.wire, pascal(&cl.id)).unwrap();
     }
     s += "            _ => None,\n        }\n    }\n\n";
-    s += "    pub fn id(self) -> &'static str {\n        CLIMATE_IDS[self as usize]\n    }\n}\n";
+    s += "    pub fn id(self) -> &'static str {\n        CLIMATE_IDS[self as usize]\n    }\n}\n\n";
+
+    let labor = labor_fields(&c.labor);
+    s += "/// Labor rules (`content/labor.toml`, docs/design/labor.md).\n#[derive(Debug, PartialEq)]\npub struct LaborRules {\n";
+    rust_struct_fields(&mut s, &labor);
+    s += "}\n\n";
+    writeln!(s, "pub static LABOR: LaborRules = LaborRules {{ {} }};", rust_values(&labor)).unwrap();
     s
 }
 
@@ -590,6 +649,10 @@ pub fn render_csharp(c: &Content) -> String {
         writeln!(s, "        {} = {},", pascal(&cl.id), cl.wire).unwrap();
     }
     s += "    }\n\n";
+    let labor = labor_fields(&c.labor);
+    s += "    /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>\n";
+    csharp_param_docs(&mut s, &labor);
+    writeln!(s, "    public sealed record LaborRules({});\n", csharp_params(&labor)).unwrap();
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -634,7 +697,9 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        public static readonly IReadOnlyList<string> ClimateIds = new[] { ";
     s += &c.climates.iter().map(|cl| format!("{:?}", cl.id)).collect::<Vec<_>>().join(", ");
     s += " };\n\n";
-    s += "        public static string Id(this Climate climate) => ClimateIds[(int)climate];\n    }\n}\n";
+    s += "        public static string Id(this Climate climate) => ClimateIds[(int)climate];\n\n";
+    writeln!(s, "        public static readonly LaborRules Labor = new({});", csharp_values(&labor)).unwrap();
+    s += "    }\n}\n";
     s
 }
 
@@ -716,16 +781,31 @@ mod tests {
         wire = 1
     "#;
 
+    const LABOR: &str = r#"
+        cap = 5000
+        regen_points = 10
+        regen_period_s = 300
+        start_points = 5000
+    "#;
+
+    fn sources() -> Sources {
+        Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: LAND.into(), labor: LABOR.into() }
+    }
+
     fn parse_movement(movement: &str) -> Result<Content, Vec<String>> {
-        parse(&Sources { movement: movement.into(), ships: SHIPS.into(), land: LAND.into() })
+        parse(&Sources { movement: movement.into(), ..sources() })
     }
 
     fn parse_ships(ships: &str) -> Result<Content, Vec<String>> {
-        parse(&Sources { movement: MOVEMENT.into(), ships: ships.into(), land: LAND.into() })
+        parse(&Sources { ships: ships.into(), ..sources() })
     }
 
     fn parse_land(land: &str) -> Result<Content, Vec<String>> {
-        parse(&Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: land.into() })
+        parse(&Sources { land: land.into(), ..sources() })
+    }
+
+    fn parse_labor(labor: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { labor: labor.into(), ..sources() })
     }
 
     fn ship_errors(ships: &str) -> String {
@@ -854,10 +934,11 @@ mod tests {
 
     #[test]
     fn errors_in_both_files_are_reported() {
-        let e = parse(&Sources { movement: "[[mode]\n".into(), ships: "[[hull]\n".into(), land: "[[x]\n".into() })
-            .unwrap_err()
-            .join("\n");
-        assert!(e.contains("movement.toml") && e.contains("ships.toml") && e.contains("land.toml"), "{e}");
+        let bad = Sources { movement: "[[mode]\n".into(), ships: "[[hull]\n".into(), land: "[[x]\n".into(), labor: "cap =\n".into() };
+        let e = parse(&bad).unwrap_err().join("\n");
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml"] {
+            assert!(e.contains(file), "{file} missing from:\n{e}");
+        }
     }
 
     #[test]
@@ -913,6 +994,37 @@ mod tests {
         let many_climates: String = (0..9).map(|i| format!("[[climate]]\nid = \"c{i}\"\nwire = {i}\n")).collect();
         let one_use = "[[land_use]]\nid = \"wild\"\nwire = 0\nbuildable = false\n";
         assert!(e(&format!("{one_use}{many_climates}")).contains("at most 8 climates"));
+    }
+
+    #[test]
+    fn labor_rules_reach_both_outputs() {
+        let c = parse_labor(LABOR).unwrap();
+        assert_eq!(c.labor, LaborDef { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 });
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("pub static LABOR: LaborRules = LaborRules { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 };"), "{rs}");
+        assert!(cs.contains("public static readonly LaborRules Labor = new(5000, 10, 300, 5000);"), "{cs}");
+    }
+
+    #[test]
+    fn any_labor_change_changes_the_hash() {
+        let a = parse_labor(LABOR).unwrap().hash;
+        for (from, to) in [("cap = 5000", "cap = 5001"), ("= 10", "= 11"), ("= 300", "= 301"), ("start_points = 5000", "start_points = 0")] {
+            let changed = LABOR.replace(from, to);
+            assert_ne!(parse_labor(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_labor_rules_are_reported_together() {
+        let e = parse_labor(&LABOR.replace("regen_points = 10", "regen_points = 6000").replace("start_points = 5000", "start_points = 5001").replace("= 300", "= 0"))
+            .unwrap_err()
+            .join("\n");
+        for want in ["regen_points must be", "start_points must be", "regen_period_s must be"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(parse_labor(&LABOR.replace("cap = 5000", "cap = 0")).unwrap_err().join("\n").contains("cap must be"));
+        assert!(parse_labor(&format!("{LABOR}\nbonus = 1")).unwrap_err().join("\n").contains("unknown field `bonus`"));
+        assert!(parse_labor("cap = 5000").unwrap_err().join("\n").contains("missing field"));
     }
 
     #[test]

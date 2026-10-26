@@ -6,47 +6,47 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct DevClock {
+pub struct GameClock {
     pub id: u8,
     pub offset_micros: i64,
 }
 
-impl __sdk::InModule for DevClock {
+impl __sdk::InModule for GameClock {
     type Module = super::RemoteModule;
 }
 
-/// Column accessor struct for the table `DevClock`.
+/// Column accessor struct for the table `GameClock`.
 ///
 /// Provides typed access to columns for query building.
-pub struct DevClockCols {
-    pub id: __sdk::__query_builder::Col<DevClock, u8>,
-    pub offset_micros: __sdk::__query_builder::Col<DevClock, i64>,
+pub struct GameClockCols {
+    pub id: __sdk::__query_builder::Col<GameClock, u8>,
+    pub offset_micros: __sdk::__query_builder::Col<GameClock, i64>,
 }
 
-impl __sdk::__query_builder::HasCols for DevClock {
-    type Cols = DevClockCols;
+impl __sdk::__query_builder::HasCols for GameClock {
+    type Cols = GameClockCols;
     fn cols(table_name: &'static str) -> Self::Cols {
-        DevClockCols {
+        GameClockCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             offset_micros: __sdk::__query_builder::Col::new(table_name, "offset_micros"),
         }
     }
 }
 
-/// Indexed column accessor struct for the table `DevClock`.
+/// Indexed column accessor struct for the table `GameClock`.
 ///
 /// Provides typed access to indexed columns for query building.
-pub struct DevClockIxCols {
-    pub id: __sdk::__query_builder::IxCol<DevClock, u8>,
+pub struct GameClockIxCols {
+    pub id: __sdk::__query_builder::IxCol<GameClock, u8>,
 }
 
-impl __sdk::__query_builder::HasIxCols for DevClock {
-    type IxCols = DevClockIxCols;
+impl __sdk::__query_builder::HasIxCols for GameClock {
+    type IxCols = GameClockIxCols;
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
-        DevClockIxCols {
+        GameClockIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
         }
     }
 }
 
-impl __sdk::__query_builder::CanBeLookupTable for DevClock {}
+impl __sdk::__query_builder::CanBeLookupTable for GameClock {}

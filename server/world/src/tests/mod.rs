@@ -7,6 +7,7 @@ use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
 use sim::content::CONTENT_HASH;
 
+mod labor;
 #[cfg(feature = "dev")]
 mod ships;
 
@@ -346,6 +347,9 @@ fn dev_clock_moves_game_time_forward_only() {
     let after = read(&t, now);
     assert_eq!(after.to_micros_since_unix_epoch() - before.to_micros_since_unix_epoch(), 3_600_000_000);
     assert!(call(&t, 1, |ctx| dev_advance_clock(ctx, -1)).is_err());
+    // Clients read the offset to compute values from timestamps (docs/design/labor.md).
+    use crate::time::game_clock;
+    assert_eq!(read(&t, |ctx| ctx.db.game_clock().id().find(0).unwrap().offset_micros), 3_600_000_000);
 }
 
 fn tick(t: &TestContext) -> crate::tick::TickState {

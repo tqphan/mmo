@@ -40,6 +40,16 @@ namespace Mmo.Net
         public SubscriptionDirector? Near { get; private set; }
         public int Reconnects { get; private set; }
 
+        /// <summary>
+        /// Game time in µs since the Unix epoch: our clock plus the dev test clock's offset from
+        /// <c>game_clock</c>, which production servers never set (docs/design/labor.md).
+        /// </summary>
+        public long GameNowMicros => (DateTime.UtcNow - DateTime.UnixEpoch).Ticks / 10 + (Conn?.Db.GameClock.Id.Find(0)?.OffsetMicros ?? 0);
+
+        /// <summary>Our account's labor pool as stored; settle it at <see cref="GameNowMicros"/> to show it.</summary>
+        public Sim.LaborPool? Labor =>
+            Conn?.Db.MyLabor.Iter().FirstOrDefault() is { } l ? new Sim.LaborPool(l.Points, l.At.MicrosecondsSinceUnixEpoch) : null;
+
         /// <summary>We're in the world: snap to this presence.</summary>
         public event Action<Presence>? Entered;
 
@@ -75,6 +85,12 @@ namespace Mmo.Net
                 Me = null;
                 SetStatus("left the world");
             }
+            // Dev builds: spend labor as work would, until there is work (docs/design/labor.md).
+            if (Me is not null && Input.IsActionJustPressed("dev_spend_labor"))
+            {
+                Conn.Reducers.DevSpendLabor(100);
+                Log("F8: spent 100 labor");
+            }
         }
 
         public override void _ExitTree()
@@ -104,7 +120,11 @@ namespace Mmo.Net
             conn.SubscriptionBuilder()
                 .OnApplied(_ => EnterWorld())
                 .OnError((_, e) => SetStatus($"subscription failed: {e.Message}", error: true))
-                .Subscribe(new[] { "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public" });
+                .Subscribe(new[]
+                {
+                    "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public",
+                    "SELECT * FROM my_labor", "SELECT * FROM game_clock",
+                });
         }
 
         /// <summary>
@@ -174,6 +194,11 @@ namespace Mmo.Net
             Log($"entered as {name}, entity {p.EntityId}, at ({p.X:F1}, {p.Y:F1}, {p.Z:F1})");
             Near ??= new SubscriptionDirector(new SdkCellChannel(Conn), NearTables, NearRadius);
             Near.Update(p.X, p.Z);
+            if (options.Labor is int labor)
+            {
+                Conn.Reducers.DevSetLabor(labor);
+                Log($"--labor: set the pool to {labor}");
+            }
             Entered?.Invoke(p);
         }
 

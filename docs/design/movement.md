@@ -47,7 +47,7 @@ The run speed matches the original. Walk and swim are placeholders: walk is unkn
 - Unknown mode → `Err`. NaN or infinite position → treated as a rejected move.
 
 ### Time
-- Every reducer reads game time through `time::now(ctx)`. In `dev` builds it adds the offset from the private `dev_clock` row, which `dev_advance_clock(micros)` moves forward only. Production builds compile all of this out.
+- Every reducer reads game time through `time::now(ctx)`. In `dev` builds it adds the offset from the public `game_clock` row, which `dev_advance_clock(micros)` moves forward only and clients read to compute timestamp-based values (docs/design/labor.md). Production builds never write that row, and their `now` ignores it.
 
 ## 3. Deviations and not yet done
 - **No obstacle checks yet.** Vertical checks against the heightmap came with spike 5 (docs/design/terrain.md); walls and buildings come with world-building tooling and housing.

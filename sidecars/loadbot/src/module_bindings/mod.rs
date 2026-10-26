@@ -17,10 +17,11 @@ pub mod combat_event_table;
 pub mod combat_event_type;
 pub mod create_character_reducer;
 pub mod dev_advance_clock_reducer;
-pub mod dev_clock_type;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
+pub mod dev_set_labor_reducer;
 pub mod dev_spawn_ship_reducer;
+pub mod dev_spend_labor_reducer;
 pub mod dev_swing_reducer;
 pub mod dev_teleport_reducer;
 pub mod dev_tick_table;
@@ -28,12 +29,16 @@ pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
 pub mod fire_reducer;
+pub mod game_clock_table;
+pub mod game_clock_type;
 pub mod helm_reducer;
+pub mod labor_type;
 pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
 pub mod move_event_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
+pub mod my_labor_table;
 pub mod my_presence_table;
 pub mod owner_type;
 pub mod presence_type;
@@ -61,10 +66,11 @@ pub use combat_event_table::*;
 pub use combat_event_type::CombatEvent;
 pub use create_character_reducer::create_character;
 pub use dev_advance_clock_reducer::dev_advance_clock;
-pub use dev_clock_type::DevClock;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
+pub use dev_set_labor_reducer::dev_set_labor;
 pub use dev_spawn_ship_reducer::dev_spawn_ship;
+pub use dev_spend_labor_reducer::dev_spend_labor;
 pub use dev_swing_reducer::dev_swing;
 pub use dev_teleport_reducer::dev_teleport;
 pub use dev_tick_table::*;
@@ -72,12 +78,16 @@ pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
 pub use fire_reducer::fire;
+pub use game_clock_table::*;
+pub use game_clock_type::GameClock;
 pub use helm_reducer::helm;
+pub use labor_type::Labor;
 pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
 pub use move_event_reducer::move_event;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
+pub use my_labor_table::*;
 pub use my_presence_table::*;
 pub use owner_type::Owner;
 pub use presence_type::Presence;
@@ -118,11 +128,17 @@ pub enum Reducer {
     DevSetGm {
         level: u8,
     },
+    DevSetLabor {
+        points: i32,
+    },
     DevSpawnShip {
         hull: u8,
         x: f32,
         z: f32,
         yaw: f32,
+    },
+    DevSpendLabor {
+        cost: i32,
     },
     DevSwing {
         target: u64,
@@ -173,7 +189,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
+            Reducer::DevSetLabor { .. } => "dev_set_labor",
             Reducer::DevSpawnShip { .. } => "dev_spawn_ship",
+            Reducer::DevSpendLabor { .. } => "dev_spend_labor",
             Reducer::DevSwing { .. } => "dev_swing",
             Reducer::DevTeleport { .. } => "dev_teleport",
             Reducer::EnterWorld { .. } => "enter_world",
@@ -217,12 +235,22 @@ impl __sdk::Reducer for Reducer {
                     level: level.clone(),
                 })
             }
+            Reducer::DevSetLabor { points } => {
+                __sats::bsatn::to_vec(&dev_set_labor_reducer::DevSetLaborArgs {
+                    points: points.clone(),
+                })
+            }
             Reducer::DevSpawnShip { hull, x, z, yaw } => {
                 __sats::bsatn::to_vec(&dev_spawn_ship_reducer::DevSpawnShipArgs {
                     hull: hull.clone(),
                     x: x.clone(),
                     z: z.clone(),
                     yaw: yaw.clone(),
+                })
+            }
+            Reducer::DevSpendLabor { cost } => {
+                __sats::bsatn::to_vec(&dev_spend_labor_reducer::DevSpendLaborArgs {
+                    cost: cost.clone(),
                 })
             }
             Reducer::DevSwing { target } => {
@@ -289,7 +317,9 @@ pub struct DbUpdate {
     combat_event: __sdk::TableUpdate<CombatEvent>,
     dev_tick: __sdk::TableUpdate<TickState>,
     entity: __sdk::TableUpdate<Entity>,
+    game_clock: __sdk::TableUpdate<GameClock>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
+    my_labor: __sdk::TableUpdate<Labor>,
     my_presence: __sdk::TableUpdate<Presence>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
     transform: __sdk::TableUpdate<Transform>,
@@ -314,9 +344,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(entity_table::parse_table_update(table_update)?),
+                "game_clock" => db_update
+                    .game_clock
+                    .append(game_clock_table::parse_table_update(table_update)?),
                 "my_characters" => db_update
                     .my_characters
                     .append(my_characters_table::parse_table_update(table_update)?),
+                "my_labor" => db_update
+                    .my_labor
+                    .append(my_labor_table::parse_table_update(table_update)?),
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
@@ -362,6 +398,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
+        diff.game_clock = cache
+            .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
+            .with_updates_by_pk(|row| &row.id);
         diff.terrain_info = cache
             .apply_diff_to_table::<TerrainInfo>("terrain_info", &self.terrain_info)
             .with_updates_by_pk(|row| &row.id);
@@ -374,6 +413,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
+        diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
 
         diff
@@ -394,8 +434,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "game_clock" => db_update
+                    .game_clock
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_labor" => db_update
+                    .my_labor
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
@@ -434,8 +480,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "game_clock" => db_update
+                    .game_clock
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_labor" => db_update
+                    .my_labor
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
@@ -468,7 +520,9 @@ pub struct AppliedDiff<'r> {
     combat_event: __sdk::TableAppliedDiff<'r, CombatEvent>,
     dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
+    game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
+    my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
@@ -498,11 +552,13 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<TickState>("dev_tick", &self.dev_tick, event);
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
+        callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
             "my_characters",
             &self.my_characters,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
             "terrain_info",
@@ -1175,7 +1231,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         combat_event_table::register_table(client_cache);
         dev_tick_table::register_table(client_cache);
         entity_table::register_table(client_cache);
+        game_clock_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
+        my_labor_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
         transform_table::register_table(client_cache);
@@ -1186,7 +1244,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "combat_event",
         "dev_tick",
         "entity",
+        "game_clock",
         "my_characters",
+        "my_labor",
         "my_presence",
         "terrain_info",
         "transform",

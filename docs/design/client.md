@@ -70,6 +70,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--autopilot helm:X,Z,R` | Board the ship nearest (X, Z), take the helm, wait 20 s for the crew, sail at full throttle, and put the rudder to R% 15 s later |
 | `--autopilot gun:X,Z,M` | Board the ship nearest (X, Z), man cannon mount M and fire whenever it's loaded |
 | `--spawn-ship X,Z,YAW` | Dev builds: once within 60 m of (X, Z), replace any ship within 30 m of it with a fresh clipper facing YAW degrees |
+| `--labor N` | Dev builds: on entering, set the account's labor pool to N (docs/design/labor.md) |
 | `--walk` | Walk mode |
 | `--world DIR` | The world's files (default `world`), or a bare `.mmoh` height file |
 | `--secs S` | Quit after S seconds |
@@ -78,7 +79,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
 | `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |
 
-Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump, F to climb aboard or use the helm or a cannon (docs/design/ships.md). Dev builds: F9 spawns a clipper 30 m ahead, F10 removes the nearest ship.
+Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump, F to climb aboard or use the helm or a cannon (docs/design/ships.md). Dev builds: F9 spawns a clipper 30 m ahead, F10 removes the nearest ship, F8 spends 100 labor. The HUD shows the account's labor, computed every frame from `my_labor` and the public `game_clock` (docs/design/labor.md).
 
 ### Captures
 `cargo xtask capture <name> <frames> [client args]` runs Godot's Movie Maker at 30 fps and writes PNGs to `target/captures/<name>/`. Movie Maker renders as fast as it can, but the server checks moves against its own clock, so in movie mode the client holds each frame back to real time. Encoding can still make it slower than real time (about 70% with two windows and a bot on the laptop). Our own movement then looks slower in the video and other players faster, but nothing is corrected.

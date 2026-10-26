@@ -11,14 +11,14 @@ namespace SpacetimeDB.Types
 {
     [SpacetimeDB.Type]
     [DataContract]
-    public sealed partial class DevClock
+    public sealed partial class GameClock
     {
         [DataMember(Name = "id")]
         public byte Id;
         [DataMember(Name = "offset_micros")]
         public long OffsetMicros;
 
-        public DevClock(
+        public GameClock(
             byte Id,
             long OffsetMicros
         )
@@ -27,7 +27,7 @@ namespace SpacetimeDB.Types
             this.OffsetMicros = OffsetMicros;
         }
 
-        public DevClock()
+        public GameClock()
         {
         }
     }

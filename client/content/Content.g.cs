@@ -62,6 +62,13 @@ namespace Mmo.Content
         Subarctic = 3,
     }
 
+    /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>
+    /// <param name="Cap">The most a pool holds by regenerating.</param>
+    /// <param name="RegenPoints">Points added at the end of each period.</param>
+    /// <param name="RegenPeriodS">The regeneration period, s.</param>
+    /// <param name="StartPoints">What a new account starts with.</param>
+    public sealed record LaborRules(int Cap, int RegenPoints, int RegenPeriodS, int StartPoints);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -79,7 +86,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x9a1205fde59b4b39UL;
+        public const ulong Hash = 0xdb0daaaa592d3e4eUL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -110,5 +117,7 @@ namespace Mmo.Content
         public static readonly IReadOnlyList<string> ClimateIds = new[] { "temperate", "tropical", "arid", "subarctic" };
 
         public static string Id(this Climate climate) => ClimateIds[(int)climate];
+
+        public static readonly LaborRules Labor = new(5000, 10, 300, 5000);
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Mmo.Content;
 using Mmo.Gameplay;
@@ -6,7 +7,7 @@ using Mmo.World;
 
 namespace Mmo.UI
 {
-    /// <summary>A debug readout: connection, position, land use, cell window, entities in view, corrections, and the ship we're on or next to.</summary>
+    /// <summary>A debug readout: connection, position, labor, land use, cell window, entities in view, corrections, and the ship we're on or next to.</summary>
     public partial class Hud : CanvasLayer
     {
         private readonly Session session;
@@ -43,6 +44,8 @@ namespace Mmo.UI
                 var p = player.GlobalPosition;
                 text += $"\nentity {me.EntityId}  pos ({p.X:F1}, {p.Y:F1}, {p.Z:F1})  {player.Mode.Data().Id}";
                 text += $"\ncorrections {me.Corrections}  moves sent {player.MovesSent}";
+                if (session.Labor is { } pool)
+                    text += "\n" + LaborLine(pool, session.GameNowMicros);
                 if (land?.At(p.X, p.Z) is byte t)
                 {
                     var use = LandRaster.Use(t).Data();
@@ -58,6 +61,17 @@ namespace Mmo.UI
             if (controls.Prompt.Length > 0)
                 text += "\n" + controls.Prompt;
             label.Text = text;
+        }
+
+        /// <summary><c>labor 4,980 / 5,000 (+10 in 2:31)</c>, or <c>(full)</c> (docs/design/labor.md).</summary>
+        public static string LaborLine(Sim.LaborPool pool, long now)
+        {
+            var rules = GameContent.Labor;
+            var line = FormattableString.Invariant($"labor {pool.Current(rules, now):N0} / {rules.Cap:N0}");
+            if (pool.NextRegenAt(rules, now) is not long next)
+                return line + " (full)";
+            long secs = Math.Max(0, (next - now + 999_999) / 1_000_000);
+            return line + $" (+{rules.RegenPoints} in {secs / 60}:{secs % 60:D2})";
         }
     }
 }

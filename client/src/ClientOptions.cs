@@ -11,6 +11,7 @@ namespace Mmo
     /// <item><c>--profile NAME</c>: keeps its own identity token, and names the character it makes.</item>
     /// <item><c>--autopilot circle:X,Z,R | pace:X,Z,LEN | deck:X,Z,S | helm:X,Z,R | gun:X,Z,M | none</c>: run a scripted route instead of reading the keyboard (<see cref="Gameplay.Autopilot"/>).</item>
     /// <item><c>--spawn-ship X,Z,YAW</c>: dev builds; once within 60 m of (X, Z), replace any ship within 30 m of it with a fresh clipper facing YAW degrees.</item>
+    /// <item><c>--labor N</c>: dev builds; on entering, set our account's labor pool to N (docs/design/labor.md). F8 spends 100.</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
@@ -32,6 +33,7 @@ namespace Mmo
         public string Profile = "player";
         public Gameplay.Autopilot? Autopilot;
         public (float X, float Z, float YawDeg)? SpawnShip;
+        public int? Labor;
         public bool Walk;
         public float CamYawDeg;
         public bool Trace;
@@ -71,6 +73,7 @@ namespace Mmo
                     case "--profile": o.Profile = Next(); break;
                     case "--autopilot": o.Autopilot = Gameplay.Autopilot.Parse(Next()); break;
                     case "--walk": o.Walk = true; break;
+                    case "--labor": o.Labor = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--spawn-ship": o.SpawnShip = Triple(Next()); break;
                     case "--trace": o.Trace = true; break;
                     case "--test-cheat": o.TestCheat = true; break;

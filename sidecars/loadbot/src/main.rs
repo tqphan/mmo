@@ -10,6 +10,7 @@
 #[allow(clippy::all, unused)]
 mod module_bindings;
 mod director;
+mod labor;
 mod metrics;
 mod ship;
 mod swarm;
@@ -98,6 +99,7 @@ fn main() {
         "world-upload" => terrain::upload_world(&args, &ta),
         "ship" => ship::scenario(&args, &sh),
         "visitor" => visitor::scenario(&args, &va),
+        "labor" => labor::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -111,7 +113,8 @@ fn main() {
                  terrain-upload   upload a .mmoh height file as an admin\n  \
                  world-upload     upload the world's files (world/, or --world) as an admin and check its terrain hash\n  \
                  ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
-                 visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)"
+                 visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)\n  \
+                 labor            a new account's labor pool regenerates with the dev clock, fills, and refuses what it can't cover"
             );
             std::process::exit(2);
         }

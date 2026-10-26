@@ -166,6 +166,7 @@ namespace Mmo
             Bind("interact", Key.F);
             Bind("dev_spawn_ship", Key.F9);
             Bind("dev_remove_ship", Key.F10);
+            Bind("dev_spend_labor", Key.F8);
         }
     }
 }

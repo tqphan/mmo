@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-10-26 (M1 planned).
+**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-10-26 (M1 task 1: labor).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -16,6 +16,7 @@
   - server-side terrain (docs/design/terrain.md, ADR 0013): a 2 m `u16` heightmap in private `terrain_chunk` (one 33 × 33 row per cell), uploaded by admins from `.mmoh` files; vertical checks on every move (below ground, a jump-plus-51° climb ceiling from the last footing, a minimum fall after a 1.5 s grace, swimming at sea level), always taking the kinder of the two triangulations; corrected moves settle on the ground; `line_of_sight` used by `dev_swing`
   - ships and moving decks (docs/design/ships.md, ADR 0014): clipper hulls from `content/ships.toml`, stepped by `world_tick` with the shared `sim::ship::step` (throttle and rudder, draft checked against terrain), published to `transform` at 5 Hz with the helm, HP and reloads in public `vehicle`; passengers move in the ship's frame (`parent` on `presence`, `transform` and `move_event`) and change cells with it; `take_helm`, `helm`, `leave_helm`; `fire` schedules a `cannon_shot` row that lands after its flight time and damages ships it hits; dev `dev_spawn_ship` and `dev_remove_ship`
   - dev-only `dev_teleport`, `dev_set_gm`, and `dev_swing` with a `combat_event` event table, as a stand-in for combat in load tests
+- **Labor** (M1 task 1, docs/design/labor.md, ADR 0021): one pool per account in private `labor`, read through `my_labor`. It regenerates 10 points every 5 minutes, online and offline, up to 5,000, computed from a timestamp by `sim::labor` and never ticked. New accounts start full. The rules are in `content/labor.toml`. `labor::spend` is ready for gathering; dev builds add `dev_spend_labor` and `dev_set_labor`. The test clock's offset is now the public `game_clock` row, so clients compute game time. The client's port (checked against vectors) drives a HUD line, `labor 1,234 / 5,000 (+10 in 4:57)`; `--labor N` and F8 are dev helpers. The `labor` bot scenario passes, and a capture shows the HUD tracking a dev-clock jump: `docs/captures/2026-10-26-labor-{before,after}.png`.
 - **Godot client skeleton, working against the local server** (docs/design/client.md, ADR 0015):
   - The client connects with Gzip, keeps a token per `--profile`, makes a character if needed and enters with the content hash.
   - The player is a predicted `CharacterBody3D`. It sends movement events (start, stop, turns, jump, landing, 0.5 s heartbeats) and snaps to `my_presence` on each correction.
@@ -52,9 +53,9 @@
   - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.5–0.7 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. On the Radeon 610M integrated GPU, far below mid-range, it holds 36–60 fps at 1080p with no frame over 33 ms, which puts mid-range inside the 4 ms budget (docs/spikes/world-scale.md).
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected. Walkers now count a slide once per fall and respawn when stuck sliding in a steep dip. A rerun on 2026-10-26 walked 151 km with 17 slides (against 10,020 counted frame by frame in the worst earlier run), no respawns needed and no false corrections.
 - **Tests:**
-  - 65 `sim` unit tests (one checks the client's golden vectors are current), 17 `contentgen` tests, 59 module tests (in-memory datastore), 14 `worldtool` tests (including one that loads the committed world against its manifest) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
-  - 74 client xUnit tests: the C# ports match `sim` on 864 generated vectors (including a `.mmoh` file and its chunk and terrain hashes, and ship frames, steps, courses and cannon flights), plus the director, the move sender (frame changes, mode changes inside the swim limit), the snapshot buffer, the ship predictor, boarding, swimming, the autopilot and its ship routes, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
-  - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
+  - 74 `sim` unit tests (one checks the client's golden vectors are current), 20 `contentgen` tests, 68 module tests (in-memory datastore), 14 `worldtool` tests (including one that loads the committed world against its manifest) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
+  - 76 client xUnit tests: the C# ports match `sim` on 998 generated vectors (labor included) (including a `.mmoh` file and its chunk and terrain hashes, and ship frames, steps, courses and cannon flights), plus the director, the move sender (frame changes, mode changes inside the swim limit), the snapshot buffer, the ship predictor, boarding, swimming, the autopilot and its ship routes, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
+  - the `see-each-other`, `tick`, `cross-cells`, `terrain`, `ship` and `labor` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **Client toolchain:** Godot 4.7.2 .NET with `SpacetimeDB.ClientSDK.Godot` 2.13.0 on Linux. The SDK declares GodotSharp 4.6.2, and NuGet resolves it to 4.7.2 without complaint. Movie Maker captures work under Wayland on the laptop's GPU.
 
@@ -69,9 +70,9 @@
 | Blender | none | none |
 
 ## Next
-1. **M1 task 1, labor** (BACKLOG), then items, gathering and crafting.
+1. **M1 task 2, items and inventory** (BACKLOG), then gathering and crafting.
 2. Verify on the Windows PC when you're at it (BACKLOG, "Any time").
-3. **After pulling:** `presence` gained a column, so run `cargo xtask publish --clear` and then `cargo xtask world` once.
+3. **After pulling:** the schema changed (`labor`, `game_clock`), so run `cargo xtask publish --clear` and then `cargo xtask world` once.
 4. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
 
 ## Research

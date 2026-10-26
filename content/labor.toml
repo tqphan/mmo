@@ -1,0 +1,10 @@
+# Labor (docs/design/labor.md): one pool per account, regenerating online and offline at the rate
+# everyone had on the original's last server (A/B). Points are whole numbers.
+
+# The most a pool holds by regenerating.
+cap = 5000
+# Points added at the end of each period.
+regen_points = 10
+regen_period_s = 300
+# What a new account starts with: a full pool (our choice; the original's is unknown).
+start_points = 5000
