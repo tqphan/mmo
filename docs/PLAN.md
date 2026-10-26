@@ -831,14 +831,11 @@ L is likelihood and I is impact: H = high, M = medium, L = low.
 
 Progress is tracked in [STATUS.md](STATUS.md) and [BACKLOG.md](BACKLOG.md) from M0 on.
 
-- **Toolchain (2026-10-25):**
-  - On the Linux laptop, the Rust wasm target and the SpacetimeDB CLI 2.13.0 are installed. The client tooling isn't approved yet.
-  - On the Windows PC, the CLI upgrade and the wasm target are still to do.
+- **Toolchain (2026-10-26):**
+  - The Linux laptop has the full server and client toolchain (STATUS).
+  - On the Windows PC, the CLI upgrade, the wasm target and Godot are still to do.
 - **Git:** Claude commits and pushes freely (ADR 0005).
-- **M0 progress:**
-  - Steps 1, 3 (server side) and 4 are done.
-  - Step 2 is done on the server side; the Godot client skeleton is waiting on its toolchain.
-  - Step 5 (the art style test) needs Godot.
+- **M0 progress (2026-10-26):** every deliverable and all five spikes are done, and the client plays on the world's terrain, on ships, and through a reconnect. What's left is the check on the Windows PC (BACKLOG). STATUS has the details.
 
 ---
 

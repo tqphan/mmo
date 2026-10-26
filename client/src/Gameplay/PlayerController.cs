@@ -94,6 +94,8 @@ namespace Mmo.Gameplay
             SetPhysicsProcess(false);
             session.Entered += Snap;
             session.Corrected += Snap;
+            // Out of the world until we enter again, which snaps us to where the server saved us.
+            session.Dropped += () => SetPhysicsProcess(false);
         }
 
         public override void _ExitTree() =>

@@ -1,6 +1,6 @@
 //! Accounts, characters, entering and leaving the world (PLAN §5.3, docs/design/movement.md).
 
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
+use spacetimedb::{ConnectionId, Identity, ReducerContext, Table, Timestamp, ViewContext};
 
 use crate::movement::moved;
 use crate::terrain::{Terrain, terrain_info};
@@ -112,6 +112,10 @@ pub struct Presence {
     #[unique]
     pub entity_id: u64,
     pub entered_at: Timestamp,
+    /// The connection that entered. Only its own disconnect despawns the character: a client that
+    /// lost its connection may reconnect and enter again before the server notices the old one has
+    /// gone (docs/design/client.md).
+    pub connection_id: ConnectionId,
     /// 0 in the world, or the ship whose deck the character is on. The position and anchor below
     /// are in this frame (docs/design/ships.md).
     #[index(btree)]
@@ -172,7 +176,10 @@ pub fn require_admin(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer(client_disconnected)]
 pub fn on_disconnect(ctx: &ReducerContext) {
-    despawn(ctx, ctx.sender());
+    let entered_here = ctx.db.presence().identity().find(ctx.sender()).is_some_and(|p| Some(p.connection_id) == ctx.connection_id());
+    if entered_here {
+        despawn(ctx, ctx.sender());
+    }
 }
 
 pub fn validate_name(name: &str) -> Result<(), String> {
@@ -268,6 +275,7 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64, terrai
         char_id,
         entity_id: e.id,
         entered_at: t,
+        connection_id: ctx.connection_id().unwrap_or(ConnectionId::ZERO),
         parent: 0,
         last_seq: 0,
         last_move_at: t,

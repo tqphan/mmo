@@ -86,11 +86,15 @@ namespace Mmo.Net
                 string[] queries = tables.Select(t => $"SELECT * FROM {t} WHERE cell = {cell}").ToArray();
                 h.Handle = channel.Subscribe(cell, queries, () =>
                 {
+                    // Runs again for every live subscription after the SDK reconnects.
                     h.Applied = true;
-                    if (h.Dropped)
-                        channel.Unsubscribe(h.Handle!);
-                    else
+                    if (!h.Dropped)
                         Retire();
+                    else if (h.Handle is { } handle)
+                    {
+                        h.Handle = null;
+                        channel.Unsubscribe(handle);
+                    }
                 });
             }
             // Coming back to cells still held can complete the window straight away.

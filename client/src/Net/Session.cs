@@ -11,6 +11,8 @@ namespace Mmo.Net
     /// The connection to the world module: connects with Gzip (ADR 0011), keeps a token per profile,
     /// subscribes to our own views, makes a character if there isn't one and enters the world with
     /// our content hash and the terrain hash of the world we loaded (docs/design/world.md). Once we're in, it runs the Near tier's subscription director.
+    /// A dropped connection is recovered by the SDK, which keeps the cache and replays every
+    /// subscription, the director's included; the server despawned us, so we enter again.
     /// The SDK's callbacks run inside <see cref="DbConnection.FrameTick"/>, on the main thread.
     /// </summary>
     public partial class Session : Node
@@ -22,6 +24,8 @@ namespace Mmo.Net
         private readonly ClientOptions options;
         private readonly ulong terrainHash;
         private bool entering;
+        /// <summary>Reconnected: enter again even if a presence from the old connection is still in the cache.</summary>
+        private bool reenter;
 
         public Session(ClientOptions options, ulong terrainHash)
         {
@@ -34,6 +38,7 @@ namespace Mmo.Net
         public string Status { get; private set; } = "connecting";
         public Presence? Me { get; private set; }
         public SubscriptionDirector? Near { get; private set; }
+        public int Reconnects { get; private set; }
 
         /// <summary>We're in the world: snap to this presence.</summary>
         public event Action<Presence>? Entered;
@@ -41,15 +46,20 @@ namespace Mmo.Net
         /// <summary>The server rejected a move: snap to this presence (docs/design/movement.md).</summary>
         public event Action<Presence>? Corrected;
 
+        /// <summary>The connection dropped and we're out of the world until <see cref="Entered"/> fires again.</summary>
+        public event Action? Dropped;
+
         public override void _Ready()
         {
             var builder = DbConnection.Builder()
                 .WithUri(options.Uri)
                 .WithDatabaseName(options.Db)
                 .WithCompression(Compression.Gzip)
+                .WithAutomaticReconnect(new AutomaticReconnectOptions { MinDelay = TimeSpan.FromSeconds(1), MaxDelay = TimeSpan.FromSeconds(15) })
                 .OnConnect(OnConnected)
-                .OnConnectError(e => SetStatus($"connect failed: {e.Message}", error: true))
-                .OnDisconnect((_, e) => SetStatus(e is null ? "disconnected" : $"disconnected: {e.Message}", error: e is not null));
+                .OnAutomaticReconnect(OnReconnected)
+                .OnConnectError((e, next) => SetStatus(next is { } n ? $"reconnect failed: {e.Message}; {Retry(n)}" : $"connect failed: {e.Message}", error: true))
+                .OnDisconnect((_, e, next) => OnDisconnected(e, next));
             if (LoadToken() is string token)
                 builder = builder.WithToken(token);
             Conn = builder.Build();
@@ -69,6 +79,8 @@ namespace Mmo.Net
 
         public override void _ExitTree()
         {
+            if (Reconnects > 0)
+                Log($"reconnected {Reconnects}x");
             if (Conn is { IsActive: true })
                 Conn.Disconnect();
         }
@@ -95,10 +107,39 @@ namespace Mmo.Net
                 .Subscribe(new[] { "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public" });
         }
 
+        /// <summary>
+        /// Recovered after a drop. The SDK replays our subscriptions next, and the views' <c>OnApplied</c>
+        /// enters again. The server despawns a character when the connection that entered it closes
+        /// (ADR 0020), which it may not have noticed yet, so we enter even if the old presence is still there.
+        /// </summary>
+        private void OnReconnected(DbConnection conn, Identity identity, string token)
+        {
+            SaveToken(token);
+            Reconnects++;
+            reenter = true;
+            SetStatus("reconnected");
+        }
+
+        private void OnDisconnected(Exception? e, NextReconnect? next)
+        {
+            bool wasIn = Me is not null;
+            Me = null;
+            entering = false;
+            string why = e is null ? "" : $": {e.Message}";
+            if (next is { } n)
+                SetStatus($"connection lost{why}; {Retry(n)}", error: true);
+            else
+                SetStatus($"disconnected{why}", error: e is not null);
+            if (wasIn)
+                Dropped?.Invoke();
+        }
+
+        private static string Retry(NextReconnect n) => $"retrying in {n.Delay.TotalSeconds:F1} s (attempt {n.Attempt})";
+
         /// <summary>Make a character named after the profile if we have none, then enter with the first one.</summary>
         private void EnterWorld()
         {
-            if (Conn is null || Me is not null || entering)
+            if (Conn is null || (Me is not null && !reenter) || entering)
                 return;
             var mine = Conn.Db.MyCharacters.Iter().OrderBy(c => c.CharId).FirstOrDefault();
             if (mine is null)
@@ -108,6 +149,8 @@ namespace Mmo.Net
                 return;
             }
             entering = true;
+            reenter = false;
+            Me = null;
             SetStatus("entering the world");
             Conn.Reducers.EnterWorld(mine.CharId, GameContent.Hash, terrainHash);
         }

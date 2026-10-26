@@ -131,6 +131,43 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void AppliesReplayedAfterAReconnectChangeNothing()
+        {
+            var ch = new FakeChannel();
+            var d = new SubscriptionDirector(ch, Tables, 2);
+            d.Update(32, 32);
+            ch.ApplyAll();
+            d.Update(2000, 2000);
+            // The SDK replays every live subscription after a reconnect, and each one's OnApplied
+            // runs again, the old window's and the new one's alike.
+            foreach (var s in ch.Subs.Where(s => s.Applied && !s.Ended).ToList())
+                s.OnApplied();
+            ch.ApplyAll();
+            foreach (var s in ch.Subs.Where(s => !s.Ended).ToList())
+                s.OnApplied();
+            Assert.True(d.Settled);
+            Assert.Equal(Cell.WindowCells(Cell.CellOf(0, 2000, 2000), 2).ToHashSet(), ch.Live);
+        }
+
+        [Fact]
+        public void ACellDroppedBeforeItAppliedIsUnsubscribedOnce()
+        {
+            var ch = new FakeChannel();
+            var d = new SubscriptionDirector(ch, Tables, 2);
+            d.Update(32, 32);
+            ch.ApplyAll();
+            d.Update(73, 32); // new column pending
+            d.Update(32, 32); // back: the old window is whole, so the column is dropped before it applies
+            ch.ApplyAll();
+            var column = ch.Subs.Where(s => s.Ended).ToList();
+            Assert.Equal(5, column.Count);
+            // A replay of its apply, from a reconnect while the unsubscribe was in flight, does nothing.
+            foreach (var s in column)
+                s.OnApplied();
+            Assert.Equal(Cell.WindowCells(Home, 2).ToHashSet(), ch.Live);
+        }
+
+        [Fact]
         public void NonFinitePositionsKeepTheWindow()
         {
             var ch = new FakeChannel();

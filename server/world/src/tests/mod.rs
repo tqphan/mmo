@@ -19,8 +19,13 @@ fn world() -> TestContext {
 }
 
 fn auth(player: u128) -> TestAuth {
+    auth_on(player, player)
+}
+
+/// `player` on connection `conn`: a reconnecting client keeps its identity but gets a new connection.
+fn auth_on(player: u128, conn: u128) -> TestAuth {
     let payload = format!(r#"{{"iss":"test","sub":"player{player}","iat":0}}"#);
-    TestAuth::from_jwt_payload(payload, ConnectionId::from_u128(player)).unwrap()
+    TestAuth::from_jwt_payload(payload, ConnectionId::from_u128(conn)).unwrap()
 }
 
 fn identity(player: u128) -> Identity {
@@ -277,6 +282,36 @@ fn leaving_saves_position_and_despawns() {
     call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
     let tr = transform_of(&t, presence_of(&t, 1).entity_id);
     assert_eq!((tr.x, tr.z), (2.0, -1.0));
+}
+
+#[test]
+fn a_late_disconnect_spares_a_reconnected_character() {
+    let t = world();
+    let p = arrive(&t, 1, "Mira");
+    // The client reconnects on connection 101 and enters again before the server notices that
+    // connection 1 has gone.
+    let enter = |ctx: &ReducerContext| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx));
+    t.with_reducer_tx(auth_on(1, 101), |ctx| {
+        on_connect(ctx);
+        enter(ctx)
+    })
+    .unwrap();
+    let again = presence_of(&t, 1);
+    assert_ne!(again.entity_id, p.entity_id);
+    assert_eq!(again.connection_id, ConnectionId::from_u128(101));
+    t.with_reducer_tx::<_, ()>(auth_on(1, 1), |ctx| {
+        on_disconnect(ctx);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(presence_of(&t, 1).entity_id, again.entity_id, "the old connection's disconnect leaves it be");
+    assert!(read(&t, |ctx| ctx.db.transform().entity_id().find(again.entity_id)).is_some());
+    t.with_reducer_tx::<_, ()>(auth_on(1, 101), |ctx| {
+        on_disconnect(ctx);
+        Ok(())
+    })
+    .unwrap();
+    assert!(read(&t, |ctx| ctx.db.presence().identity().find(identity(1))).is_none(), "its own disconnect despawns it");
 }
 
 #[test]

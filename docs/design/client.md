@@ -1,6 +1,6 @@
 # Client skeleton (Godot)
 
-Status: v0.3, 2026-10-26 (decks and ships). M0 slice. Code: `client/` (`src/`, `tests/`), `server/sim/src/vectors.rs`, `sidecars/loadbot/src/visitor.rs`. Decisions: ADR 0015, ADR 0019.
+Status: v0.4, 2026-10-26 (reconnect). M0 slice. Code: `client/` (`src/`, `tests/`), `server/sim/src/vectors.rs`, `sidecars/loadbot/src/visitor.rs`. Decisions: ADR 0015, ADR 0019, ADR 0020.
 
 ## 1. How the original worked
 
@@ -31,6 +31,12 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 - The identity token is kept per profile in `user://tokens/<profile>.token`. Two windows with different `--profile`s are two players.
 - On connecting, it subscribes to `my_characters`, `my_presence` and `character_public`. If the account has no character, it creates one named after the profile (letters only, capitalised: `alpha` → `Alpha`). Then it calls `enter_world(char_id, GameContent.Hash, terrainHash)`, with the terrain hash of the world it loaded (docs/design/world.md). A client on a different world is refused, and the HUD shows the server's message.
 - **`my_presence` is a view, and view rows have no primary key.** The SDK delivers each change as an insert of the new row plus a delete of the old one, and the insert comes first. So an insert for the entity we already have is an update. We've left the world only when no row is left at the end of a frame.
+
+### Reconnecting (ADR 0020)
+- The SDK's automatic reconnect is on, with a backoff from 1 s to 15 s. It keeps the cache and the subscription handles, and replays every subscription after it recovers, the Near director's cells included. Each replayed subscription's `OnApplied` runs again, so the director treats a second apply as a no-op.
+- On a drop, `Session` forgets its presence and raises `Dropped`, and the player stops stepping and sending moves. The HUD shows the reason and the next attempt.
+- After recovery the views' `OnApplied` enters the world again, even if the old presence is still in the cache, because the server may not have noticed the old connection close yet. The server despawns a character only when the connection that entered it closes (`presence.connection_id`). Entering snaps the player to where the server saved it, as on first entry.
+- A failed first connection isn't retried. A passenger comes back in the world frame where it dropped, not on the deck.
 
 ### The world
 - The client loads the world's files at start (`--world`, default `world/`, the files `cargo xtask world` uploads to the server; about 0.2 s) and draws them with the terrain tiles and the sea from the world-scale spike, centred on the camera (docs/design/worldstream.md, world.md). If they can't be read, or don't match their manifest's terrain hash, it stops with a message. Housing land and towns are tinted, and the HUD shows the land use and climate underfoot.
@@ -79,7 +85,7 @@ Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to
 
 ## 3. Deviations and not yet done
 - **Swimming is simple.** You float at one depth. There's no diving, jumping from the water, stamina or breath.
-- **No reconnect.** A dropped connection ends the session.
+- **Reconnecting means re-entering:** a new entity id, and passengers come back off the deck (see Reconnecting). A failed first connection still ends the session.
 - **Characters face their direction of travel**, including when walking backwards. Strafing and backpedalling with the original's feel come with animation.
 - **No `.sln`.** `dotnet build client/Mmo.csproj` and the xtask commands work without one. Opening the project in the editor offers to create it.
 - **Captures run slower than real time** when the machine is busy (see Captures).
@@ -99,6 +105,9 @@ Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to
 | C# | `HeightMap.CellHeights` gives each cell's 33 × 33 samples, edges shared, null outside the file | `client/tests/HeightMapTests.cs` |
 | C# | Ships: the port of `sim::ship`, the predictor, boarding, frame events and the ship routes. Swimming: when it starts and ends, the float height within the server's limits, running into the sea inside the swim speed check | `client/tests/SimVectorTests.cs`, `ShipTests.cs`, `MovementTests.cs` |
 | live | Decks: three clients crew a clipper, see docs/design/ships.md | manual, results there |
+| module | A late disconnect from the old connection spares a character that re-entered on a new one; its own disconnect despawns it | `server/world/src/tests/mod.rs` |
+| C# | Director: replayed applies after a reconnect change nothing; a cell dropped before it applied is unsubscribed once | `client/tests/SubscriptionDirectorTests.cs` |
+| live | Reconnect: kill the server under two clients, restart it, and both re-enter and see each other, with zero corrections; `bot visitor --expect 2` sees both | manual, results below |
 | live | On the uploaded world: two autopilot clients for 10 minutes over hills, coast and shallow water with `bot visitor --expect 2`: zero corrections; the body stands within a few cm of the heightmap's height | manual, results below |
 
 ### Results, 2026-10-26 (Linux laptop, local server)
@@ -113,3 +122,7 @@ Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to
 - **10 minutes, two clients and a bot.** Alpha paced `pace:150,-14,1150` east and west through spawn, from shallow water off the west coast over the 17 m hills. Bravo ran `circle:100,0,450` round the island's coast. `bot visitor --expect 2` circled at spawn on the file's ground and saw both. Alpha sent 1,186 moves and Bravo 1,185, with **0 corrections**. On the floor the body stood at most 0.01 m (Alpha) and 0.06 m (Bravo, the capsule on slopes) from the heightmap's bilinear height.
 - **Correction:** `--test-cheat` from spawn was corrected once, and the client snapped back to (0, 12.8, 0) on the hilltop.
 - Captures: `docs/captures/2026-10-26-terrain-{coast,island,spawn}.png`.
+
+### Results for reconnecting, 2026-10-26 (Linux laptop, local server, the placeholder world uploaded)
+- Alpha ran `circle:0,0,6` and Bravo `pace:0,-10,30`. The server was killed 10 s after both had entered and restarted 8 s later. Both logged the drop and 2 or 3 failed attempts, then reconnected and entered again where they had stood: Alpha at (3.9, 12.5, -4.6) as entity 3, Bravo at (11.7, 12.2, -10.0) as entity 4. Each dropped the other's old entity and drew the new one. `bot visitor --secs 30 --expect 2` then saw both. Alpha sent 454 moves and Bravo 160, with **0 corrections**.
+- Bravo's move in flight when the server died was reported as "Connection lost before the result was received", which the SDK doesn't retry. The next move after entering starts from the new presence, so nothing depends on it.

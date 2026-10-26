@@ -31,6 +31,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Presence, ulong> CharId { get; }
         public global::SpacetimeDB.Col<Presence, ulong> EntityId { get; }
         public global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp> EnteredAt { get; }
+        public global::SpacetimeDB.Col<Presence, SpacetimeDB.ConnectionId> ConnectionId { get; }
         public global::SpacetimeDB.Col<Presence, ulong> Parent { get; }
         public global::SpacetimeDB.Col<Presence, uint> LastSeq { get; }
         public global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp> LastMoveAt { get; }
@@ -52,6 +53,7 @@ namespace SpacetimeDB.Types
             CharId = new global::SpacetimeDB.Col<Presence, ulong>(tableName, "char_id");
             EntityId = new global::SpacetimeDB.Col<Presence, ulong>(tableName, "entity_id");
             EnteredAt = new global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp>(tableName, "entered_at");
+            ConnectionId = new global::SpacetimeDB.Col<Presence, SpacetimeDB.ConnectionId>(tableName, "connection_id");
             Parent = new global::SpacetimeDB.Col<Presence, ulong>(tableName, "parent");
             LastSeq = new global::SpacetimeDB.Col<Presence, uint>(tableName, "last_seq");
             LastMoveAt = new global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp>(tableName, "last_move_at");
