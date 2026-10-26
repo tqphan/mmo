@@ -184,7 +184,7 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
         let yaw = ((heading.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU) * 65535.0) as u16;
         let done = timer(&shared);
         conn.reducers
-            .move_event_then(seq, x, 0.0, z, yaw, (RUN_SPEED * 100.0) as i16, 1, move |_, r| done(matches!(r, Ok(Ok(())))))
+            .move_event_then(seq, 0, x, 0.0, z, yaw, (RUN_SPEED * 100.0) as i16, 1, move |_, r| done(matches!(r, Ok(Ok(())))))
             .map_err(|e| e.to_string())?;
 
         if near.update(&conn, x, z) {

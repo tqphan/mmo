@@ -2,13 +2,14 @@
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
 //! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
-//! `terrain` takes `--bots N --secs S --file F`, and `terrain-gen` and `terrain-upload` take `--file F`.
+//! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, and `terrain-gen` and `terrain-upload` take `--file F`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
 mod director;
 mod metrics;
+mod ship;
 mod swarm;
 mod terrain;
 
@@ -30,10 +31,11 @@ struct Args {
     scenario: String,
 }
 
-fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs) {
+fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs) {
     let mut a = Args { uri: "http://127.0.0.1:3000".into(), db: "mmo-world".into(), scenario: "help".into() };
     let mut sw = swarm::SwarmArgs::default();
     let mut ta = terrain::TerrainArgs::default();
+    let mut sh = ship::ShipArgs::default();
     let mut it = std::env::args().skip(1);
     fn num<T: std::str::FromStr>(flag: &str, v: Option<String>) -> T {
         v.and_then(|v| v.parse().ok()).unwrap_or_else(|| panic!("{flag} needs a number"))
@@ -51,6 +53,7 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs) {
             "--secs" => {
                 sw.secs = num("--secs", it.next());
                 ta.secs = sw.secs;
+                sh.secs = sw.secs;
             }
             "--file" => ta.file = it.next().expect("--file needs a path"),
             "--compression" => {
@@ -64,11 +67,11 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs) {
             s => a.scenario = s.into(),
         }
     }
-    (a, sw, ta)
+    (a, sw, ta, sh)
 }
 
 fn main() {
-    let (args, sw, ta) = parse_args();
+    let (args, sw, ta, sh) = parse_args();
     let scenario = args.scenario.clone();
     let result = match scenario.as_str() {
         "see-each-other" => see_each_other(&args),
@@ -79,6 +82,7 @@ fn main() {
         "terrain" => terrain::scenario(&args, &ta),
         "terrain-gen" => terrain::write(&ta.file),
         "terrain-upload" => terrain::upload_file(&args, &ta),
+        "ship" => ship::scenario(&args, &sh),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -89,7 +93,8 @@ fn main() {
                  swarm            the throughput spike: many bots moving and fighting, measured\n  \
                  terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
                  terrain-gen      write the procedural test terrain to a .mmoh file\n  \
-                 terrain-upload   upload a .mmoh height file as a dev admin"
+                 terrain-upload   upload a .mmoh height file as a dev admin\n  \
+                 ship             bots walk the deck of a turning ship, fire its cannon and try to cheat"
             );
             std::process::exit(2);
         }
@@ -186,7 +191,7 @@ impl Bot {
         self.seq += 1;
         self.conn
             .reducers
-            .move_event(self.seq, x, 0.0, z, 0, (RUN_SPEED * 100.0) as i16, 1)
+            .move_event(self.seq, 0, x, 0.0, z, 0, (RUN_SPEED * 100.0) as i16, 1)
             .map_err(|e| e.to_string())?;
         if self.near.center().is_some() {
             self.near.update(&self.conn, x, z);

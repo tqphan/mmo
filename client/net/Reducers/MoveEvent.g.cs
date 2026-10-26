@@ -12,12 +12,12 @@ namespace SpacetimeDB.Types
 {
     public sealed partial class RemoteReducers : RemoteBase
     {
-        public delegate void MoveEventHandler(ReducerEventContext ctx, uint seq, float x, float y, float z, ushort yaw, short speed, byte mode);
+        public delegate void MoveEventHandler(ReducerEventContext ctx, uint seq, ulong parent, float x, float y, float z, ushort yaw, short speed, byte mode);
         public event MoveEventHandler? OnMoveEvent;
 
-        public void MoveEvent(uint seq, float x, float y, float z, ushort yaw, short speed, byte mode)
+        public void MoveEvent(uint seq, ulong parent, float x, float y, float z, ushort yaw, short speed, byte mode)
         {
-            conn.InternalCallReducer(new Reducer.MoveEvent(seq, x, y, z, yaw, speed, mode));
+            conn.InternalCallReducer(new Reducer.MoveEvent(seq, parent, x, y, z, yaw, speed, mode));
         }
 
         public bool InvokeMoveEvent(ReducerEventContext ctx, Reducer.MoveEvent args)
@@ -38,6 +38,7 @@ namespace SpacetimeDB.Types
             OnMoveEvent(
                 ctx,
                 args.Seq,
+                args.Parent,
                 args.X,
                 args.Y,
                 args.Z,
@@ -57,6 +58,8 @@ namespace SpacetimeDB.Types
         {
             [DataMember(Name = "seq")]
             public uint Seq;
+            [DataMember(Name = "parent")]
+            public ulong Parent;
             [DataMember(Name = "x")]
             public float X;
             [DataMember(Name = "y")]
@@ -72,6 +75,7 @@ namespace SpacetimeDB.Types
 
             public MoveEvent(
                 uint Seq,
+                ulong Parent,
                 float X,
                 float Y,
                 float Z,
@@ -81,6 +85,7 @@ namespace SpacetimeDB.Types
             )
             {
                 this.Seq = Seq;
+                this.Parent = Parent;
                 this.X = X;
                 this.Y = Y;
                 this.Z = Z;

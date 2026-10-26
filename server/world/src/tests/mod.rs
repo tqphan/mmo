@@ -7,6 +7,9 @@ use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
 use sim::content::CONTENT_HASH;
 
+#[cfg(feature = "dev")]
+mod ships;
+
 const T0: i64 = 1_800_000_000_000_000; // an arbitrary start time, in µs
 
 fn world() -> TestContext {
@@ -64,7 +67,7 @@ fn publish(t: &TestContext) -> usize {
 }
 
 fn step(t: &TestContext, player: u128, seq: u32, x: f32, z: f32) {
-    call(t, player, |ctx| move_event(ctx, seq, x, 0.0, z, 0, 540, 1)).unwrap();
+    call(t, player, |ctx| move_event(ctx, seq, 0, x, 0.0, z, 0, 540, 1)).unwrap();
 }
 
 #[test]
@@ -234,14 +237,14 @@ fn stale_and_duplicate_events_are_ignored() {
 #[test]
 fn moving_requires_being_in_the_world() {
     let t = world();
-    assert!(call(&t, 1, |ctx| move_event(ctx, 1, 0.0, 0.0, 0.0, 0, 0, 1)).is_err());
+    assert!(call(&t, 1, |ctx| move_event(ctx, 1, 0, 0.0, 0.0, 0.0, 0, 0, 1)).is_err());
 }
 
 #[test]
 fn unknown_modes_and_nan_positions_are_rejected() {
     let t = world();
     arrive(&t, 1, "Mira");
-    assert!(call(&t, 1, |ctx| move_event(ctx, 1, 0.0, 0.0, 0.0, 0, 0, 99)).is_err());
+    assert!(call(&t, 1, |ctx| move_event(ctx, 1, 0, 0.0, 0.0, 0.0, 0, 0, 99)).is_err());
     step(&t, 1, 2, f32::NAN, 0.0);
     assert_eq!(presence_of(&t, 1).x, 0.0);
     assert_eq!(presence_of(&t, 1).corrections, 1);
@@ -416,7 +419,8 @@ fn dev_teleport_moves_and_restarts_the_move_clock() {
 #[cfg(feature = "dev")]
 #[test]
 fn dev_swing_needs_a_target_in_range() {
-    use crate::dev::{combat_event, dev_swing};
+    use crate::combat::combat_event;
+    use crate::dev::dev_swing;
     let t = world();
     let a = arrive(&t, 1, "Mira");
     let b = arrive(&t, 2, "Tobin");
@@ -486,7 +490,7 @@ fn upload_cliff(t: &TestContext) {
 }
 
 fn step_y(t: &TestContext, player: u128, seq: u32, x: f32, y: f32, z: f32) {
-    call(t, player, |ctx| move_event(ctx, seq, x, y, z, 0, 540, 1)).unwrap();
+    call(t, player, |ctx| move_event(ctx, seq, 0, x, y, z, 0, 540, 1)).unwrap();
 }
 
 fn suspicions(t: &TestContext) -> Vec<String> {

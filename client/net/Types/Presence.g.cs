@@ -21,6 +21,8 @@ namespace SpacetimeDB.Types
         public ulong EntityId;
         [DataMember(Name = "entered_at")]
         public SpacetimeDB.Timestamp EnteredAt;
+        [DataMember(Name = "parent")]
+        public ulong Parent;
         [DataMember(Name = "last_seq")]
         public uint LastSeq;
         [DataMember(Name = "last_move_at")]
@@ -53,6 +55,7 @@ namespace SpacetimeDB.Types
             ulong CharId,
             ulong EntityId,
             SpacetimeDB.Timestamp EnteredAt,
+            ulong Parent,
             uint LastSeq,
             SpacetimeDB.Timestamp LastMoveAt,
             uint Corrections,
@@ -72,6 +75,7 @@ namespace SpacetimeDB.Types
             this.CharId = CharId;
             this.EntityId = EntityId;
             this.EnteredAt = EnteredAt;
+            this.Parent = Parent;
             this.LastSeq = LastSeq;
             this.LastMoveAt = LastMoveAt;
             this.Corrections = Corrections;

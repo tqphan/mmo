@@ -34,6 +34,7 @@ namespace SpacetimeDB.Types
             AddTable(MyCharacters = new(conn));
             AddTable(MyPresence = new(conn));
             AddTable(Transform = new(conn));
+            AddTable(Vehicle = new(conn));
         }
     }
 
@@ -537,6 +538,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.MyCharacters().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
             new QueryBuilder().From.Transform().ToSql(),
+            new QueryBuilder().From.Vehicle().ToSql(),
         }
         ;
     }
@@ -550,6 +552,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
         public global::SpacetimeDB.Table<Transform, TransformCols, TransformIxCols> Transform() => new("transform", new TransformCols("transform"), new TransformIxCols("transform"));
+        public global::SpacetimeDB.Table<Vehicle, VehicleCols, VehicleIxCols> Vehicle() => new("vehicle", new VehicleCols("vehicle"), new VehicleIxCols("vehicle"));
     }
 
     public sealed class TypedSubscriptionBuilder
@@ -635,12 +638,18 @@ namespace SpacetimeDB.Types
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
+                Reducer.DevRemoveShip args => Reducers.InvokeDevRemoveShip(eventContext, args),
                 Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
+                Reducer.DevSpawnShip args => Reducers.InvokeDevSpawnShip(eventContext, args),
                 Reducer.DevSwing args => Reducers.InvokeDevSwing(eventContext, args),
                 Reducer.DevTeleport args => Reducers.InvokeDevTeleport(eventContext, args),
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),
+                Reducer.Fire args => Reducers.InvokeFire(eventContext, args),
+                Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
+                Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
+                Reducer.TakeHelm args => Reducers.InvokeTakeHelm(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

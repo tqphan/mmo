@@ -4,27 +4,24 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 
 ## M0: Foundations and risk spikes
 
-1. **Spike 3: ship and moving deck (server)**
-   A server-driven clipper (throttle and rudder) moving in `world_tick`, with seats and players in ship-local coordinates (`transform.parent`).
-   *Done when:* a scenario has 4 bots walking on deck while the ship turns, with no false corrections, and a cannon impact scheduled as a timer.
-
-2. **Godot client skeleton**
+1. **Godot client skeleton**
    Project in `client/`, net layer, enter the world, a predicted CharacterBody3D with heartbeats, other entities shown as capsules, and snapping on correction. Follow ADR 0011: Gzip, snap to `my_presence`, interpolation buffer of at least two ticks. Port the subscription director (docs/design/interest.md), with test vectors for `recenter` generated from `sim`. Compile `client/content/*.cs` and send `GameContent.Hash` to `enter_world` (docs/design/content.md).
    *Done when:* two client windows plus a bot see each other, and Movie Maker frames are captured.
 
-3. **Art style test scene** (needs 2)
+2. **Art style test scene** (needs 1)
    Stylized terrain, water, and a CC0 character walking (ADR 0004).
    *Done when:* the user has reviewed captures and decided flat low-poly vs hand-painted.
 
-4. **Spike 4: world scale** (needs 2): a 16 km Terrain3D map with water and streaming, within budget at mid-range settings.
-5. **World exporter v0** (needs 2): Godot plugin → heightmap as a `.mmoh` file (docs/design/terrain.md) and a land-use raster → uploaded as an admin. Production uploads need the publisher's identity (the owner), since `dev_set_gm` is dev-only.
-6. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, and check that `cargo xtask check` passes.
+3. **Spike 4: world scale** (needs 1): a 16 km Terrain3D map with water and streaming, within budget at mid-range settings.
+4. **World exporter v0** (needs 1): Godot plugin → heightmap as a `.mmoh` file (docs/design/terrain.md) and a land-use raster → uploaded as an admin. Production uploads need the publisher's identity (the owner), since `dev_set_gm` is dev-only.
+5. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, and check that `cargo xtask check` passes.
 
-7. **Loadbot: unstick terrain walkers.** A walker that lands in a steep-sided dip slides every frame (one 30-minute run counted 10,020 slides against 19 in another). Count a slide once per fall, and pick a new heading or respawn after a few seconds stuck.
+6. **Loadbot: unstick terrain walkers.** A walker that lands in a steep-sided dip slides every frame (one 30-minute run counted 10,020 slides against 19 in another). Count a slide once per fall, and pick a new heading or respawn after a few seconds stuck.
 
 ## Research backlog
 - Original on-foot speeds (walk, run, swim, sprint) and the pack-carrying slowdown. Needed before M1 tuning (docs/design/movement.md §1).
 - Original jump height, how falling felt, and the fall-damage threshold. The terrain checks use lenient placeholders (docs/design/terrain.md §1); fall damage needs the threshold in M1.
+- Original ship handling and gunnery: acceleration, turn rate, cannon range, damage, reload and ship HP. All placeholders now except the clipper's 11 m/s (docs/design/ships.md §1). Needed before M1 ships.
 
 ## Done
 - 2026-10-25 **Repository scaffold**: STATUS, BACKLOG, ADRs 0001–0009, docs folders, asset ledger.
@@ -38,3 +35,4 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 - 2026-10-25 **Cell switching with hysteresis**: `sim::cell::recenter` (8 m margin) and a subscription director in loadbot with one subscription per cell, new before old; `cross-cells` scenario (290 m, 5 window moves, no gap); the swarm uses it, and 500 spread bots went from 6.0 to 4.9 KB/s per client (docs/design/interest.md).
 - 2026-10-25 **`contentgen` v0**: `content/movement.toml` → `sim::content` (Rust) and `client/content/Content.g.cs` (C#), both committed and checked for staleness by `cargo xtask test`; FNV-1a `CONTENT_HASH`, checked by `enter_world` (docs/design/content.md, ADR 0012).
 - 2026-10-25 **Spike 5: server-side terrain**: private `terrain_chunk` (2 m `u16` heightmap, 33 × 33 per cell), admin upload from `.mmoh` files, vertical checks anchored to the last footing and line of sight in `sim`, both taking the kinder triangulation (ADR 0013); `terrain` scenario, 30 minutes with 16 bots and zero false corrections (docs/design/terrain.md).
+- 2026-10-26 **Spike 3: ship and moving deck**: `content/ships.toml` hulls, `sim::ship` (poses, step, draft, cannon flight), ships stepped in `world_tick` and published at 5 Hz, passengers in the ship's frame, helm and cannons with scheduled impacts (ADR 0014); `ship` scenario with zero false corrections, 8 of 8 shots hitting, cheats caught (docs/design/ships.md).

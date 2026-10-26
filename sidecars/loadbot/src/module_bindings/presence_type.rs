@@ -11,6 +11,7 @@ pub struct Presence {
     pub char_id: u64,
     pub entity_id: u64,
     pub entered_at: __sdk::Timestamp,
+    pub parent: u64,
     pub last_seq: u32,
     pub last_move_at: __sdk::Timestamp,
     pub corrections: u32,
@@ -38,6 +39,7 @@ pub struct PresenceCols {
     pub char_id: __sdk::__query_builder::Col<Presence, u64>,
     pub entity_id: __sdk::__query_builder::Col<Presence, u64>,
     pub entered_at: __sdk::__query_builder::Col<Presence, __sdk::Timestamp>,
+    pub parent: __sdk::__query_builder::Col<Presence, u64>,
     pub last_seq: __sdk::__query_builder::Col<Presence, u32>,
     pub last_move_at: __sdk::__query_builder::Col<Presence, __sdk::Timestamp>,
     pub corrections: __sdk::__query_builder::Col<Presence, u32>,
@@ -61,6 +63,7 @@ impl __sdk::__query_builder::HasCols for Presence {
             char_id: __sdk::__query_builder::Col::new(table_name, "char_id"),
             entity_id: __sdk::__query_builder::Col::new(table_name, "entity_id"),
             entered_at: __sdk::__query_builder::Col::new(table_name, "entered_at"),
+            parent: __sdk::__query_builder::Col::new(table_name, "parent"),
             last_seq: __sdk::__query_builder::Col::new(table_name, "last_seq"),
             last_move_at: __sdk::__query_builder::Col::new(table_name, "last_move_at"),
             corrections: __sdk::__query_builder::Col::new(table_name, "corrections"),
@@ -85,6 +88,7 @@ pub struct PresenceIxCols {
     pub char_id: __sdk::__query_builder::IxCol<Presence, u64>,
     pub entity_id: __sdk::__query_builder::IxCol<Presence, u64>,
     pub identity: __sdk::__query_builder::IxCol<Presence, __sdk::Identity>,
+    pub parent: __sdk::__query_builder::IxCol<Presence, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Presence {
@@ -94,6 +98,7 @@ impl __sdk::__query_builder::HasIxCols for Presence {
             char_id: __sdk::__query_builder::IxCol::new(table_name, "char_id"),
             entity_id: __sdk::__query_builder::IxCol::new(table_name, "entity_id"),
             identity: __sdk::__query_builder::IxCol::new(table_name, "identity"),
+            parent: __sdk::__query_builder::IxCol::new(table_name, "parent"),
         }
     }
 }

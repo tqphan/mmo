@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-25.
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26.
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -14,15 +14,17 @@
   - server timings read from the host's Prometheus endpoint by `cargo xtask bot metrics` (ADR 0010). An idle tick costs about 90 µs of CPU.
   - game data from `content/` through `contentgen` (docs/design/content.md, ADR 0012): the movement-mode table, generated into Rust (`sim::content`) and C# (`client/content`), with a `CONTENT_HASH` that `enter_world` checks
   - server-side terrain (docs/design/terrain.md, ADR 0013): a 2 m `u16` heightmap in private `terrain_chunk` (one 33 × 33 row per cell), uploaded by admins from `.mmoh` files; vertical checks on every move (below ground, a jump-plus-51° climb ceiling from the last footing, a minimum fall after a 1.5 s grace, swimming at sea level), always taking the kinder of the two triangulations; corrected moves settle on the ground; `line_of_sight` used by `dev_swing`
+  - ships and moving decks (docs/design/ships.md, ADR 0014): clipper hulls from `content/ships.toml`, stepped by `world_tick` with the shared `sim::ship::step` (throttle and rudder, draft checked against terrain), published to `transform` at 5 Hz with the helm, HP and reloads in public `vehicle`; passengers move in the ship's frame (`parent` on `presence`, `transform` and `move_event`) and change cells with it; `take_helm`, `helm`, `leave_helm`; `fire` schedules a `cannon_shot` row that lands after its flight time and damages ships it hits; dev `dev_spawn_ship` and `dev_remove_ship`
   - dev-only `dev_teleport`, `dev_set_gm`, and `dev_swing` with a `combat_event` event table, as a stand-in for combat in load tests
-- **Spikes 1, 2 and 5 done** (docs/spikes/throughput.md, mass-fight.md):
+- **Spikes 1, 2, 3 and 5 done** (docs/spikes/throughput.md, mass-fight.md):
   - 500 players spread out: about 1 core and 0.6 GB on this laptop, 6 KB/s per client.
   - With batched publishing and Gzip, a 150-player fight costs each client about 19 KB/s (reducer p99 3 ms), and 500 all in view about 44 KB/s.
   - The levers for siege-sized crowds are written down for M3.
+  - Ships: four bots walked, jumped and swung at each other on a clipper turning at full speed with zero corrections, and the gunner hit the second ship with every shot after its 1.27 s flight time. Extrapolating the 5 Hz ship publishes with the shared step is 0.2 m off one second ahead (mean), against 1.2 m for a straight line. A 10-minute run: 3,782 moves on deck and 280 jumps with no false corrections, 7,103° of turning, 595 swings landed and 106 of 106 shots hit.
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected.
 - **Tests:**
-  - 44 `sim` unit tests, 9 `contentgen` tests, 37 module tests (in-memory datastore) and 3 loadbot tests, with clippy clean; the generated C# compiles with warnings as errors
-  - the `see-each-other`, `tick`, `cross-cells` and `terrain` bot scenarios, which pass against a live server, plus `swarm` for load
+  - 61 `sim` unit tests, 14 `contentgen` tests, 55 module tests (in-memory datastore) and 3 loadbot tests, with clippy clean; the generated C# compiles with warnings as errors
+  - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **No client yet, but the toolchain works on Linux.** A throwaway Godot 4.7.2 C# project using `SpacetimeDB.ClientSDK.Godot` 2.13.0 and our generated bindings built cleanly, connected to the local server and read `dev_tick` (headless). The SDK declares GodotSharp 4.6.2; NuGet resolves it to 4.7.2 without complaint.
 
@@ -37,8 +39,7 @@
 | Blender | none | none |
 
 ## Next
-1. Spike 3, ship and moving deck (top of BACKLOG).
-2. The Godot client skeleton is unblocked. Its net layer follows ADR 0011 (Gzip, snap from `my_presence`, buffer two ticks), ports the subscription director, and sends `GameContent.Hash` on entering.
+1. The Godot client skeleton (top of BACKLOG). Its net layer follows ADR 0011 (Gzip, snap from `my_presence`, buffer two ticks), ports the subscription director, and sends `GameContent.Hash` on entering. Ships come later: the client extrapolates them with `sim::ship::step` ported to C#, and its body must not inherit a deck's velocity on leaving (ADR 0014).
 
 ## Blockers and open questions
 - **Art look:** decided after the style test (ADR 0004).

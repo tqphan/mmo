@@ -4,5 +4,6 @@
 pub mod cell;
 pub mod content;
 pub mod movement;
+pub mod ship;
 pub mod terrain;
 pub mod tick;

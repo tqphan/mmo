@@ -15,6 +15,9 @@ pub const SPAWN: [f32; 3] = [0.0, 0.0, 0.0];
 
 pub mod entity_kind {
     pub const CHARACTER: u8 = 1;
+    /// `ref_id` is the hull's wire id (docs/design/ships.md).
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_ship` makes ships until shipyards (M1)
+    pub const SHIP: u8 = 2;
 }
 
 /// `account.gm_level` values.
@@ -72,7 +75,7 @@ pub struct Entity {
     #[index(btree)]
     pub cell: u64,
     pub kind: u8,
-    /// For characters, the `char_id`.
+    /// For characters, the `char_id`; for ships, the hull.
     pub ref_id: u64,
 }
 
@@ -80,12 +83,14 @@ pub struct Entity {
 /// lags the authoritative position in `presence` by up to one tick: `world_tick` publishes moves
 /// in one batch every 100 ms (docs/spikes/mass-fight.md).
 #[spacetimedb::table(accessor = transform, public)]
+#[derive(Debug, PartialEq)]
 pub struct Transform {
     #[primary_key]
     pub entity_id: u64,
     #[index(btree)]
     pub cell: u64,
-    /// 0 = the world, otherwise the vehicle the entity stands on.
+    /// 0 = the world, otherwise the ship the entity stands on; the position is then ship-local, and
+    /// the cell is the ship's (docs/design/ships.md).
     pub parent: u64,
     pub x: f32,
     pub y: f32,
@@ -107,6 +112,10 @@ pub struct Presence {
     #[unique]
     pub entity_id: u64,
     pub entered_at: Timestamp,
+    /// 0 in the world, or the ship whose deck the character is on. The position and anchor below
+    /// are in this frame (docs/design/ships.md).
+    #[index(btree)]
+    pub parent: u64,
     /// The last accepted movement event.
     pub last_seq: u32,
     pub last_move_at: Timestamp,
@@ -251,6 +260,7 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Res
         char_id,
         entity_id: e.id,
         entered_at: t,
+        parent: 0,
         last_seq: 0,
         last_move_at: t,
         corrections: 0,
@@ -273,11 +283,13 @@ pub fn leave_world(ctx: &ReducerContext) {
     despawn(ctx, ctx.sender());
 }
 
-/// Remove `who`'s character from the world, saving where it stood.
+/// Remove `who`'s character from the world, saving where it stood in world coordinates.
 fn despawn(ctx: &ReducerContext, who: Identity) {
     let Some(p) = ctx.db.presence().identity().find(who) else { return };
+    let [x, y, z] = crate::ship::world_position(ctx, &p);
+    crate::ship::let_go(ctx, p.parent, p.entity_id);
     if let Some(c) = ctx.db.character_private().char_id().find(p.char_id) {
-        ctx.db.character_private().char_id().update(CharacterPrivate { x: p.x, y: p.y, z: p.z, ..c });
+        ctx.db.character_private().char_id().update(CharacterPrivate { x, y, z, ..c });
     }
     ctx.db.moved().entity_id().delete(p.entity_id);
     ctx.db.transform().entity_id().delete(p.entity_id);

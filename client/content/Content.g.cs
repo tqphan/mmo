@@ -19,10 +19,46 @@ namespace Mmo.Content
     /// <param name="MaxSpeedMps">Horizontal speed limit in m/s.</param>
     public sealed record MoveModeData(MoveMode Mode, string Id, float MaxSpeedMps);
 
+    /// <summary>Ship hulls (content/ships.toml). The value is the wire value.</summary>
+    public enum Hull : byte
+    {
+        Clipper = 0,
+    }
+
+    /// <param name="MuzzleSpeedMps">Shot speed leaving the muzzle, m/s.</param>
+    /// <param name="MuzzleHeightM">The muzzle's height above the deck, m.</param>
+    /// <param name="ArcDeg">How far either side of the mount's facing it aims, degrees.</param>
+    /// <param name="MinPitchDeg">Lowest elevation, degrees.</param>
+    /// <param name="MaxPitchDeg">Highest elevation, degrees.</param>
+    /// <param name="ReloadS">Time between shots from one mount, s.</param>
+    /// <param name="Damage">Hull damage per hit.</param>
+    /// <param name="SplashM">How far outside a hull a shot still hits it, m.</param>
+    public sealed record CannonData(float MuzzleSpeedMps, float MuzzleHeightM, float ArcDeg, float MinPitchDeg, float MaxPitchDeg, float ReloadS, int Damage, float SplashM);
+
+    /// <summary>A cannon's place on deck.</summary>
+    /// <param name="X">Ship-local x, m.</param>
+    /// <param name="Z">Ship-local z, m.</param>
+    /// <param name="FacingDeg">Yaw on deck: 0 the bow, 90 port, -90 starboard.</param>
+    public sealed record Mount(float X, float Z, float FacingDeg);
+
+    /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
+    /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
+    /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
+    /// <param name="DriftDecelMps2">How fast the ship slows with the throttle at 0, m/s².</param>
+    /// <param name="TurnRateDps">Yaw rate at full rudder and full authority, degrees/s.</param>
+    /// <param name="DeckHalfWidthM">Half the deck's width (ship-local x), m.</param>
+    /// <param name="DeckHalfLengthM">Half the deck's length (ship-local z), m.</param>
+    /// <param name="DeckHeightM">The deck's height above the water, m.</param>
+    /// <param name="DraftM">Depth below the water, m. Shallower water stops the ship.</param>
+    /// <param name="Hp">Hit points when built.</param>
+    /// <param name="HelmX">The helm's ship-local x, m.</param>
+    /// <param name="HelmZ">The helm's ship-local z, m.</param>
+    public sealed record HullData(Hull Hull, string Id, float MaxSpeedMps, float AsternSpeedMps, float AccelMps2, float DriftDecelMps2, float TurnRateDps, float DeckHalfWidthM, float DeckHalfLengthM, float DeckHeightM, float DraftM, int Hp, float HelmX, float HelmZ, CannonData Cannon, IReadOnlyList<Mount> Mounts);
+
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x91c367042d134551UL;
+        public const ulong Hash = 0x176c4ad5fc4f49e1UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -32,5 +68,12 @@ namespace Mmo.Content
         };
 
         public static MoveModeData Data(this MoveMode mode) => MoveModes[(int)mode];
+
+        public static readonly IReadOnlyList<HullData> Hulls = new HullData[]
+        {
+            new(Hull.Clipper, "clipper", 11.0f, 3.0f, 1.5f, 0.8f, 12.0f, 2.5f, 9.0f, 2.0f, 1.2f, 12000, 0.0f, 7.5f, new CannonData(40.0f, 1.0f, 30.0f, -5.0f, 15.0f, 5.0f, 1500, 2.0f), new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }),
+        };
+
+        public static HullData Data(this Hull hull) => Hulls[(int)hull];
     }
 }

@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct MoveEventArgs {
     pub seq: u32,
+    pub parent: u64,
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -20,6 +21,7 @@ impl From<MoveEventArgs> for super::Reducer {
     fn from(args: MoveEventArgs) -> Self {
         Self::MoveEvent {
             seq: args.seq,
+            parent: args.parent,
             x: args.x,
             y: args.y,
             z: args.z,
@@ -48,6 +50,7 @@ pub trait move_event {
     fn move_event(
         &self,
         seq: u32,
+        parent: u64,
         x: f32,
         y: f32,
         z: f32,
@@ -55,7 +58,7 @@ pub trait move_event {
         speed: i16,
         mode: u8,
     ) -> __sdk::Result<()> {
-        self.move_event_then(seq, x, y, z, yaw, speed, mode, |_, _| {})
+        self.move_event_then(seq, parent, x, y, z, yaw, speed, mode, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `move_event` to run as soon as possible,
@@ -67,6 +70,7 @@ pub trait move_event {
     fn move_event_then(
         &self,
         seq: u32,
+        parent: u64,
         x: f32,
         y: f32,
         z: f32,
@@ -84,6 +88,7 @@ impl move_event for super::RemoteReducers {
     fn move_event_then(
         &self,
         seq: u32,
+        parent: u64,
         x: f32,
         y: f32,
         z: f32,
@@ -98,6 +103,7 @@ impl move_event for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             MoveEventArgs {
                 seq,
+                parent,
                 x,
                 y,
                 z,

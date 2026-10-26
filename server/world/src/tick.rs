@@ -51,11 +51,13 @@ pub fn world_tick(ctx: &ReducerContext, _timer: WorldTickTimer) -> Result<(), St
         sim::tick::step_dt(at.to_micros_since_unix_epoch() - s.last_at.to_micros_since_unix_epoch())
     });
 
-    // Systems that step by `dt` go here as they arrive (ships in M0 spike 3).
+    let ticks = last.map_or(0, |s| s.ticks) + 1;
+
+    // Systems that step by `dt`. Ships first, so passengers publish into their ship's new cell.
+    crate::ship::step_ships(ctx, dt, ticks.is_multiple_of(2));
 
     crate::movement::publish_moves(ctx);
 
-    let ticks = last.map_or(0, |s| s.ticks) + 1;
     ctx.db.tick_state().id().delete(0);
     ctx.db.tick_state().insert(TickState { id: 0, ticks, last_at: at, last_dt: dt });
     Ok(())

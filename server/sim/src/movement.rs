@@ -35,12 +35,16 @@ pub enum Verdict {
 /// Check a move from `from` to `to` (both `[x, y, z]`) made `dt_s` seconds after the last accepted
 /// one. Only the horizontal plane is checked.
 pub fn check_move(from: [f32; 3], to: [f32; 3], dt_s: f32, mode: MoveMode) -> Verdict {
+    check_distance(from, to, allowed_distance(mode.data().max_speed_mps, dt_s))
+}
+
+/// Check that a move covers at most `allowed_m` horizontally.
+pub fn check_distance(from: [f32; 3], to: [f32; 3], allowed_m: f32) -> Verdict {
     if !to.iter().all(|c| c.is_finite()) {
         return Verdict::NotFinite;
     }
     let (dx, dz) = (to[0] - from[0], to[2] - from[2]);
     let moved_m = (dx * dx + dz * dz).sqrt();
-    let allowed_m = allowed_distance(mode.data().max_speed_mps, dt_s);
     if moved_m <= allowed_m {
         Verdict::Ok
     } else {

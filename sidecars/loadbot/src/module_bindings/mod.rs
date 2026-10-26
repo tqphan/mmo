@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub mod account_type;
 pub mod admin_clear_terrain_reducer;
 pub mod admin_put_terrain_reducer;
+pub mod cannon_shot_type;
 pub mod character_private_type;
 pub mod character_public_table;
 pub mod character_public_type;
@@ -17,13 +18,18 @@ pub mod combat_event_type;
 pub mod create_character_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_clock_type;
+pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
+pub mod dev_spawn_ship_reducer;
 pub mod dev_swing_reducer;
 pub mod dev_teleport_reducer;
 pub mod dev_tick_table;
 pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
+pub mod fire_reducer;
+pub mod helm_reducer;
+pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
 pub mod move_event_reducer;
 pub mod moved_type;
@@ -31,16 +37,21 @@ pub mod my_characters_table;
 pub mod my_presence_table;
 pub mod owner_type;
 pub mod presence_type;
+pub mod ship_motion_type;
 pub mod suspicion_type;
+pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
 pub mod tick_state_type;
 pub mod transform_table;
 pub mod transform_type;
+pub mod vehicle_table;
+pub mod vehicle_type;
 pub mod world_tick_timer_type;
 
 pub use account_type::Account;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
 pub use admin_put_terrain_reducer::admin_put_terrain;
+pub use cannon_shot_type::CannonShot;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
@@ -49,13 +60,18 @@ pub use combat_event_type::CombatEvent;
 pub use create_character_reducer::create_character;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_clock_type::DevClock;
+pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
+pub use dev_spawn_ship_reducer::dev_spawn_ship;
 pub use dev_swing_reducer::dev_swing;
 pub use dev_teleport_reducer::dev_teleport;
 pub use dev_tick_table::*;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
+pub use fire_reducer::fire;
+pub use helm_reducer::helm;
+pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
 pub use move_event_reducer::move_event;
 pub use moved_type::Moved;
@@ -63,11 +79,15 @@ pub use my_characters_table::*;
 pub use my_presence_table::*;
 pub use owner_type::Owner;
 pub use presence_type::Presence;
+pub use ship_motion_type::ShipMotion;
 pub use suspicion_type::Suspicion;
+pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
 pub use tick_state_type::TickState;
 pub use transform_table::*;
 pub use transform_type::Transform;
+pub use vehicle_table::*;
+pub use vehicle_type::Vehicle;
 pub use world_tick_timer_type::WorldTickTimer;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -88,8 +108,17 @@ pub enum Reducer {
     DevAdvanceClock {
         micros: i64,
     },
+    DevRemoveShip {
+        ship: u64,
+    },
     DevSetGm {
         level: u8,
+    },
+    DevSpawnShip {
+        hull: u8,
+        x: f32,
+        z: f32,
+        yaw: f32,
     },
     DevSwing {
         target: u64,
@@ -102,9 +131,20 @@ pub enum Reducer {
         char_id: u64,
         content_hash: u64,
     },
+    Fire {
+        mount: u8,
+        yaw: f32,
+        pitch: f32,
+    },
+    Helm {
+        throttle: i8,
+        rudder: i8,
+    },
+    LeaveHelm,
     LeaveWorld,
     MoveEvent {
         seq: u32,
+        parent: u64,
         x: f32,
         y: f32,
         z: f32,
@@ -112,6 +152,7 @@ pub enum Reducer {
         speed: i16,
         mode: u8,
     },
+    TakeHelm,
 }
 
 impl __sdk::InModule for Reducer {
@@ -125,12 +166,18 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
+            Reducer::DevSpawnShip { .. } => "dev_spawn_ship",
             Reducer::DevSwing { .. } => "dev_swing",
             Reducer::DevTeleport { .. } => "dev_teleport",
             Reducer::EnterWorld { .. } => "enter_world",
+            Reducer::Fire { .. } => "fire",
+            Reducer::Helm { .. } => "helm",
+            Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
             Reducer::MoveEvent { .. } => "move_event",
+            Reducer::TakeHelm => "take_helm",
             _ => unreachable!(),
         }
     }
@@ -155,9 +202,22 @@ impl __sdk::Reducer for Reducer {
                     micros: micros.clone(),
                 })
             }
+            Reducer::DevRemoveShip { ship } => {
+                __sats::bsatn::to_vec(&dev_remove_ship_reducer::DevRemoveShipArgs {
+                    ship: ship.clone(),
+                })
+            }
             Reducer::DevSetGm { level } => {
                 __sats::bsatn::to_vec(&dev_set_gm_reducer::DevSetGmArgs {
                     level: level.clone(),
+                })
+            }
+            Reducer::DevSpawnShip { hull, x, z, yaw } => {
+                __sats::bsatn::to_vec(&dev_spawn_ship_reducer::DevSpawnShipArgs {
+                    hull: hull.clone(),
+                    x: x.clone(),
+                    z: z.clone(),
+                    yaw: yaw.clone(),
                 })
             }
             Reducer::DevSwing { target } => {
@@ -178,9 +238,20 @@ impl __sdk::Reducer for Reducer {
                 char_id: char_id.clone(),
                 content_hash: content_hash.clone(),
             }),
+            Reducer::Fire { mount, yaw, pitch } => __sats::bsatn::to_vec(&fire_reducer::FireArgs {
+                mount: mount.clone(),
+                yaw: yaw.clone(),
+                pitch: pitch.clone(),
+            }),
+            Reducer::Helm { throttle, rudder } => __sats::bsatn::to_vec(&helm_reducer::HelmArgs {
+                throttle: throttle.clone(),
+                rudder: rudder.clone(),
+            }),
+            Reducer::LeaveHelm => __sats::bsatn::to_vec(&leave_helm_reducer::LeaveHelmArgs {}),
             Reducer::LeaveWorld => __sats::bsatn::to_vec(&leave_world_reducer::LeaveWorldArgs {}),
             Reducer::MoveEvent {
                 seq,
+                parent,
                 x,
                 y,
                 z,
@@ -189,6 +260,7 @@ impl __sdk::Reducer for Reducer {
                 mode,
             } => __sats::bsatn::to_vec(&move_event_reducer::MoveEventArgs {
                 seq: seq.clone(),
+                parent: parent.clone(),
                 x: x.clone(),
                 y: y.clone(),
                 z: z.clone(),
@@ -196,6 +268,7 @@ impl __sdk::Reducer for Reducer {
                 speed: speed.clone(),
                 mode: mode.clone(),
             }),
+            Reducer::TakeHelm => __sats::bsatn::to_vec(&take_helm_reducer::TakeHelmArgs {}),
             _ => unreachable!(),
         }
     }
@@ -212,6 +285,7 @@ pub struct DbUpdate {
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_presence: __sdk::TableUpdate<Presence>,
     transform: __sdk::TableUpdate<Transform>,
+    vehicle: __sdk::TableUpdate<Vehicle>,
 }
 
 impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
@@ -241,6 +315,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "transform" => db_update
                     .transform
                     .append(transform_table::parse_table_update(table_update)?),
+                "vehicle" => db_update
+                    .vehicle
+                    .append(vehicle_table::parse_table_update(table_update)?),
 
                 unknown => {
                     return Err(__sdk::InternalError::unknown_name(
@@ -277,6 +354,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.transform = cache
             .apply_diff_to_table::<Transform>("transform", &self.transform)
             .with_updates_by_pk(|row| &row.entity_id);
+        diff.vehicle = cache
+            .apply_diff_to_table::<Vehicle>("vehicle", &self.vehicle)
+            .with_updates_by_pk(|row| &row.entity_id);
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
@@ -308,6 +388,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "transform" => db_update
                     .transform
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "vehicle" => db_update
+                    .vehicle
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => {
                     return Err(
@@ -343,6 +426,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "transform" => db_update
                     .transform
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "vehicle" => db_update
+                    .vehicle
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => {
                     return Err(
                         __sdk::InternalError::unknown_name("table", unknown, "QueryRows").into(),
@@ -365,6 +451,7 @@ pub struct AppliedDiff<'r> {
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
+    vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
 
@@ -397,6 +484,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<Transform>("transform", &self.transform, event);
+        callbacks.invoke_table_row_callbacks::<Vehicle>("vehicle", &self.vehicle, event);
     }
 }
 
@@ -1064,6 +1152,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_characters_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         transform_table::register_table(client_cache);
+        vehicle_table::register_table(client_cache);
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "character_public",
@@ -1073,5 +1162,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_characters",
         "my_presence",
         "transform",
+        "vehicle",
     ];
 }

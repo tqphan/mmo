@@ -1,9 +1,11 @@
 //! The `world` SpacetimeDB module: the whole game world in one database (PLAN §4, §5).
 
+mod combat;
 #[cfg(feature = "dev")]
 mod dev;
 mod movement;
 mod session;
+mod ship;
 mod terrain;
 mod tick;
 mod time;

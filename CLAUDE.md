@@ -50,7 +50,7 @@ Run these from the repo root. They work on Linux and Windows (ADR 0008).
 - `cargo xtask server`: local SpacetimeDB on 127.0.0.1:3000, in the foreground (data in `target/stdb-data`)
 - `cargo xtask publish [--prod] [--clear]`: build the module to wasm and publish it as `mmo-world` on the local server
 - `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.
-- `cargo xtask bot <scenario> [args]`: run a loadbot scenario against the local server (`bot metrics` prints server timings; `bot swarm --bots N --area M` is the throughput test, docs/spikes/throughput.md; `bot terrain --bots N --secs S` walks bots over uploaded test terrain in the map's south-west corner and clears it afterwards, docs/design/terrain.md; `bot terrain-gen` and `bot terrain-upload --file F` write and upload `.mmoh` height files)
+- `cargo xtask bot <scenario> [args]`: run a loadbot scenario against the local server (`bot metrics` prints server timings; `bot swarm --bots N --area M` is the throughput test, docs/spikes/throughput.md; `bot terrain --bots N --secs S` walks bots over uploaded test terrain in the map's south-west corner and clears it afterwards, docs/design/terrain.md; `bot terrain-gen` and `bot terrain-upload --file F` write and upload `.mmoh` height files; `bot ship --secs S` sails a clipper with bots walking its deck and firing its cannon, docs/design/ships.md)
 - `cargo xtask check`: test, then publish with `--clear` and run every scenario (needs `server` running)
 - Not yet: run the client, capture frames (the Godot client skeleton in BACKLOG).
 

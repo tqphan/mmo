@@ -109,13 +109,13 @@ fn read(file: &str) -> Result<HeightFile, String> {
 }
 
 /// Run a reducer through its `_then` form and wait for the outcome.
-fn outcome(send: impl FnOnce(mpsc::Sender<Result<(), String>>) -> spacetimedb_sdk::Result<()>) -> Check {
+pub(crate) fn outcome(send: impl FnOnce(mpsc::Sender<Result<(), String>>) -> spacetimedb_sdk::Result<()>) -> Check {
     let (tx, rx) = mpsc::channel();
     send(tx).map_err(|e| e.to_string())?;
     rx.recv_timeout(WAIT).map_err(|_| "no reply from the server".to_string())?
 }
 
-fn flatten<E: std::fmt::Display>(r: Result<Result<(), String>, E>) -> Result<(), String> {
+pub(crate) fn flatten<E: std::fmt::Display>(r: Result<Result<(), String>, E>) -> Result<(), String> {
     r.map_err(|e| e.to_string())?
 }
 
@@ -309,7 +309,7 @@ impl Walker {
         self.stats.events += 1;
         let [x, y, z] = self.pos;
         let yaw = (self.heading.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU * 65536.0) as u16;
-        self.bot.conn.reducers.move_event(self.bot.seq, x, y, z, yaw, (RUN_SPEED * 100.0) as i16, 1).map_err(|e| e.to_string())
+        self.bot.conn.reducers.move_event(self.bot.seq, 0, x, y, z, yaw, (RUN_SPEED * 100.0) as i16, 1).map_err(|e| e.to_string())
     }
 
     /// Like the client: when the server's correction count changes, snap to its position.
@@ -413,7 +413,7 @@ fn spawn_walker(args: &Args, f: &HeightFile, i: usize) -> Result<Walker, String>
 
 fn move_to(bot: &mut Bot, x: f32, y: f32, z: f32) -> Check {
     bot.seq += 1;
-    bot.conn.reducers.move_event(bot.seq, x, y, z, 0, 0, 1).map_err(|e| e.to_string())
+    bot.conn.reducers.move_event(bot.seq, 0, x, y, z, 0, 0, 1).map_err(|e| e.to_string())
 }
 
 fn expect_corrections(bot: &Bot, n: u32, what: &str) -> Check {

@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x91c367042d134551;
+pub const CONTENT_HASH: u64 = 0x176c4ad5fc4f49e1;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,5 +34,109 @@ impl MoveMode {
 
     pub fn data(self) -> &'static MoveModeData {
         &MOVE_MODES[self as usize]
+    }
+}
+
+/// Ship hulls (`content/ships.toml`). The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Hull {
+    Clipper = 0,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CannonData {
+    /// Shot speed leaving the muzzle, m/s.
+    pub muzzle_speed_mps: f32,
+    /// The muzzle's height above the deck, m.
+    pub muzzle_height_m: f32,
+    /// How far either side of the mount's facing it aims, degrees.
+    pub arc_deg: f32,
+    /// Lowest elevation, degrees.
+    pub min_pitch_deg: f32,
+    /// Highest elevation, degrees.
+    pub max_pitch_deg: f32,
+    /// Time between shots from one mount, s.
+    pub reload_s: f32,
+    /// Hull damage per hit.
+    pub damage: i32,
+    /// How far outside a hull a shot still hits it, m.
+    pub splash_m: f32,
+}
+
+/// A cannon's place on deck.
+#[derive(Debug, PartialEq)]
+pub struct Mount {
+    /// Ship-local x, m.
+    pub x: f32,
+    /// Ship-local z, m.
+    pub z: f32,
+    /// Yaw on deck: 0 the bow, 90 port, -90 starboard.
+    pub facing_deg: f32,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HullData {
+    pub hull: Hull,
+    pub id: &'static str,
+    /// Top speed ahead, m/s.
+    pub max_speed_mps: f32,
+    /// Top speed astern, m/s.
+    pub astern_speed_mps: f32,
+    /// How fast speed follows the throttle, m/s².
+    pub accel_mps2: f32,
+    /// How fast the ship slows with the throttle at 0, m/s².
+    pub drift_decel_mps2: f32,
+    /// Yaw rate at full rudder and full authority, degrees/s.
+    pub turn_rate_dps: f32,
+    /// Half the deck's width (ship-local x), m.
+    pub deck_half_width_m: f32,
+    /// Half the deck's length (ship-local z), m.
+    pub deck_half_length_m: f32,
+    /// The deck's height above the water, m.
+    pub deck_height_m: f32,
+    /// Depth below the water, m. Shallower water stops the ship.
+    pub draft_m: f32,
+    /// Hit points when built.
+    pub hp: i32,
+    /// The helm's ship-local x, m.
+    pub helm_x: f32,
+    /// The helm's ship-local z, m.
+    pub helm_z: f32,
+    pub cannon: CannonData,
+    pub mounts: &'static [Mount],
+}
+
+pub static HULLS: [HullData; 1] = [
+    HullData {
+        hull: Hull::Clipper,
+        id: "clipper",
+        max_speed_mps: 11.0,
+        astern_speed_mps: 3.0,
+        accel_mps2: 1.5,
+        drift_decel_mps2: 0.8,
+        turn_rate_dps: 12.0,
+        deck_half_width_m: 2.5,
+        deck_half_length_m: 9.0,
+        deck_height_m: 2.0,
+        draft_m: 1.2,
+        hp: 12000,
+        helm_x: 0.0,
+        helm_z: 7.5,
+        cannon: CannonData { muzzle_speed_mps: 40.0, muzzle_height_m: 1.0, arc_deg: 30.0, min_pitch_deg: -5.0, max_pitch_deg: 15.0, reload_s: 5.0, damage: 1500, splash_m: 2.0 },
+        mounts: &[
+            Mount { x: -2.0, z: 0.0, facing_deg: 90.0 },
+            Mount { x: 2.0, z: 0.0, facing_deg: -90.0 },
+        ],
+    },
+];
+
+impl Hull {
+    pub fn from_u8(v: u8) -> Option<Self> {
+        HULLS.get(usize::from(v)).map(|d| d.hull)
+    }
+
+    pub fn data(self) -> &'static HullData {
+        &HULLS[self as usize]
     }
 }

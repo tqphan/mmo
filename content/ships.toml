@@ -1,0 +1,39 @@
+# Ship hulls (docs/design/ships.md). `wire` is the hull's id on the wire and in `entity.ref_id`;
+# the values must run 0, 1, 2, … with no gaps. Positions are ship-local metres: origin at the deck's
+# centre, -z the bow, +x starboard. A mount's `facing_deg` is a yaw on deck: 0 is the bow, 90 port,
+# -90 starboard. Every number is a placeholder, confidence C, except the clipper's top speed (B).
+
+[[hull]]
+id = "clipper"
+wire = 0
+max_speed_mps = 11.0
+astern_speed_mps = 3.0
+accel_mps2 = 1.5
+drift_decel_mps2 = 0.8
+turn_rate_dps = 12.0
+deck_half_width_m = 2.5
+deck_half_length_m = 9.0
+deck_height_m = 2.0
+draft_m = 1.2
+hp = 12000
+helm = [0.0, 7.5]
+
+[hull.cannon]
+muzzle_speed_mps = 40.0
+muzzle_height_m = 1.0
+arc_deg = 30.0
+min_pitch_deg = -5.0
+max_pitch_deg = 15.0
+reload_s = 5.0
+damage = 1500
+splash_m = 2.0
+
+[[hull.mount]]
+x = -2.0
+z = 0.0
+facing_deg = 90.0
+
+[[hull.mount]]
+x = 2.0
+z = 0.0
+facing_deg = -90.0
