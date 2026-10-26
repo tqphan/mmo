@@ -2,6 +2,7 @@
 
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
 
+use crate::movement::moved;
 use crate::time::now;
 
 pub const MAX_CHARACTERS_PER_ACCOUNT: usize = 4;
@@ -60,7 +61,9 @@ pub struct Entity {
     pub ref_id: u64,
 }
 
-/// Hot: where it is. Public, keyed by cell. Kept small.
+/// Hot: where it is, as others see it. Public, keyed by cell. Kept small. For characters this
+/// lags the authoritative position in `presence` by up to one tick: `world_tick` publishes moves
+/// in one batch every 100 ms (docs/spikes/mass-fight.md).
 #[spacetimedb::table(accessor = transform, public)]
 pub struct Transform {
     #[primary_key]
@@ -78,7 +81,8 @@ pub struct Transform {
     pub mode: u8,
 }
 
-/// Private: who is in the world as which character, and their movement bookkeeping.
+/// Private: who is in the world as which character, where it really is, and its movement
+/// bookkeeping. The owner reads it through `my_presence`.
 #[spacetimedb::table(accessor = presence)]
 pub struct Presence {
     #[primary_key]
@@ -91,9 +95,16 @@ pub struct Presence {
     /// The last accepted movement event.
     pub last_seq: u32,
     pub last_move_at: Timestamp,
-    /// Bumped whenever the server overrules the client's position; the client snaps to its
-    /// `transform` row when this changes.
+    /// Bumped whenever the server overrules the client's position; the client snaps to the
+    /// position below when this changes.
     pub corrections: u32,
+    /// The authoritative position and motion, as of the last accepted move.
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub yaw: u16,
+    pub speed: i16,
+    pub mode: u8,
 }
 
 #[spacetimedb::view(accessor = my_characters, public)]
@@ -198,6 +209,12 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64) -> Result<(), String> {
         last_seq: 0,
         last_move_at: t,
         corrections: 0,
+        x: c.x,
+        y: c.y,
+        z: c.z,
+        yaw: 0,
+        speed: 0,
+        mode: sim::movement::MoveMode::Run as u8,
     });
     Ok(())
 }
@@ -210,11 +227,10 @@ pub fn leave_world(ctx: &ReducerContext) {
 /// Remove `who`'s character from the world, saving where it stood.
 fn despawn(ctx: &ReducerContext, who: Identity) {
     let Some(p) = ctx.db.presence().identity().find(who) else { return };
-    if let Some(t) = ctx.db.transform().entity_id().find(p.entity_id)
-        && let Some(c) = ctx.db.character_private().char_id().find(p.char_id)
-    {
-        ctx.db.character_private().char_id().update(CharacterPrivate { x: t.x, y: t.y, z: t.z, ..c });
+    if let Some(c) = ctx.db.character_private().char_id().find(p.char_id) {
+        ctx.db.character_private().char_id().update(CharacterPrivate { x: p.x, y: p.y, z: p.z, ..c });
     }
+    ctx.db.moved().entity_id().delete(p.entity_id);
     ctx.db.transform().entity_id().delete(p.entity_id);
     ctx.db.entity().id().delete(p.entity_id);
     ctx.db.presence().identity().delete(who);

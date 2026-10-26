@@ -3,7 +3,7 @@
 use spacetimedb::test_utils::{TestAuth, TestContext};
 use spacetimedb::{ConnectionId, Identity, ReducerContext, Table, TimeDuration, Timestamp};
 
-use crate::movement::{move_event, suspicion};
+use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
 
 const T0: i64 = 1_800_000_000_000_000; // an arbitrary start time, in µs
@@ -55,6 +55,11 @@ fn presence_of(t: &TestContext, player: u128) -> Presence {
 
 fn advance_ms(t: &TestContext, ms: i64) {
     t.clock.advance(TimeDuration::from_micros(ms * 1000));
+}
+
+/// Run the tick's publish step: what observers see catches up with `presence`.
+fn publish(t: &TestContext) -> usize {
+    read(t, crate::movement::publish_moves)
 }
 
 fn step(t: &TestContext, player: u128, seq: u32, x: f32, z: f32) {
@@ -155,6 +160,8 @@ fn a_legal_run_is_accepted_and_changes_cell() {
         advance_ms(&t, 500);
         step(&t, 1, i, 2.7 * i as f32, 0.0);
     }
+    assert!((presence_of(&t, 1).x - 75.6).abs() < 1e-3);
+    assert_eq!(publish(&t), 1);
     let tr = transform_of(&t, p.entity_id);
     assert!((tr.x - 75.6).abs() < 1e-3);
     assert_eq!(tr.cell, sim::cell::cell_of(0, 75.6, 0.0));
@@ -170,38 +177,40 @@ fn a_speed_hack_is_corrected_and_logged() {
     let p = arrive(&t, 1, "Mira");
     advance_ms(&t, 500);
     step(&t, 1, 1, 20.0, 0.0); // 40 m/s
-    let tr = transform_of(&t, p.entity_id);
-    assert_eq!((tr.x, tr.z), (0.0, 0.0));
     let pr = presence_of(&t, 1);
+    assert_eq!((pr.x, pr.z, pr.speed), (0.0, 0.0, 0));
     assert_eq!((pr.corrections, pr.last_seq), (1, 1));
+    publish(&t);
+    let tr = transform_of(&t, p.entity_id);
+    assert_eq!((tr.x, tr.z, tr.speed), (0.0, 0.0, 0));
     assert_eq!(read(&t, |ctx| ctx.db.suspicion().count()), 1);
 
     // The next legal step from the server's position is accepted again.
     advance_ms(&t, 500);
     step(&t, 1, 2, 2.0, 0.0);
-    assert_eq!(transform_of(&t, p.entity_id).x, 2.0);
+    assert_eq!(presence_of(&t, 1).x, 2.0);
 }
 
 #[test]
 fn going_quiet_does_not_allow_a_teleport() {
     let t = world();
-    let p = arrive(&t, 1, "Mira");
+    arrive(&t, 1, "Mira");
     advance_ms(&t, 60_000);
     step(&t, 1, 1, 300.0, 0.0);
-    assert_eq!(transform_of(&t, p.entity_id).x, 0.0);
+    assert_eq!(presence_of(&t, 1).x, 0.0);
     assert_eq!(presence_of(&t, 1).corrections, 1);
 }
 
 #[test]
 fn stale_and_duplicate_events_are_ignored() {
     let t = world();
-    let p = arrive(&t, 1, "Mira");
+    arrive(&t, 1, "Mira");
     advance_ms(&t, 500);
     step(&t, 1, 5, 1.0, 0.0);
     advance_ms(&t, 500);
     step(&t, 1, 5, 2.0, 0.0);
     step(&t, 1, 3, 3.0, 0.0);
-    assert_eq!(transform_of(&t, p.entity_id).x, 1.0);
+    assert_eq!(presence_of(&t, 1).x, 1.0);
     assert_eq!(presence_of(&t, 1).last_seq, 5);
 }
 
@@ -214,10 +223,10 @@ fn moving_requires_being_in_the_world() {
 #[test]
 fn unknown_modes_and_nan_positions_are_rejected() {
     let t = world();
-    let p = arrive(&t, 1, "Mira");
+    arrive(&t, 1, "Mira");
     assert!(call(&t, 1, |ctx| move_event(ctx, 1, 0.0, 0.0, 0.0, 0, 0, 99)).is_err());
     step(&t, 1, 2, f32::NAN, 0.0);
-    assert_eq!(transform_of(&t, p.entity_id).x, 0.0);
+    assert_eq!(presence_of(&t, 1).x, 0.0);
     assert_eq!(presence_of(&t, 1).corrections, 1);
 }
 
@@ -234,6 +243,7 @@ fn leaving_saves_position_and_despawns() {
     .unwrap();
     assert_eq!(read(&t, |ctx| ctx.db.entity().count()), 0);
     assert_eq!(read(&t, |ctx| ctx.db.transform().count()), 0);
+    assert_eq!(read(&t, |ctx| ctx.db.moved().count()), 0, "the unpublished move goes too");
     assert!(read(&t, |ctx| ctx.db.presence().identity().find(identity(1))).is_none());
     let c = read(&t, |ctx| ctx.db.character_private().char_id().find(p.char_id).unwrap());
     assert_eq!((c.x, c.z), (2.0, -1.0));
@@ -406,4 +416,23 @@ fn dev_swing_needs_a_target_in_range() {
     })
     .unwrap();
     assert_eq!(seen, 1);
+}
+
+#[test]
+fn others_see_moves_only_when_the_tick_publishes_them() {
+    let t = started();
+    let p = arrive(&t, 1, "Mira");
+    for (seq, x) in [(1, 2.0), (2, 4.0)] {
+        advance_ms(&t, 500);
+        step(&t, 1, seq, x, 0.0);
+    }
+    // Two moves, one pending publish, and the public row hasn't moved yet.
+    assert_eq!(read(&t, |ctx| ctx.db.moved().count()), 1);
+    assert_eq!(transform_of(&t, p.entity_id).x, 0.0);
+    tick(&t);
+    let tr = transform_of(&t, p.entity_id);
+    assert_eq!((tr.x, tr.speed), (4.0, 540));
+    assert_eq!(read(&t, |ctx| ctx.db.moved().count()), 0);
+    // Nothing moved since, so the next tick publishes nothing.
+    assert_eq!(publish(&t), 0);
 }

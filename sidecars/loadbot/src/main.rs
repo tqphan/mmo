@@ -1,7 +1,7 @@
 //! Headless bots that play scripted scenarios against a running server and check what they see.
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
-//! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S`.
+//! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
@@ -39,6 +39,14 @@ fn parse_args() -> (Args, swarm::SwarmArgs) {
             "--combat" => sw.combat = num("--combat", it.next()),
             "--area" => sw.area = num("--area", it.next()),
             "--secs" => sw.secs = num("--secs", it.next()),
+            "--compression" => {
+                sw.compression = match it.next().as_deref() {
+                    Some("none") => spacetimedb_sdk::Compression::None,
+                    Some("gzip") => spacetimedb_sdk::Compression::Gzip,
+                    Some("brotli") => spacetimedb_sdk::Compression::Brotli,
+                    _ => panic!("--compression is none, gzip or brotli"),
+                }
+            }
             s => a.scenario = s.into(),
         }
     }
@@ -99,6 +107,7 @@ impl Bot {
         let conn = DbConnection::builder()
             .with_uri(args.uri.as_str())
             .with_database_name(args.db.as_str())
+            .with_compression(spacetimedb_sdk::Compression::Gzip)
             .build()
             .map_err(|e| format!("{label}: connect failed: {e}"))?;
         conn.run_threaded();

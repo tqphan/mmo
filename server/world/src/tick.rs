@@ -53,6 +53,8 @@ pub fn world_tick(ctx: &ReducerContext, _timer: WorldTickTimer) -> Result<(), St
 
     // Systems that step by `dt` go here as they arrive (ships in M0 spike 3).
 
+    crate::movement::publish_moves(ctx);
+
     let ticks = last.map_or(0, |s| s.ticks) + 1;
     ctx.db.tick_state().id().delete(0);
     ctx.db.tick_state().insert(TickState { id: 0, ticks, last_at: at, last_dt: dt });

@@ -2,6 +2,8 @@
 
 Status: done, 2026-10-25. PLAN §11, M0 spike 1. Code: `sidecars/loadbot/src/swarm.rs`, `server/world/src/dev.rs`.
 
+> **Later:** spike 2 (docs/spikes/mass-fight.md, ADR 0011) batched movement into the tick and switched clients to Gzip. That fixed the crowd result: 150 in view now costs about 19 KB/s, and 500 about 44 KB/s. The numbers below are from before that change.
+
 ## Question
 
 Can one SpacetimeDB 2.13 instance on this laptop carry 500 players moving and fighting?

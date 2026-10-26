@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::SeqCst};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use spacetimedb_sdk::{DbContext, EventTable as _, SubscriptionHandle as _, Table};
+use spacetimedb_sdk::{Compression, DbContext, EventTable as _, SubscriptionHandle as _, Table};
 
 use crate::module_bindings::*;
 use crate::{Args, Check, RUN_SPEED, metrics, name_for};
@@ -23,11 +23,14 @@ pub struct SwarmArgs {
     pub area: f32,
     /// How long to measure, after everyone is in and a warm-up.
     pub secs: u64,
+    /// What the server should compress large messages with. Gzip, like the real client (ADR 0011);
+    /// the others are there to compare.
+    pub compression: Compression,
 }
 
 impl Default for SwarmArgs {
     fn default() -> Self {
-        Self { bots: 100, combat: 0.3, area: 1000.0, secs: 60 }
+        Self { bots: 100, combat: 0.3, area: 1000.0, secs: 60, compression: Compression::Gzip }
     }
 }
 
@@ -117,6 +120,7 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
         DbConnection::builder()
             .with_uri(args.uri.as_str())
             .with_database_name(args.db.as_str())
+            .with_compression(sw.compression)
             .build()
             .map_err(|e| format!("bot {i}: connect failed: {e}"))?,
     );
@@ -195,9 +199,7 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
             && p.corrections != corrections
         {
             corrections = p.corrections;
-            if let Some(t) = conn.db.transform().entity_id().find(&me) {
-                (x, z) = (t.x, t.z);
-            }
+            (x, z) = (p.x, p.z);
         }
         // Wander: turn a little each step, and head back in when outside the square.
         heading += (rng.unit() - 0.5) * 0.6;

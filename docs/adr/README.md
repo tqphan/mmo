@@ -14,3 +14,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0008](0008-two-dev-machines-xtask.md) | Develop on Linux and Windows; dev tasks via `cargo xtask`; workspace at the repo root | Accepted |
 | [0009](0009-lockfile-seeded-from-spacetimedb.md) | Seed `Cargo.lock` from SpacetimeDB's own lockfile | Accepted |
 | [0010](0010-server-metrics-from-the-host.md) | Server timings come from the host's Prometheus metrics, not a module table | Accepted |
+| [0011](0011-batched-movement-and-gzip.md) | Movement is published once per tick; clients use Gzip | Accepted |

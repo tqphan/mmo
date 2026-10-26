@@ -34,6 +34,12 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Presence, uint> LastSeq { get; }
         public global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp> LastMoveAt { get; }
         public global::SpacetimeDB.Col<Presence, uint> Corrections { get; }
+        public global::SpacetimeDB.Col<Presence, float> X { get; }
+        public global::SpacetimeDB.Col<Presence, float> Y { get; }
+        public global::SpacetimeDB.Col<Presence, float> Z { get; }
+        public global::SpacetimeDB.Col<Presence, ushort> Yaw { get; }
+        public global::SpacetimeDB.Col<Presence, short> Speed { get; }
+        public global::SpacetimeDB.Col<Presence, byte> Mode { get; }
 
         public MyPresenceCols(string tableName)
         {
@@ -44,6 +50,12 @@ namespace SpacetimeDB.Types
             LastSeq = new global::SpacetimeDB.Col<Presence, uint>(tableName, "last_seq");
             LastMoveAt = new global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp>(tableName, "last_move_at");
             Corrections = new global::SpacetimeDB.Col<Presence, uint>(tableName, "corrections");
+            X = new global::SpacetimeDB.Col<Presence, float>(tableName, "x");
+            Y = new global::SpacetimeDB.Col<Presence, float>(tableName, "y");
+            Z = new global::SpacetimeDB.Col<Presence, float>(tableName, "z");
+            Yaw = new global::SpacetimeDB.Col<Presence, ushort>(tableName, "yaw");
+            Speed = new global::SpacetimeDB.Col<Presence, short>(tableName, "speed");
+            Mode = new global::SpacetimeDB.Col<Presence, byte>(tableName, "mode");
         }
     }
 

@@ -1,6 +1,6 @@
 # Sessions, movement and cells
 
-Status: v0.1, 2026-10-25. M0 slice. Code: `server/sim/src/{cell,movement}.rs`, `server/world/src/{session,movement,time}.rs`, `sidecars/loadbot`.
+Status: v0.2, 2026-10-25. M0 slice; v0.2 publishes moves once per tick (ADR 0011). Code: `server/sim/src/{cell,movement}.rs`, `server/world/src/{session,movement,time}.rs`, `sidecars/loadbot`.
 
 ## 1. How the original worked
 
@@ -37,7 +37,9 @@ Our speed numbers are placeholders until the research is done. They live in `sim
 - Check (horizontal only): distance from the server's position ≤ `max_speed(mode) × (1 + 15%) × min(dt, 2 s) + 0.5 m`, where `dt` is measured since the last accepted event, using `now(ctx)`.
   - The 2 s cap means a client can't stay quiet and then jump.
   - Placeholder limits: walk 2.0 m/s, run 5.4 m/s, swim 3.5 m/s (confidence C).
-- **Rejected move:** the transform keeps the server position with speed 0, a row goes into the private `suspicion` log, and `presence.corrections` goes up by one. The client watches `my_presence.corrections` and snaps to its `transform` row when the count changes. `seq` and the time still advance, so the next legal step counts from the server position.
+- **The authoritative position lives in the private `presence` row** (x, y, z, yaw, speed, mode). Moves are checked against it and update it at once.
+- **Others see moves once per tick** (ADR 0011). An accepted move also adds the entity to the private `moved` set. `world_tick` copies every moved position into the public `transform` (and `entity.cell`) in one transaction every 100 ms, so observers lag by 0–100 ms. Game rules that need a character's position read `presence`.
+- **Rejected move:** the position stays where it was with speed 0, a row goes into the private `suspicion` log, and `presence.corrections` goes up by one. The client watches `my_presence.corrections` and snaps to the position in that row when the count changes. `seq` and the time still advance, so the next legal step counts from the server position.
 - Unknown mode → `Err`. NaN or infinite position → treated as a rejected move.
 
 ### Time
@@ -59,5 +61,6 @@ Our speed numbers are placeholders until the research is done. They live in `sim
 | module | Account once per identity; name rules and case-insensitive uniqueness; 4-character limit; no account → error | `server/world/src/tests.rs` |
 | module | Enter spawns entity and transform in the right cell; can't use someone else's character; re-entering replaces the entity | same |
 | module | Legal run accepted across a cell boundary (entity and transform cells agree); speed hack corrected and logged, then recovers; quiet-then-jump rejected; stale and duplicate seq ignored; NaN corrected; unknown mode errors | same |
-| module | Leave saves position, despawns, and re-enter restores it; two players appear in the same cell query; views return only your own rows; dev clock moves forward only | same |
+| module | Moves reach `transform` only when the tick publishes them, one publish per moved entity, nothing when nothing moved; corrections publish speed 0 | same |
+| module | Leave saves position, despawns (dropping any unpublished move), and re-enter restores it; two players appear in the same cell query; views return only your own rows; dev clock moves forward only | same |
 | scenario | Two bots on a live server subscribe to the Near tier, see each other, B sees A's run, A's speed hack is corrected and B never sees the jump, A disconnects and B sees it despawn | `cargo xtask bot see-each-other` |

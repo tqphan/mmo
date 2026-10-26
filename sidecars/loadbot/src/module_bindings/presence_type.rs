@@ -14,6 +14,12 @@ pub struct Presence {
     pub last_seq: u32,
     pub last_move_at: __sdk::Timestamp,
     pub corrections: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub yaw: u16,
+    pub speed: i16,
+    pub mode: u8,
 }
 
 impl __sdk::InModule for Presence {
@@ -31,6 +37,12 @@ pub struct PresenceCols {
     pub last_seq: __sdk::__query_builder::Col<Presence, u32>,
     pub last_move_at: __sdk::__query_builder::Col<Presence, __sdk::Timestamp>,
     pub corrections: __sdk::__query_builder::Col<Presence, u32>,
+    pub x: __sdk::__query_builder::Col<Presence, f32>,
+    pub y: __sdk::__query_builder::Col<Presence, f32>,
+    pub z: __sdk::__query_builder::Col<Presence, f32>,
+    pub yaw: __sdk::__query_builder::Col<Presence, u16>,
+    pub speed: __sdk::__query_builder::Col<Presence, i16>,
+    pub mode: __sdk::__query_builder::Col<Presence, u8>,
 }
 
 impl __sdk::__query_builder::HasCols for Presence {
@@ -44,6 +56,12 @@ impl __sdk::__query_builder::HasCols for Presence {
             last_seq: __sdk::__query_builder::Col::new(table_name, "last_seq"),
             last_move_at: __sdk::__query_builder::Col::new(table_name, "last_move_at"),
             corrections: __sdk::__query_builder::Col::new(table_name, "corrections"),
+            x: __sdk::__query_builder::Col::new(table_name, "x"),
+            y: __sdk::__query_builder::Col::new(table_name, "y"),
+            z: __sdk::__query_builder::Col::new(table_name, "z"),
+            yaw: __sdk::__query_builder::Col::new(table_name, "yaw"),
+            speed: __sdk::__query_builder::Col::new(table_name, "speed"),
+            mode: __sdk::__query_builder::Col::new(table_name, "mode"),
         }
     }
 }

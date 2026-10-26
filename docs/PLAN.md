@@ -196,7 +196,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
   | Tier | Contents | Radius | Write rate |
   |---|---|---|---|
   | Self | The player's own private data through views: inventory, cooldowns, quests, labor, mail, crime record | — | On change |
-  | Near | `entity`, `transform`, `status`, `combat_event` | 5×5 cells, about ±160 m | Movement events, 2 Hz heartbeat |
+  | Near | `entity`, `transform`, `status`, `combat_event` | 5×5 cells, about ±160 m | Published in one batch per 10 Hz tick (ADR 0011) |
   | Static | Plots, buildings, crops, trees, livestock, furniture, resource nodes | 9×9 cells, about ±290 m | Rarely |
   | Far | `far_marker` (ships, world bosses, siege engines) on a 512 m grid | 5×5 cells, about ±1.3 km | 1 Hz |
   | Global | Zone war states, world events, clock, weather | Whole world | Rarely |
@@ -204,6 +204,8 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
   The Far tier is what puts a sail on the horizon.
 - **Switching cells.** Subscribe to the new cells before dropping the old ones, with hysteresis so a player on a cell border doesn't keep resubscribing.
 - **Hot and cold tables are separate.** Write rows only when something changed, using small types.
+- **Movement reaches other players in batches** (ADR 0011). `move_event` updates the private `presence` row; `world_tick` copies every moved position into `transform` in one transaction. Each observer gets one message per tick instead of one per move. Clients ask for Gzip compression. Measured in M0 spike 2 (docs/spikes/mass-fight.md): a 150-player crowd costs each client about 19 KB/s, and 500 all in view about 44 KB/s.
+- **Next lever for siege-sized crowds:** publish the outer ring of the Near tier at 2 Hz from a second table, so clients subscribe to the inner 3×3 cells at full rate and the outer 16 at a lower one. Build it when M3's large battles need it.
 - **Public positions are readable by modified clients**, so map hacks are possible. Protect only what matters for gameplay (§4.5).
 
 ### 4.4 Simulation timing
@@ -486,7 +488,8 @@ pub struct CombatEvent { cell: u64, source: u64, target: u64, skill_id: u32, amo
 | WorldStream | Terrain3D regions, per-cell prop scenes loaded on background threads, foliage instancing, impostors, water, sky and weather |
 
 ### 6.2 Sync rules
-- **Row callbacks.** A row inserted in a subscribed cell spawns an entity; a deleted row despawns it with a fade. A `transform` update feeds the interpolation buffer. The local player reconciles only when the server sends a correction.
+- **Row callbacks.** A row inserted in a subscribed cell spawns an entity; a deleted row despawns it with a fade. A `transform` update feeds the interpolation buffer. Updates arrive once per 100 ms tick, so the buffer holds at least two ticks. The local player reconciles only when `my_presence.corrections` changes, snapping to the position in that row.
+- **Connection settings.** Ask for Gzip compression (`WithCompression(Compression.Gzip)`). It's nearly as small as the default Brotli and much cheaper to decode (ADR 0011).
 - **Sending movement.** Send movement events on start, stop, turn, jump and mode change, plus a 2 Hz heartbeat, numbered so the server can order them.
 - **Optimistic updates.** Only movement and cosmetic UI update before the server confirms.
 

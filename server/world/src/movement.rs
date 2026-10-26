@@ -1,9 +1,13 @@
 //! Movement events from client prediction, checked against speed limits (PLAN §4.2).
+//!
+//! Accepted moves update the private `presence` row at once, so the next check and the mover's own
+//! client see them immediately. Everyone else sees them when `world_tick` publishes the batch to
+//! `transform`, one transaction per tick instead of one per move (docs/spikes/mass-fight.md).
 
 use spacetimedb::{ReducerContext, Table, Timestamp};
 use sim::movement::{MoveMode, Verdict, check_move};
 
-use crate::session::{Presence, Transform, entity, presence, transform};
+use crate::session::{Entity, Presence, Transform, entity, presence, transform};
 use crate::time::{now, secs_between};
 
 /// Private log of rejected moves, for spotting cheats and tuning the limits.
@@ -16,6 +20,13 @@ pub struct Suspicion {
     pub char_id: u64,
     pub at: Timestamp,
     pub reason: String,
+}
+
+/// Private: entities whose `presence` position changed since the last tick published it.
+#[spacetimedb::table(accessor = moved)]
+pub struct Moved {
+    #[primary_key]
+    pub entity_id: u64,
 }
 
 /// One movement event: start, stop, turn, jump, mode change or heartbeat. `seq` increases with
@@ -37,20 +48,23 @@ pub fn move_event(
         return Ok(()); // stale or duplicate; ordering is the client's job, not an error
     }
     let mode = MoveMode::from_u8(mode).ok_or("unknown movement mode")?;
-    let t = ctx.db.transform().entity_id().find(p.entity_id).ok_or("presence without transform")?;
     let at = now(ctx);
     let dt = secs_between(p.last_move_at, at);
+    let entity_id = p.entity_id;
 
-    match check_move([t.x, t.y, t.z], [x, y, z], dt, mode) {
+    match check_move([p.x, p.y, p.z], [x, y, z], dt, mode) {
         Verdict::Ok => {
-            let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
-            if cell != t.cell
-                && let Some(e) = ctx.db.entity().id().find(p.entity_id)
-            {
-                ctx.db.entity().id().update(crate::session::Entity { cell, ..e });
-            }
-            ctx.db.transform().entity_id().update(Transform { cell, x, y, z, yaw, speed, mode: mode as u8, ..t });
-            ctx.db.presence().identity().update(Presence { last_seq: seq, last_move_at: at, ..p });
+            ctx.db.presence().identity().update(Presence {
+                last_seq: seq,
+                last_move_at: at,
+                x,
+                y,
+                z,
+                yaw,
+                speed,
+                mode: mode as u8,
+                ..p
+            });
         }
         bad => {
             let reason = match bad {
@@ -62,14 +76,47 @@ pub fn move_event(
             log::warn!("move rejected for char {}: {reason}", p.char_id);
             ctx.db.suspicion().insert(Suspicion { id: 0, char_id: p.char_id, at, reason });
             // Keep the server position, stop the entity and tell the client to snap back.
-            ctx.db.transform().entity_id().update(Transform { speed: 0, ..t });
             ctx.db.presence().identity().update(Presence {
                 last_seq: seq,
                 last_move_at: at,
                 corrections: p.corrections + 1,
+                speed: 0,
                 ..p
             });
         }
     }
+    if ctx.db.moved().entity_id().find(entity_id).is_none() {
+        ctx.db.moved().insert(Moved { entity_id });
+    }
     Ok(())
+}
+
+/// Called by `world_tick`: copy every moved position from `presence` into the public `transform`,
+/// moving entities between cells as needed. Returns how many it published.
+pub fn publish_moves(ctx: &ReducerContext) -> usize {
+    let ids: Vec<u64> = ctx.db.moved().iter().map(|m| m.entity_id).collect();
+    for &id in &ids {
+        ctx.db.moved().entity_id().delete(id);
+        let (Some(p), Some(t)) = (ctx.db.presence().entity_id().find(id), ctx.db.transform().entity_id().find(id))
+        else {
+            continue;
+        };
+        let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, p.x, p.z);
+        if cell != t.cell
+            && let Some(e) = ctx.db.entity().id().find(id)
+        {
+            ctx.db.entity().id().update(Entity { cell, ..e });
+        }
+        ctx.db.transform().entity_id().update(Transform {
+            cell,
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            yaw: p.yaw,
+            speed: p.speed,
+            mode: p.mode,
+            ..t
+        });
+    }
+    ids.len()
 }

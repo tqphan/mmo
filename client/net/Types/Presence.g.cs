@@ -27,6 +27,18 @@ namespace SpacetimeDB.Types
         public SpacetimeDB.Timestamp LastMoveAt;
         [DataMember(Name = "corrections")]
         public uint Corrections;
+        [DataMember(Name = "x")]
+        public float X;
+        [DataMember(Name = "y")]
+        public float Y;
+        [DataMember(Name = "z")]
+        public float Z;
+        [DataMember(Name = "yaw")]
+        public ushort Yaw;
+        [DataMember(Name = "speed")]
+        public short Speed;
+        [DataMember(Name = "mode")]
+        public byte Mode;
 
         public Presence(
             SpacetimeDB.Identity Identity,
@@ -35,7 +47,13 @@ namespace SpacetimeDB.Types
             SpacetimeDB.Timestamp EnteredAt,
             uint LastSeq,
             SpacetimeDB.Timestamp LastMoveAt,
-            uint Corrections
+            uint Corrections,
+            float X,
+            float Y,
+            float Z,
+            ushort Yaw,
+            short Speed,
+            byte Mode
         )
         {
             this.Identity = Identity;
@@ -45,6 +63,12 @@ namespace SpacetimeDB.Types
             this.LastSeq = LastSeq;
             this.LastMoveAt = LastMoveAt;
             this.Corrections = Corrections;
+            this.X = X;
+            this.Y = Y;
+            this.Z = Z;
+            this.Yaw = Yaw;
+            this.Speed = Speed;
+            this.Mode = Mode;
         }
 
         public Presence()
