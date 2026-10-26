@@ -24,7 +24,7 @@ This is a hobby MMO that recreates the **systems** of ArcheAge's final Western v
 2. **Build** the smallest end-to-end slice: server, client and tests.
 3. **Verify** with tests and bot scenarios. For visual changes, capture frames in Movie Maker mode and look at them.
 4. **Update docs.** Update `docs/STATUS.md` and `docs/BACKLOG.md`, and record any decisions as ADRs.
-5. **Commit.** The repository is https://github.com/tqphan/mmo (public, branch `main`). Ask before committing or pushing unless the user has given standing approval, and record any such approval here.
+5. **Commit.** The repository is https://github.com/tqphan/mmo (public, branch `main`). Ask before committing or pushing unless the user has given standing approval, and record any such approval here. (Standing approval was given; see below.)
 6. **Report** to the user: what changed, how to try it, and what needs their decision.
 
 ## Definition of done
@@ -44,9 +44,24 @@ This is a hobby MMO that recreates the **systems** of ArcheAge's final Western v
 - `docs/playtests/`: playtest notes
 
 ## Commands
-To be filled in during M0: build, test, start the local server, publish the module, generate bindings, run the client, run bots, capture frames.
+Run these from the repo root. They work on Linux and Windows (ADR 0008).
+- `cargo xtask test`: unit and module tests, then clippy with warnings as errors (with and without `dev`)
+- `cargo xtask server`: local SpacetimeDB on 127.0.0.1:3000, in the foreground (data in `target/stdb-data`)
+- `cargo xtask publish [--prod] [--clear]`: build the module to wasm and publish it as `mmo-world` on the local server
+- `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.
+- `cargo xtask bot <scenario>`: run a loadbot scenario against the local server
+- `cargo xtask check`: test, then publish with `--clear` and run every scenario (needs `server` running)
+- Not yet: run the client, capture frames (needs Godot; BACKLOG 1).
+
+Gotchas:
+- `spacetime call` connects and disconnects around each call, and disconnecting despawns the character. Use loadbot for anything that needs a session.
+- Never run a blanket `cargo update` (ADR 0009).
 
 ## Environment (checked 2026-10-25)
-- **Machine:** Windows 11, Ryzen 9 7900X, 32 GB RAM, RX 6950 XT.
-- **Installed:** Git 2.45, Rust 1.90 (still needs the `wasm32-unknown-unknown` target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI **1.10** (upgrade to 2.13.x pending).
-- **Not installed:** Godot, Blender.
+Development happens on two machines, so keep everything cross-platform (ADR 0008). Details are in `docs/STATUS.md`.
+- **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 in `~/.local/bin` (not on PATH; the xtask finds it). No .NET, Godot or Blender.
+- **Windows PC:** Rust 1.90 (needs the wasm32 target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI 1.10 (needs upgrading to 2.13.0). No Godot or Blender.
+
+## Standing approvals
+- 2026-10-25: Claude may commit **and push** to `main` after each finished task without asking (ADR 0005).
+- 2026-10-25: installing the Rust wasm target and the SpacetimeDB CLI on the Linux machine. Client tooling (.NET, Godot) is **not** approved yet.

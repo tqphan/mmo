@@ -1,0 +1,3 @@
+[alias]
+# Dev tasks: `cargo xtask help`
+xtask = "run --quiet -p xtask --"

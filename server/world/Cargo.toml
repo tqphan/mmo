@@ -1,0 +1,20 @@
+[package]
+name = "world"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+# Dev builds only: the test-clock offset and admin shortcuts. Production builds leave this off.
+dev = []
+
+[dependencies]
+spacetimedb.workspace = true
+log.workspace = true
+sim = { path = "../sim" }
+
+[dev-dependencies]
+spacetimedb = { workspace = true, features = ["test-utils"] }

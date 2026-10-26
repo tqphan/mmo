@@ -1,6 +1,6 @@
 # Plan: an ArcheAge-faithful sandbox MMO on SpacetimeDB + Godot
 
-Status: v0.2, 2026-10-25. The research is in [RESEARCH.md](RESEARCH.md); references like R§2A point to its sections. Day-to-day progress will be tracked in `docs/STATUS.md` and `docs/BACKLOG.md`, which get created in milestone M0.
+Status: v0.3, 2026-10-25. The research is in [RESEARCH.md](RESEARCH.md); references like R§2A point to its sections. Day-to-day progress will be tracked in `docs/STATUS.md` and `docs/BACKLOG.md`, which get created in milestone M0.
 
 ## Decisions so far
 
@@ -13,6 +13,11 @@ Status: v0.2, 2026-10-25. The research is in [RESEARCH.md](RESEARCH.md); referen
 | Who builds it | Claude, across many sessions. The user directs, playtests and approves. | User |
 | Server | SpacetimeDB 2.x with Rust modules | Plan v0.1 |
 | Client | Godot 4.7 .NET (C#) | Plan v0.1 |
+| Art look | Flat low-poly vs hand-painted, decided after the M0 style test | User, 2026-10-25 (ADR 0004) |
+| Dev machines | Arch Linux laptop and Windows PC; tooling must be cross-platform (`cargo xtask`) | User, 2026-10-25 (ADR 0008) |
+| Commits | Claude commits and pushes to `main` after each finished task | User, 2026-10-25 (ADR 0005) |
+
+Decision records live in [adr/](adr/README.md).
 
 ---
 
@@ -248,7 +253,9 @@ mmo/
 │   └── playtests/   notes from each playtest
 ├── content/         game data source of truth (items, skills, recipes, NPCs, quests, routes)
 ├── assets/          third-party and generated assets + LEDGER.md (source, author, license)
-├── server/          Cargo workspace
+├── Cargo.toml       Cargo workspace for server/, sidecars/ and xtask/ (ADR 0008)
+├── xtask/           dev tasks: `cargo xtask help`
+├── server/
 │   ├── world/       SpacetimeDB module (the whole world)
 │   ├── sim/         pure rules: formulas, motion, combat math (no SpacetimeDB dependency)
 │   └── contentgen/  turns content/ into Rust statics, C# data and a content hash
@@ -817,32 +824,20 @@ L is likelihood and I is impact: H = high, M = medium, L = low.
 
 ## 13. Next steps
 
-### Environment check (this PC, 2026-10-25)
+Progress is tracked in [STATUS.md](STATUS.md) and [BACKLOG.md](BACKLOG.md) from M0 on.
 
-| Item | Found | Action |
-|---|---|---|
-| Hardware | Ryzen 9 7900X, 32 GB RAM, Radeon RX 6950 XT, 714 GB free | More than enough for development, bots and captures |
-| Git | 2.45.1 | OK |
-| Rust | 1.90.0 | Add the `wasm32-unknown-unknown` target |
-| .NET SDK | 7.0.203, 10.0.401 | Check that Godot 4.7 .NET builds with SDK 10; otherwise add the .NET 8 SDK |
-| SpacetimeDB CLI | **1.10.0** | Upgrade to 2.13.x. 2.0 broke the 1.x API. |
-| Godot | Not installed | Install 4.7.x .NET |
-| Blender | Not installed | Optional; only needed for procedural assets |
-
-### What needs your OK
-1. **The toolchain changes** above.
-2. **Git:** set up on 2026-10-25 at https://github.com/tqphan/mmo (public). Still open: whether Claude may commit after each finished task without asking first.
-
-### Then Claude starts M0
-1. Scaffold the repository (§4.8). Write the status file, the backlog (M0 tasks), and decision records 0001–0007 for the decisions so far.
-2. Build the server `world` module and the Godot client skeleton, with a bindings script and build, test and run scripts.
-3. Sessions, movement, cells and the Near tier, with two clients that can see each other.
-4. The test clock and a `loadbot` skeleton.
-5. The art style test scene, with captures for your approval.
+- **Toolchain (2026-10-25):**
+  - On the Linux laptop, the Rust wasm target and the SpacetimeDB CLI 2.13.0 are installed. The client tooling isn't approved yet.
+  - On the Windows PC, the CLI upgrade and the wasm target are still to do.
+- **Git:** Claude commits and pushes freely (ADR 0005).
+- **M0 progress:**
+  - Steps 1, 3 (server side) and 4 are done.
+  - Step 2 is done on the server side; the Godot client skeleton is waiting on its toolchain.
+  - Step 5 (the art style test) needs Godot.
 
 ---
 
 ## 14. Open questions
-1. **Look:** low-poly with flat or gradient shading (recommended; free CC0 kits fit it), or hand-painted textures (needs much more custom art)?
-2. **Setup:** OK to make the toolchain changes? And may Claude commit after each finished task without asking each time?
+1. ~~**Look:**~~ Decided after the M0 style test, which is built in flat low-poly (ADR 0004).
+2. ~~**Setup:**~~ Server toolchain approved; client toolchain pending. Commits and pushes approved (ADR 0005).
 3. **Taste:** is there anything from the final version you'd rather leave out, or anything you especially want early? For example, the depth of gear progression, or the jury system.

@@ -156,6 +156,7 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 - The rules for the flag war and Guardian Scramble
 - Sport fishing details
 - The formula for power-scaled dungeons
+- On-foot movement speeds (walk, run, swim, sprint) and the slowdown from carrying a pack. A first search found nothing authoritative (docs/design/movement.md).
 
 ---
 

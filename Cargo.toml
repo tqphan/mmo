@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["server/world", "server/sim", "sidecars/loadbot", "xtask"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+publish = false
+
+[workspace.dependencies]
+spacetimedb = "=2.13.0"
+log = "0.4"

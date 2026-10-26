@@ -1,0 +1,9 @@
+[package]
+name = "loadbot"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+spacetimedb-sdk = "=2.13.0"
+sim = { path = "../../server/sim" }
