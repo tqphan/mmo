@@ -1,0 +1,10 @@
+[package]
+name = "worldtool"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+sim = { path = "../../server/sim" }
+# Pinned to the version already in Cargo.lock (ADR 0009); its default backend is pure Rust.
+flate2 = "=1.1.4"

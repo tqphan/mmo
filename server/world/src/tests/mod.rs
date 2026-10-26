@@ -45,8 +45,13 @@ fn arrive(t: &TestContext, player: u128, name: &str) -> Presence {
     .unwrap();
     call(t, player, |ctx| create_character(ctx, name.into())).unwrap();
     let char_id = read(t, |ctx| ctx.db.character_private().owner().filter(identity(player)).last().unwrap().char_id);
-    call(t, player, |ctx| enter_world(ctx, char_id, CONTENT_HASH)).unwrap();
+    call(t, player, |ctx| enter_world(ctx, char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
     read(t, |ctx| ctx.db.presence().identity().find(identity(player)).unwrap())
+}
+
+/// The server's terrain hash, which a client on the same world would send.
+fn server_terrain(ctx: &ReducerContext) -> u64 {
+    crate::terrain::terrain_info(ctx).hash
 }
 
 fn transform_of(t: &TestContext, entity_id: u64) -> Transform {
@@ -142,7 +147,7 @@ fn cannot_enter_with_someone_elses_character() {
         Ok(())
     })
     .unwrap();
-    assert!(call(&t, 2, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).is_err());
+    assert!(call(&t, 2, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx))).is_err());
 }
 
 #[test]
@@ -154,18 +159,18 @@ fn a_client_with_other_content_is_refused() {
         Ok(())
     })
     .unwrap();
-    let err = call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH ^ 1)).unwrap_err();
+    let err = call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH ^ 1, server_terrain(ctx))).unwrap_err();
     assert!(err.contains("does not match"), "{err}");
     assert_eq!(read(&t, |ctx| ctx.db.presence().count()), 0);
     assert_eq!(read(&t, |ctx| ctx.db.entity().count()), 0);
-    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
 }
 
 #[test]
 fn re_entering_replaces_the_old_entity() {
     let t = world();
     let p = arrive(&t, 1, "Mira");
-    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
     assert_eq!(read(&t, |ctx| ctx.db.entity().count()), 1);
     assert_eq!(read(&t, |ctx| ctx.db.transform().count()), 1);
     assert_ne!(presence_of(&t, 1).entity_id, p.entity_id);
@@ -269,7 +274,7 @@ fn leaving_saves_position_and_despawns() {
     assert_eq!((c.x, c.z), (2.0, -1.0));
 
     // Coming back puts the character where it left.
-    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
     let tr = transform_of(&t, presence_of(&t, 1).entity_id);
     assert_eq!((tr.x, tr.z), (2.0, -1.0));
 }
@@ -520,6 +525,65 @@ fn only_admins_upload_terrain_and_chunks_are_checked() {
 
     call(&t, ADMIN, admin_clear_terrain).unwrap();
     assert_eq!(read(&t, |ctx| ctx.db.terrain_chunk().count()), 0);
+}
+
+/// The terrain hash of the cliff's chunks, worked out the way a client does.
+fn cliff_hash() -> u64 {
+    let chunks = sim::terrain::HeightFile::generate(124, 124, 3, 2, cliff_height).chunks();
+    sim::terrain::terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())))
+}
+
+#[test]
+fn terrain_info_follows_uploads_and_clears() {
+    use crate::terrain::{TerrainChunk, admin_clear_terrain, admin_put_terrain, terrain_info};
+    let t = world();
+    assert_eq!(read(&t, |ctx| (terrain_info(ctx).chunks, terrain_info(ctx).hash)), (0, 0));
+    upload_cliff(&t);
+    assert_eq!(read(&t, |ctx| (terrain_info(ctx).chunks, terrain_info(ctx).hash)), (6, cliff_hash()));
+    // Uploading the same again changes nothing; replacing one chunk matches recomputing.
+    upload_cliff(&t);
+    assert_eq!(read(&t, |ctx| terrain_info(ctx).hash), cliff_hash());
+    let mut chunks = sim::terrain::HeightFile::generate(124, 124, 3, 2, cliff_height).chunks();
+    chunks[4].1 = vec![1234; sim::terrain::CHUNK_LEN];
+    let want = sim::terrain::terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())));
+    let replaced = vec![TerrainChunk { cell: chunks[4].0, samples: chunks[4].1.clone() }];
+    call(&t, ADMIN, |ctx| admin_put_terrain(ctx, replaced)).unwrap();
+    assert_eq!(read(&t, |ctx| (terrain_info(ctx).chunks, terrain_info(ctx).hash)), (6, want));
+    call(&t, ADMIN, admin_clear_terrain).unwrap();
+    assert_eq!(read(&t, |ctx| (terrain_info(ctx).chunks, terrain_info(ctx).hash)), (0, 0));
+}
+
+#[test]
+fn a_missing_terrain_info_row_is_rebuilt_from_the_chunks() {
+    use crate::terrain::terrain_info;
+    let t = world();
+    upload_cliff(&t);
+    call(&t, ADMIN, |ctx| {
+        ctx.db.terrain_info().id().delete(0);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_info().count()), 0);
+    assert_eq!(call(&t, ADMIN, |ctx| Ok(terrain_info(ctx).hash)).unwrap(), cliff_hash());
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_info().count()), 1);
+}
+
+#[test]
+fn a_client_on_other_terrain_is_refused() {
+    let t = world();
+    upload_cliff(&t);
+    let p = arrive(&t, 1, "Mira");
+    call(&t, 1, |ctx| {
+        leave_world(ctx);
+        Ok(())
+    })
+    .unwrap();
+    for wrong in [cliff_hash() ^ 1, 0] {
+        let err = call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, wrong)).unwrap_err();
+        assert!(err.contains("client terrain") && err.contains("cargo xtask world"), "{err}");
+    }
+    assert_eq!(read(&t, |ctx| ctx.db.presence().count()), 0);
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH, cliff_hash())).unwrap();
 }
 
 #[cfg(feature = "dev")]

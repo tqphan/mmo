@@ -2298,6 +2298,7 @@ dependencies = [
  "sim",
  "spacetimedb-sdk",
  "tokio",
+ "worldtool",
 ]
 
 [[package]]
@@ -6144,6 +6145,14 @@ dependencies = [
  "log",
  "sim",
  "spacetimedb",
+]
+
+[[package]]
+name = "worldtool"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "sim",
 ]
 
 [[package]]

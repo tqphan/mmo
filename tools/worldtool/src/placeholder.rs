@@ -1,15 +1,13 @@
-//! A placeholder for the whole 16 km map, laid out as PLAN §9 sketches it, for the world-scale
-//! spike (docs/spikes/world-scale.md): two continents either side of a central sea with three
-//! islands, a band of land along the north edge, and ocean round the outside. Written as one
-//! `.mmoh` height file that the client draws and walks on, and the server checks moves against.
-//! The real world comes from the editor through the world exporter.
+//! A placeholder for the whole 16 km map, laid out as PLAN §9 sketches it: two continents either
+//! side of a central sea with three islands, a band of land along the north edge, and ocean round
+//! the outside, with placeholder land use (docs/design/world.md). It writes `world/` until there is
+//! editor tooling; after that, regenerating would overwrite hand edits.
 
-use sim::cell::{CELLS_PER_SIDE, WORLD_HALF_M};
-use sim::terrain::{HeightFile, SPACING_M, encode};
+use sim::cell::WORLD_HALF_M;
+use sim::content::{Climate, LandUse};
+use sim::terrain::{SPACING_M, decode, encode};
 
-use crate::Check;
-
-pub const DEFAULT_FILE: &str = "target/world.mmoh";
+use crate::{LAND_SIDE, TEXEL_M, World, texel};
 
 /// A landmass: a rounded rectangle (`hx`, `hz` half-sizes, corner radius `r`) and how high its
 /// mountains get. North is -z.
@@ -116,31 +114,76 @@ pub fn world_height(x: f32, z: f32) -> f32 {
     height
 }
 
-/// Write the whole map (250 × 250 cells, 8001² samples, 128 MB) to `file`, a band of rows per thread.
-pub fn write(file: &str) -> Check {
-    let mut f = HeightFile { cell_x: 0, cell_z: 0, cells_x: CELLS_PER_SIDE, cells_z: CELLS_PER_SIDE, samples: Vec::new() };
-    let (w, h) = f.size();
+/// Housing areas, three on each continent's lowlands: centre and radius in metres.
+const HOUSING: [(f32, f32, f32); 6] = [
+    (-5600.0, -2000.0, 600.0),
+    (-4300.0, 900.0, 500.0),
+    (-5300.0, 4300.0, 500.0),
+    (5600.0, -2000.0, 600.0),
+    (4300.0, 900.0, 500.0),
+    (5300.0, 4300.0, 500.0),
+];
+/// The trade island's town, round spawn.
+const TOWN_RADIUS_M: f32 = 250.0;
+
+/// The placeholder climate at a position.
+pub fn climate(x: f32, z: f32) -> Climate {
+    if z < -4400.0 {
+        Climate::Subarctic
+    } else if z > 1500.0 && x < -2500.0 {
+        Climate::Tropical
+    } else if z > 1500.0 && x > 2500.0 {
+        Climate::Arid
+    } else {
+        Climate::Temperate
+    }
+}
+
+/// The placeholder use of a texel centred on `(x, z)`, from its mean height and steepest slope.
+fn land_use(x: f32, z: f32, height: f32, slope: f32) -> LandUse {
+    if height > 0.0 && x.hypot(z) < TOWN_RADIUS_M {
+        LandUse::Town
+    } else if (2.0..60.0).contains(&height) && slope < 0.25 && HOUSING.iter().any(|&(hx, hz, r)| (x - hx).hypot(z - hz) < r) {
+        LandUse::Housing
+    } else {
+        LandUse::Wild
+    }
+}
+
+/// The whole map: heights on every core, a band of rows per thread, then land use from them.
+pub fn generate() -> World {
+    let mut w = World::flat(0);
+    let (width, rows) = w.heights.size();
     let (x0, z0) = (-WORLD_HALF_M, -WORLD_HALF_M);
-    f.samples = vec![0; w * h];
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
-    let band = h.div_ceil(threads);
+    let band = rows.div_ceil(threads);
     std::thread::scope(|s| {
-        for (b, rows) in f.samples.chunks_mut(band * w).enumerate() {
+        for (b, part) in w.heights.samples.chunks_mut(band * width).enumerate() {
             s.spawn(move || {
-                for (i, v) in rows.iter_mut().enumerate() {
-                    let (r, c) = (b * band + i / w, i % w);
+                for (i, v) in part.iter_mut().enumerate() {
+                    let (r, c) = (b * band + i / width, i % width);
                     *v = encode(world_height(x0 + c as f32 * SPACING_M, z0 + r as f32 * SPACING_M));
                 }
             });
         }
     });
-    if let Some(dir) = std::path::Path::new(file).parent() {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let samples = &w.heights.samples;
+    for (j, row) in w.land.chunks_mut(LAND_SIDE).enumerate() {
+        for (i, t) in row.iter_mut().enumerate() {
+            // A texel covers 2 × 2 quads: 3 × 3 samples from (2i, 2j).
+            let at = |di: usize, dj: usize| decode(samples[(2 * j + dj) * width + 2 * i + di]);
+            let (mut sum, mut lo, mut hi) = (0.0, f32::MAX, f32::MIN);
+            for dj in 0..3 {
+                for di in 0..3 {
+                    let h = at(di, dj);
+                    (sum, lo, hi) = (sum + h, lo.min(h), hi.max(h));
+                }
+            }
+            let (x, z) = (x0 + (i as f32 + 0.5) * TEXEL_M, z0 + (j as f32 + 0.5) * TEXEL_M);
+            *t = texel(land_use(x, z, sum / 9.0, (hi - lo) / TEXEL_M), climate(x, z));
+        }
     }
-    std::fs::write(file, f.to_bytes()).map_err(|e| format!("{file}: {e}"))?;
-    let land = f.samples.iter().filter(|&&s| s > encode(0.0)).count();
-    println!("wrote the {} km world to {file}: {:.0}% land", 2.0 * WORLD_HALF_M / 1000.0, 100.0 * land as f32 / f.samples.len() as f32);
-    Ok(())
+    w
 }
 
 #[cfg(test)]
@@ -156,6 +199,26 @@ mod tests {
         assert!(world_height(-2000.0, 3000.0) < -10.0, "central sea");
         assert!(world_height(0.0, 7900.0) < -10.0, "outer ocean");
         assert!(world_height(-7950.0, 0.0) < -2.0, "west edge");
+    }
+
+    #[test]
+    fn climates_by_region() {
+        assert_eq!(climate(0.0, -6000.0), Climate::Subarctic);
+        assert_eq!(climate(-5200.0, 3000.0), Climate::Tropical);
+        assert_eq!(climate(5200.0, 3000.0), Climate::Arid);
+        assert_eq!(climate(-5200.0, -1000.0), Climate::Temperate);
+        assert_eq!(climate(0.0, 0.0), Climate::Temperate);
+    }
+
+    #[test]
+    fn land_use_rules() {
+        assert_eq!(land_use(10.0, 10.0, 13.0, 0.1), LandUse::Town);
+        assert_eq!(land_use(10.0, 10.0, -1.0, 0.0), LandUse::Wild, "the sea round spawn");
+        assert_eq!(land_use(-5600.0, -2000.0, 20.0, 0.1), LandUse::Housing);
+        assert_eq!(land_use(-5600.0, -2000.0, 20.0, 0.3), LandUse::Wild, "too steep");
+        assert_eq!(land_use(-5600.0, -2000.0, 80.0, 0.1), LandUse::Wild, "too high");
+        assert_eq!(land_use(-5600.0, -2000.0, 1.0, 0.1), LandUse::Wild, "the beach");
+        assert_eq!(land_use(-3000.0, -2000.0, 20.0, 0.1), LandUse::Wild, "outside the housing areas");
     }
 
     #[test]

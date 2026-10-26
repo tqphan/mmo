@@ -1,0 +1,3 @@
+# The world is binary data written by worldtool (docs/design/world.md).
+*.mmor binary
+*.mmoh binary

@@ -3,7 +3,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
 
 use crate::movement::moved;
-use crate::terrain::Terrain;
+use crate::terrain::{Terrain, terrain_info};
 use crate::time::now;
 
 pub const MAX_CHARACTERS_PER_ACCOUNT: usize = 4;
@@ -219,14 +219,22 @@ pub fn create_character(ctx: &ReducerContext, name: String) -> Result<(), String
     Ok(())
 }
 
-/// `content_hash` is the client's `CONTENT_HASH`. A client built from other content would
-/// predict with other rules, so it is refused (docs/design/content.md).
+/// `content_hash` is the client's `CONTENT_HASH`, and `terrain_hash` the terrain hash of the world
+/// it loaded. A client built from other content would predict with other rules, and one on other
+/// terrain would walk on other ground, so both are refused (docs/design/content.md, world.md).
 #[spacetimedb::reducer]
-pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Result<(), String> {
+pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64, terrain_hash: u64) -> Result<(), String> {
     if content_hash != sim::content::CONTENT_HASH {
         return Err(format!(
             "client content {content_hash:016x} does not match the server's {:016x}; update the client",
             sim::content::CONTENT_HASH
+        ));
+    }
+    let terrain = terrain_info(ctx);
+    if terrain_hash != terrain.hash {
+        return Err(format!(
+            "client terrain {terrain_hash:016x} does not match the server's {:016x} ({} chunks); run `cargo xtask world`",
+            terrain.hash, terrain.chunks
         ));
     }
     let c = ctx

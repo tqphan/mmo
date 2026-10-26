@@ -167,7 +167,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
                      ├────────────────────┤   └────────────────────┘
                      │ loadbot (Rust)     │
                      └────────────────────┘
- Offline: Godot editor + world exporter → content/ and world data
+ Offline: content/ TOML + worldtool (editor tooling later) → generated code and world/ files
           → compiled into the module or uploaded to tables, and packed into the client
 ```
 
@@ -270,7 +270,7 @@ mmo/
 │   ├── net/         generated bindings (spacetime generate --lang csharp)
 │   ├── content/     generated game data (contentgen)
 │   └── src/         Net · World · Gameplay · Presentation · UI
-├── tools/           world exporter plugin, procedural asset generators, GM web panel
+├── tools/           worldtool (the world's files, docs/design/world.md), procedural asset generators, GM web panel
 └── ops/             deploy scripts, backup jobs, configuration
 ```
 
@@ -465,7 +465,7 @@ pub struct CombatEvent { cell: u64, source: u64, target: u64, skill_id: u32, amo
   id = "ember_bolt_scorch"
   replace_effects = [ { kind = "damage", school = "fire", coeff = 1.0 }, { kind = "dot", school = "fire", coeff = 0.4, ms = 6000 } ]
   ```
-- **World data** comes out of the Godot editor through an exporter plugin. One source feeds both the server's checks and the client.
+- **World data** lives in the repo as region files under `world/`, written by our own `tools/worldtool` (ADR 0018, docs/design/world.md): the generator for now, editor tooling later. One source feeds both the server's checks and the client, and a terrain hash checked by `enter_world` keeps them in step.
 
   | Data | Notes |
   |---|---|
@@ -711,7 +711,7 @@ Relative sizes: M0 medium · M1 large · M2 very large · M3 large · M4 very la
 - **Repository setup:** `CLAUDE.md`, the status file and backlog, and decision records for everything decided so far.
 - **Scripts** to build, test, run locally, publish, generate bindings, start bots and capture frames.
 - **Basic play:** sessions, movement and cell subscriptions, with two clients that can see each other.
-- **Infrastructure:** the test clock, a first version of `contentgen`, and a first world exporter (heightmap and land-use).
+- **Infrastructure:** the test clock, a first version of `contentgen`, and the world's files (heightmap and land use) with their tool, upload and terrain hash.
 - **Art style test scene:** stylized terrain, water, and a CC0 character walking around. Screenshots go to the user for approval.
 
 **Spikes, each with a go/no-go result:**

@@ -1,23 +1,26 @@
 using Godot;
+using Mmo.Content;
 using Mmo.Gameplay;
 using Mmo.Net;
 using Mmo.World;
 
 namespace Mmo.UI
 {
-    /// <summary>A debug readout: connection, position, cell window, entities in view, corrections.</summary>
+    /// <summary>A debug readout: connection, position, land use, cell window, entities in view, corrections.</summary>
     public partial class Hud : CanvasLayer
     {
         private readonly Session session;
         private readonly PlayerController player;
         private readonly EntityRegistry entities;
+        private readonly LandRaster? land;
         private readonly Label label = new();
 
-        public Hud(Session session, PlayerController player, EntityRegistry entities)
+        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land)
         {
             this.session = session;
             this.player = player;
             this.entities = entities;
+            this.land = land;
             Name = "Hud";
         }
 
@@ -38,6 +41,11 @@ namespace Mmo.UI
                 var p = player.GlobalPosition;
                 text += $"\nentity {me.EntityId}  pos ({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
                 text += $"\ncorrections {me.Corrections}  moves sent {player.MovesSent}";
+                if (land?.At(p.X, p.Z) is byte t)
+                {
+                    var use = LandRaster.Use(t).Data();
+                    text += $"\nland {use.Id}{(use.Buildable ? " (buildable)" : "")}  climate {LandRaster.ClimateOf(t).Id()}";
+                }
             }
             if (session.Near is { } near && near.Center is ulong c)
             {

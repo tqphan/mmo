@@ -32,8 +32,9 @@ Every check below takes the reading that is kinder to the player, so the choice 
 ### Uploading
 - `admin_put_terrain(chunks)`: upsert a batch of chunks. Each must have exactly 1089 samples and an open-world cell key on the map. Caller must be an admin.
 - `admin_clear_terrain()`: delete every chunk. Admin only.
-- **Admins:** the identity that published the database (recorded by `init`), or an account with `gm_level ≥ 3`. Dev builds add `dev_set_gm(level)`, which any caller may use.
-- **File format** (`.mmoh`, `sim::terrain::HeightFile`), little-endian: magic `MMOH`, `u16` version 1, `u16` first cell x, `u16` first cell z, `u16` cells across, `u16` cells down, then `(down·32+1) × (across·32+1)` `u16` samples, rows of increasing z. Regions are whole cells. `loadbot terrain-upload <file>` sends one in batches of 32 chunks. The client draws terrain from the same file (docs/design/worldstream.md, ADR 0017). `loadbot world-gen` writes a placeholder for the whole map, and the whole map uploads in about 4 s (`cargo xtask world`), adding 172 MB to the server (docs/spikes/world-scale.md). Tools that need the ground in a few places on a big file read it through `sim::terrain::FileChunks`, which cuts out each chunk the first time it's asked for.
+- **Admins:** the identity that published the database (recorded by `init`), or an account with `gm_level ≥ 3`. Dev builds add `dev_set_gm(level)`, which any caller may use. `cargo xtask world` uploads as the publisher, with the CLI's token, so it works on production builds too (docs/design/world.md).
+- Uploads and clears keep the public `terrain_info` row (chunk count and terrain hash) up to date, and `enter_world` refuses a client whose terrain hash differs (docs/design/world.md, ADR 0018).
+- **File format** (`.mmoh`, `sim::terrain::HeightFile`), little-endian: magic `MMOH`, `u16` version 1, `u16` first cell x, `u16` first cell z, `u16` cells across, `u16` cells down, then `(down·32+1) × (across·32+1)` `u16` samples, rows of increasing z. Regions are whole cells. `loadbot terrain-upload <file>` sends one in batches of 32 chunks. The client draws terrain from the same file (docs/design/worldstream.md, ADR 0017). The world itself comes from the region files in `world/` (docs/design/world.md): `loadbot world-upload` sends the whole map in about 6 s (`cargo xtask world`), adding 172 MB to the server (docs/spikes/world-scale.md). Tools that need the ground in a few places on a big file read it through `sim::terrain::FileChunks`, which cuts out each chunk the first time it's asked for.
 
 ### Vertical checks on movement
 Every accepted horizontal move (docs/design/movement.md) is then checked against the ground at its destination, when the terrain there is known. The server keeps an **anchor** in `presence`: the position of the last solid footing and when the character last touched ground.
@@ -57,7 +58,7 @@ A rejected move is handled like a speed hack (logged, `corrections + 1`), and th
 - Used for now by the dev stand-in `dev_swing`, eye (feet + 1.6 m) to chest (feet + 1.0 m). Combat (M1) uses the same function.
 
 ## 3. Deviations and not yet done
-- **No obstacle outlines** (walls, gates, buildings). They come with the world exporter and housing, and will block both movement and sight.
+- **No obstacle outlines** (walls, gates, buildings). They come with world-building tooling and housing, and will block both movement and sight.
 - **No water raster.** Sea level is a constant 0 m, so lakes and rivers above sea level can't be swum in yet. The land-use raster (PLAN §5.4) will carry water height.
 - **Missing chunks aren't checked.** The production world must upload every land cell. For open ocean a later version can store one depth per chunk instead of 1089 samples.
 - **Endpoints only.** Moves are checked where they end, not along the way, so a fast cheater can still cut through a thin ridge between two heartbeats. The 51° credit means a cheater can climb about 1.25 m per metre walked onto walkable ground; tall cliffs (where the face itself is too steep) can't be climbed.

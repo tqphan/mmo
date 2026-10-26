@@ -9,7 +9,7 @@ Players never see how the original stored its data, and its client data is off l
 ## 2. Our rules
 
 ### Sources
-- `content/` holds human-edited TOML, one file per table group. v0 has `movement.toml`.
+- `content/` holds human-edited TOML, one file per table group: `movement.toml`, `ships.toml` (docs/design/ships.md) and `land.toml`, the land-use classes and climates of the world's land-use raster (docs/design/world.md). Land uses become `LandUse`/`LAND_USES` (with `buildable`), climates `Climate`/`CLIMATE_IDS`; at most 16 and 8, to fit the raster's byte.
 - Unknown fields are errors, so a typo can't silently fall back to a default.
 - `contentgen` reports every problem it finds, as `content/<file>[:line]: <what>`, not just the first.
 

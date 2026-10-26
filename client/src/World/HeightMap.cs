@@ -2,6 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mmo.World
 {
@@ -41,6 +43,16 @@ namespace Mmo.World
         }
 
         public static float Decode(ushort raw) => raw / 32.0f - 512.0f;
+
+        /// <summary>A map of samples already in memory, such as the world's region files put together (<see cref="WorldFiles"/>).</summary>
+        public static HeightMap FromSamples(int cellX, int cellZ, int cellsX, int cellsZ, ushort[] samples)
+        {
+            if (cellsX <= 0 || cellsZ <= 0 || cellX < 0 || cellZ < 0 || cellX + cellsX > CellsPerSide || cellZ + cellsZ > CellsPerSide)
+                throw new InvalidDataException("height map region is empty or off the map");
+            if (samples.Length != (cellsX * QuadsPerCell + 1) * (cellsZ * QuadsPerCell + 1))
+                throw new InvalidDataException($"{samples.Length} samples don't fill {cellsX} × {cellsZ} cells");
+            return new HeightMap(cellX, cellZ, cellsX, cellsZ, samples);
+        }
 
         /// <summary>Read a file straight into the sample array, without a second copy of it in memory.</summary>
         public static HeightMap Load(string path)
@@ -124,6 +136,72 @@ namespace Mmo.World
                 for (int i = 0; i < side; i++)
                     heights[j * side + i] = Decode(samples[(dz * QuadsPerCell + j) * Width + dx * QuadsPerCell + i]);
             return heights;
+        }
+
+        /// <summary>
+        /// The terrain hash of every cell's chunk, as <c>sim::terrain::terrain_hash</c> works it out
+        /// (docs/design/world.md): the wrapping sum of <see cref="ChunkHash"/> over the cells. The
+        /// server refuses to let us in if its own differs. Rows of cells run in parallel.
+        /// </summary>
+        public ulong TerrainHash()
+        {
+            ulong total = 0;
+            Parallel.For(0, CellsZ, () => 0UL, (dz, _, sum) =>
+            {
+                for (int dx = 0; dx < CellsX; dx++)
+                    sum = unchecked(sum + ChunkHashAt(dx, dz));
+                return sum;
+            }, sum => Interlocked.Add(ref total, sum));
+            return total;
+        }
+
+        private const ulong FnvOffset = 0xcbf29ce484222325UL, FnvPrime = 0x100000001b3UL;
+
+        /// <summary>
+        /// <c>sim::terrain::chunk_hash</c>: FNV-1a 64 over the cell key and the chunk's samples,
+        /// little-endian, then the splitmix64 finaliser.
+        /// </summary>
+        public static ulong ChunkHash(ulong cell, ReadOnlySpan<ushort> samples)
+        {
+            ulong h = Key(cell);
+            foreach (ushort s in samples)
+                h = Fnv(h, s);
+            return Mix(h);
+        }
+
+        private ulong ChunkHashAt(int dx, int dz)
+        {
+            ulong h = Key(Sim.Cell.Pack(0, (ushort)(CellZ + dz), (ushort)(CellX + dx)));
+            const int side = QuadsPerCell + 1;
+            for (int j = 0; j < side; j++)
+            {
+                int start = (dz * QuadsPerCell + j) * Width + dx * QuadsPerCell;
+                foreach (ushort s in samples.AsSpan(start, side))
+                    h = Fnv(h, s);
+            }
+            return Mix(h);
+        }
+
+        private static ulong Key(ulong cell)
+        {
+            ulong h = FnvOffset;
+            for (int b = 0; b < 8; b++)
+                h = unchecked((h ^ ((cell >> (8 * b)) & 0xff)) * FnvPrime);
+            return h;
+        }
+
+        private static ulong Fnv(ulong h, ushort s) => unchecked((((h ^ (byte)s) * FnvPrime) ^ (byte)(s >> 8)) * FnvPrime);
+
+        private static ulong Mix(ulong h)
+        {
+            unchecked
+            {
+                h ^= h >> 30;
+                h *= 0xbf58476d1ce4e5b9UL;
+                h ^= h >> 27;
+                h *= 0x94d049bb133111ebUL;
+                return h ^ (h >> 31);
+            }
         }
 
         /// <summary>The highest sample in [i0, i1] × [j0, j1], clamped to the file.</summary>

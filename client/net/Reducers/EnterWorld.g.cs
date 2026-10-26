@@ -12,12 +12,12 @@ namespace SpacetimeDB.Types
 {
     public sealed partial class RemoteReducers : RemoteBase
     {
-        public delegate void EnterWorldHandler(ReducerEventContext ctx, ulong charId, ulong contentHash);
+        public delegate void EnterWorldHandler(ReducerEventContext ctx, ulong charId, ulong contentHash, ulong terrainHash);
         public event EnterWorldHandler? OnEnterWorld;
 
-        public void EnterWorld(ulong charId, ulong contentHash)
+        public void EnterWorld(ulong charId, ulong contentHash, ulong terrainHash)
         {
-            conn.InternalCallReducer(new Reducer.EnterWorld(charId, contentHash));
+            conn.InternalCallReducer(new Reducer.EnterWorld(charId, contentHash, terrainHash));
         }
 
         public bool InvokeEnterWorld(ReducerEventContext ctx, Reducer.EnterWorld args)
@@ -38,7 +38,8 @@ namespace SpacetimeDB.Types
             OnEnterWorld(
                 ctx,
                 args.CharId,
-                args.ContentHash
+                args.ContentHash,
+                args.TerrainHash
             );
             return true;
         }
@@ -54,14 +55,18 @@ namespace SpacetimeDB.Types
             public ulong CharId;
             [DataMember(Name = "content_hash")]
             public ulong ContentHash;
+            [DataMember(Name = "terrain_hash")]
+            public ulong TerrainHash;
 
             public EnterWorld(
                 ulong CharId,
-                ulong ContentHash
+                ulong ContentHash,
+                ulong TerrainHash
             )
             {
                 this.CharId = CharId;
                 this.ContentHash = ContentHash;
+                this.TerrainHash = TerrainHash;
             }
 
             public EnterWorld()

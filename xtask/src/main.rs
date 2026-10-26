@@ -5,8 +5,6 @@ use std::process::{Command, ExitCode};
 
 const DB: &str = "mmo-world";
 const WASM: &str = "target/wasm32-unknown-unknown/release/world.wasm";
-/// The world's heightmap, written by `bot world-gen`; the client draws it and the server checks against it.
-const WORLD: &str = "target/world.mmoh";
 
 const HELP: &str = "\
 cargo xtask <task> [options]
@@ -20,15 +18,14 @@ cargo xtask <task> [options]
   publish [--prod] [--clear]
                        build and publish to the local server; --clear wipes the database
   generate             regenerate client bindings (Rust for loadbot, C# for the Godot client)
-  world [--gen]        upload the world's heightmap (target/world.mmoh) to the local server, writing
-                       it first if it's missing or with --gen
+  world [--gen]        upload the world's files (world/) to the local server as the publisher;
+                       --gen first rewrites world/ with the placeholder generator (commit it)
   bot <scenario> [args]
                        run a loadbot scenario against the local server; `bot help` lists them
                        (`bot swarm --bots N --combat F --area M --secs S` is the throughput spike)
   check                test, then publish --clear and run every bot scenario (needs `server`)
   client [args]        build and run the Godot client; args go to it (`--profile NAME`,
-                       `--autopilot circle:X,Z,R`, …; docs/design/client.md). Writes the world
-                       first if it's missing
+                       `--autopilot circle:X,Z,R`, …; docs/design/client.md)
   capture <name> <frames> [args]
                        run the client in Movie Maker mode at 30 fps for <frames> frames, writing
                        PNGs to target/captures/<name>/; args go to the client
@@ -168,28 +165,42 @@ fn client_import() -> Task {
     run(godot().args(["--headless", "--path", "client", "--import"]))
 }
 
-/// Write the placeholder world with loadbot (a release build: about 5 s rather than minutes).
-fn world_gen(force: bool) -> Task {
-    if !force && Path::new(WORLD).is_file() {
-        return Ok(());
-    }
-    run(cargo().args(["run", "--quiet", "--release", "-p", "loadbot", "--", "world-gen", "--file", WORLD]))
+/// The SpacetimeDB CLI's token: the identity that publishes, which the module makes an admin.
+fn publisher_token() -> Result<String, String> {
+    let out = spacetime().args(["login", "show", "--token"]).output().map_err(|e| format!("spacetime login show: {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    // "Your auth token (don't share this!) is <token>"
+    text.lines()
+        .find(|l| l.contains("auth token"))
+        .and_then(|l| l.split_whitespace().last())
+        .map(str::to_owned)
+        .ok_or_else(|| "no token from `spacetime login show --token`; log in with the CLI first".into())
 }
 
+/// Upload `world/` as the publisher (docs/design/world.md), after rewriting it with the placeholder
+/// generator if asked (a release build: seconds rather than minutes).
 fn world(regenerate: bool) -> Task {
-    world_gen(regenerate)?;
-    bot("terrain-upload", &["--file".into(), WORLD.into()])
+    if regenerate {
+        run(cargo().args(["run", "--quiet", "--release", "-p", "worldtool", "--", "gen"]))?;
+    }
+    // The token goes in the environment, not on the command line, so it doesn't show in a process list.
+    let token = publisher_token()?;
+    eprintln!("$ loadbot world-upload (as the publisher)");
+    let status = cargo()
+        .args(["run", "--quiet", "-p", "loadbot", "--", "world-upload"])
+        .env("MMO_ADMIN_TOKEN", token)
+        .status()
+        .map_err(|e| format!("could not start loadbot: {e}"))?;
+    if status.success() { Ok(()) } else { Err(format!("world-upload failed: {status}")) }
 }
 
 fn client(extra: &[String]) -> Task {
-    world_gen(false)?;
     client_build()?;
     client_import()?;
     run(with_dotnet(&mut godot()).args(["--path", "client", "--"]).args(extra))
 }
 
 fn capture(name: &str, frames: u32, extra: &[String]) -> Task {
-    world_gen(false)?;
     client_build()?;
     client_import()?;
     let dir = std::env::current_dir().unwrap().join("target").join("captures").join(name);

@@ -13,7 +13,8 @@ namespace Mmo.Presentation
     /// (docs/design/worldstream.md, ADR 0017). <see cref="TerrainPlan"/> picks each tile's level
     /// from the distance to <see cref="Focus"/>; meshes are built on worker threads in batches, nearest first,
     /// and swapped in on the main thread within <see cref="ApplyBudgetMs"/> a frame. A tile keeps its
-    /// old mesh until the new one is in. Placeholder colours only (ADR 0004).
+    /// old mesh until the new one is in. Placeholder colours only (ADR 0004), tinted by land use
+    /// (docs/design/world.md).
     /// </summary>
     public partial class Terrain : Node3D
     {
@@ -27,6 +28,7 @@ namespace Mmo.Presentation
         public Vector3 Focus;
         public readonly TerrainPlan Plan;
         private readonly HeightMap map;
+        private readonly LandRaster? land;
         private readonly Palette palette = new();
         private readonly StandardMaterial3D material = new()
         {
@@ -55,9 +57,10 @@ namespace Mmo.Presentation
 
         private sealed record TileMesh(int Tile, int Level, Vector3[] Vertices, Vector3[] Normals, Color[] Colors, int[] Indices);
 
-        public Terrain(HeightMap map)
+        public Terrain(HeightMap map, LandRaster? land = null)
         {
             this.map = map;
+            this.land = land;
             Plan = new TerrainPlan(map);
             Name = "Terrain";
         }
@@ -206,7 +209,7 @@ namespace Mmo.Presentation
                     float h = H(a, b);
                     vertices[v] = new Vector3(a * spacing, h, b * spacing);
                     normals[v] = new Vector3(H(a - 1, b) - H(a + 1, b), 2 * spacing, H(a, b - 1) - H(a, b + 1)).Normalized();
-                    colors[v] = Ground(h, normals[v].Y);
+                    colors[v] = Ground(h, normals[v].Y, map.X0 + (i0 + a * step) * HeightMap.Spacing, map.Z0 + (j0 + b * step) * HeightMap.Spacing);
                 }
             }
             for (int b = 0; b < n; b++)
@@ -243,8 +246,26 @@ namespace Mmo.Presentation
             return new TileMesh(tile, level, vertices, normals, colors, indices.ToArray());
         }
 
-        /// <summary>Placeholder ground colours: sea floor, sand at the waterline, grass, rock when steep or high.</summary>
-        private Color Ground(float height, float up)
+        /// <summary>
+        /// Placeholder ground colours: sea floor, sand at the waterline, grass, rock when steep or high;
+        /// above the waterline, housing land, towns and roads are tinted.
+        /// </summary>
+        private Color Ground(float height, float up, float x, float z)
+        {
+            var natural = Natural(height, up);
+            if (land is null || height < 0.5f)
+                return natural;
+            var tint = LandRaster.Use(land.At(x, z)) switch
+            {
+                Content.LandUse.Housing => palette.Housing,
+                Content.LandUse.Town => palette.Town,
+                Content.LandUse.Road => palette.Road,
+                _ => natural,
+            };
+            return natural.Lerp(tint, 0.55f);
+        }
+
+        private Color Natural(float height, float up)
         {
             var low = palette.SeaFloor.Lerp(palette.Sand, Mathf.SmoothStep(-3.0f, -0.5f, height));
             var grass = palette.GrassLow.Lerp(palette.GrassHigh, Mathf.SmoothStep(20, 120, height));

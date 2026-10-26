@@ -41,19 +41,16 @@ namespace Mmo
             }
             GetWindow().Title = $"mmo — {options.Profile}";
 
-            string path = ClientOptions.RepoPath(options.World);
-            if (!System.IO.File.Exists(path))
+            if (LoadWorld(options.World) is not { } world)
             {
-                GD.PushError($"no world at {path}; write one with `cargo xtask bot world-gen`");
                 GetTree().Quit(2);
                 return;
             }
-            var map = HeightMap.Load(path);
-            GD.Print($"world: {path}, {map.Width} × {map.Depth} samples");
+            var map = world.Heights;
 
-            var session = new Session(options);
+            var session = new Session(options, world.TerrainHash);
             AddChild(session);
-            var terrain = new Presentation.Terrain(map);
+            var terrain = new Presentation.Terrain(map, world.Land);
             AddChild(terrain);
             var water = Presentation.Water.Create(faceted: false, new Presentation.Palette(), horizon: 80000.0f);
             AddChild(water);
@@ -75,13 +72,31 @@ namespace Mmo
             AddChild(player);
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
-            AddChild(new Hud(session, player, entities));
+            AddChild(new Hud(session, player, entities, world.Land));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
                 AddChild(new RealTime());
             if (options.Secs > 0)
                 GetTree().CreateTimer(options.Secs).Timeout += () => GetTree().Quit();
+        }
+
+        /// <summary>The world's files, or a bare height file (docs/design/world.md); null, with the reason logged, if they can't be read.</summary>
+        public static WorldData? LoadWorld(string option)
+        {
+            string path = ClientOptions.RepoPath(option);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var world = WorldFiles.Load(path);
+                GD.Print($"world: {path}, {world.Heights.Width} × {world.Heights.Depth} samples, terrain hash {world.TerrainHash:x16}, read in {clock.ElapsedMilliseconds} ms");
+                return world;
+            }
+            catch (Exception e) when (e is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException)
+            {
+                GD.PushError($"world: can't read {path}: {e.Message}");
+                return null;
+            }
         }
 
         /// <summary>Keeps the terrain's levels of detail and the sea centred on the camera.</summary>

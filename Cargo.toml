@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["server/world", "server/sim", "server/contentgen", "sidecars/loadbot", "xtask"]
+members = ["server/world", "server/sim", "server/contentgen", "sidecars/loadbot", "tools/worldtool", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -10,3 +10,13 @@ publish = false
 [workspace.dependencies]
 spacetimedb = "=2.13.0"
 log = "0.4"
+
+# The world's files are 64 M samples: decode and hash them at full speed in tests and dev runs too.
+[profile.dev.package.worldtool]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.adler2]
+opt-level = 3
+[profile.dev.package.sim]
+opt-level = 3

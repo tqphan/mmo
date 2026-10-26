@@ -6,6 +6,8 @@
 # yaw_from_u16 <wire> <radians>
 # mmoh <hex bytes of a height file>
 # mmoh_sample <i> <j> <height>
+# chunk_hash <cell key> <hash>, for each chunk of the mmoh file
+# terrain_hash <hash of the whole mmoh file>
 cell_of 0 0.0 0.0 8192125
 cell_of 0 -0.01 -0.01 8126588
 cell_of 0 64.0 0.0 8192126
@@ -591,3 +593,6 @@ mmoh_sample 47 29 -106.1875
 mmoh_sample 13 21 -106.3125
 mmoh_sample 58 0 -69.59375
 mmoh_sample 37 21 -88.375
+chunk_hash 327683 1673004973181143599
+chunk_hash 327684 12170397475299401765
+terrain_hash 13843402448480545364

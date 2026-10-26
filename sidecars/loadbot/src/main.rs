@@ -3,7 +3,8 @@
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
 //! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
 //! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, `visitor` takes `--secs S --expect N --file F`,
-//! `terrain-gen`, `terrain-upload` and `world-gen` take `--file F`.
+//! `terrain-gen` and `terrain-upload` take `--file F`, `world-upload` takes `--world DIR`, and so
+//! does `visitor`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
@@ -14,7 +15,6 @@ mod ship;
 mod swarm;
 mod terrain;
 mod visitor;
-mod world;
 
 use std::time::{Duration, Instant};
 
@@ -65,6 +65,10 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs
                 ta.file = it.next().expect("--file needs a path");
                 va.file = Some(ta.file.clone());
             }
+            "--world" => {
+                ta.world = it.next().expect("--world needs a directory");
+                va.world = ta.world.clone();
+            }
             "--compression" => {
                 sw.compression = match it.next().as_deref() {
                     Some("none") => spacetimedb_sdk::Compression::None,
@@ -91,7 +95,7 @@ fn main() {
         "terrain" => terrain::scenario(&args, &ta),
         "terrain-gen" => terrain::write(&ta.file),
         "terrain-upload" => terrain::upload_file(&args, &ta),
-        "world-gen" => world::write(if ta.file == terrain::TerrainArgs::default().file { world::DEFAULT_FILE } else { &ta.file }),
+        "world-upload" => terrain::upload_world(&args, &ta),
         "ship" => ship::scenario(&args, &sh),
         "visitor" => visitor::scenario(&args, &va),
         _ => {
@@ -104,8 +108,8 @@ fn main() {
                  swarm            the throughput spike: many bots moving and fighting, measured\n  \
                  terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
                  terrain-gen      write the procedural test terrain to a .mmoh file\n  \
-                 terrain-upload   upload a .mmoh height file as a dev admin\n  \
-                 world-gen        write the placeholder 16 km world to target/world.mmoh (or --file)\n  \
+                 terrain-upload   upload a .mmoh height file as an admin\n  \
+                 world-upload     upload the world's files (world/, or --world) as an admin and check its terrain hash\n  \
                  ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
                  visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)"
             );
@@ -145,10 +149,16 @@ struct Bot {
 
 impl Bot {
     fn connect(args: &Args, label: &'static str) -> Result<Self, String> {
+        Self::connect_as(args, label, None)
+    }
+
+    /// Connect with `token`'s identity, or a fresh one.
+    fn connect_as(args: &Args, label: &'static str, token: Option<String>) -> Result<Self, String> {
         let conn = DbConnection::builder()
             .with_uri(args.uri.as_str())
             .with_database_name(args.db.as_str())
             .with_compression(spacetimedb_sdk::Compression::Gzip)
+            .with_token(token)
             .build()
             .map_err(|e| format!("{label}: connect failed: {e}"))?;
         conn.run_threaded();
@@ -168,8 +178,19 @@ impl Bot {
             .subscription_builder()
             .on_applied(move |_| flag.store(true, std::sync::atomic::Ordering::SeqCst))
             .on_error(|_, e| eprintln!("subscription error: {e}"))
-            .subscribe(["SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public"]);
+            .subscribe([
+                "SELECT * FROM my_characters",
+                "SELECT * FROM my_presence",
+                "SELECT * FROM character_public",
+                "SELECT * FROM terrain_info",
+            ]);
         wait_for("subscription", || applied.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    /// The server's terrain hash (docs/design/world.md). Bots enter with it: they test the server,
+    /// not a world file. No row yet means no terrain.
+    fn server_terrain(&self) -> TerrainInfo {
+        self.conn.db.terrain_info().iter().next().unwrap_or(TerrainInfo { id: 0, chunks: 0, hash: 0 })
     }
 
     /// Start the Near tier around `(x, z)`; `step` keeps it following us from then on.
@@ -190,7 +211,8 @@ impl Bot {
         self.conn.reducers.create_character(name.clone()).map_err(|e| e.to_string())?;
         wait_for("character", || self.conn.db.my_characters().count() > 0)?;
         let char_id = self.conn.db.my_characters().iter().next().unwrap().char_id;
-        self.conn.reducers.enter_world(char_id, sim::content::CONTENT_HASH).map_err(|e| e.to_string())?;
+        let terrain = self.server_terrain().hash;
+        self.conn.reducers.enter_world(char_id, sim::content::CONTENT_HASH, terrain).map_err(|e| e.to_string())?;
         wait_for("presence", || self.presence().is_some())?;
         println!("{}: entered as {name} (char {char_id})", self.label);
         Ok(self.presence().unwrap())

@@ -14,11 +14,11 @@ namespace Mmo
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
     /// <item><c>--test-cheat</c>: 3 s after entering, jump 30 m in one frame, to check that the server's correction snaps us back.</item>
-    /// <item><c>--world FILE</c>: the world's <c>.mmoh</c> heightmap (default <c>target/world.mmoh</c>), the same file uploaded to the server.</item>
+    /// <item><c>--world DIR</c>: the world's files (default <c>world</c>), the same ones uploaded to the server (docs/design/world.md); or a bare <c>.mmoh</c> height file.</item>
     /// <item><c>--style-test flat|gradient</c>: show the offline art style test scene instead of connecting (docs/design/art.md).</item>
     /// <item><c>--outline</c>: in the style test, outline the characters.</item>
     /// <item><c>--shot follow|wide</c>: in the style test, orbit the walking character or the whole island.</item>
-    /// <item><c>--world-test FILE</c>: show the offline world-scale test with this <c>.mmoh</c> map instead of connecting (docs/design/worldstream.md).</item>
+    /// <item><c>--world-test DIR</c>: show the offline world-scale test with this world (a directory or a <c>.mmoh</c> file) instead of connecting (docs/design/worldstream.md).</item>
     /// <item><c>--route sail|cross|walk|high</c>: the world test's camera route.</item>
     /// <item><c>--no-vsync</c>: in the world test, render as fast as possible, to measure frame times.</item>
     /// <item><c>--secs S</c>: quit after S seconds.</item>
@@ -34,7 +34,7 @@ namespace Mmo
         public float CamYawDeg;
         public bool Trace;
         public bool TestCheat;
-        public string World = "target/world.mmoh";
+        public string World = "world";
         public string? StyleTest;
         public bool Outline;
         public string Shot = "follow";

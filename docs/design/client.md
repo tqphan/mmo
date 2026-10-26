@@ -29,11 +29,11 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 ### Connecting and entering
 - One `DbConnection` with Gzip (ADR 0011). `FrameTick` runs in `Session._Process`, so every SDK callback runs on the main thread.
 - The identity token is kept per profile in `user://tokens/<profile>.token`. Two windows with different `--profile`s are two players.
-- On connecting, it subscribes to `my_characters`, `my_presence` and `character_public`. If the account has no character, it creates one named after the profile (letters only, capitalised: `alpha` → `Alpha`). Then it calls `enter_world(char_id, GameContent.Hash)`.
+- On connecting, it subscribes to `my_characters`, `my_presence` and `character_public`. If the account has no character, it creates one named after the profile (letters only, capitalised: `alpha` → `Alpha`). Then it calls `enter_world(char_id, GameContent.Hash, terrainHash)`, with the terrain hash of the world it loaded (docs/design/world.md). A client on a different world is refused, and the HUD shows the server's message.
 - **`my_presence` is a view, and view rows have no primary key.** The SDK delivers each change as an insert of the new row plus a delete of the old one, and the insert comes first. So an insert for the entity we already have is an update. We've left the world only when no row is left at the end of a frame.
 
 ### The world
-- The client loads the world's heightmap at start (`--world`, default `target/world.mmoh`, the file `cargo xtask world` uploads to the server) and draws it with the terrain tiles and the sea from the world-scale spike, centred on the camera (docs/design/worldstream.md). Without the file it stops with a message; `cargo xtask client` writes it first if it's missing.
+- The client loads the world's files at start (`--world`, default `world/`, the files `cargo xtask world` uploads to the server; about 0.2 s) and draws them with the terrain tiles and the sea from the world-scale spike, centred on the camera (docs/design/worldstream.md, world.md). If they can't be read, or don't match their manifest's terrain hash, it stops with a message. Housing land and towns are tinted, and the HUD shows the land use and climate underfoot.
 - The player stands on `HeightMapShape3D`s for the 3 × 3 cells around it, holding the server's own samples (`TerrainCollision`, docs/design/worldstream.md). The camera stays 0.5 m above the ground.
 - Until the world has spawn points, new characters appear at (0, 0), on the placeholder world's trade island about 13 m up. The server settles them on its ground.
 
@@ -56,7 +56,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--profile NAME` | Identity token and character name |
 | `--autopilot circle:X,Z,R` / `pace:X,Z,LEN` | Run a scripted route instead of reading the keyboard |
 | `--walk` | Walk mode |
-| `--world FILE` | The world's `.mmoh` heightmap (default `target/world.mmoh`) |
+| `--world DIR` | The world's files (default `world`), or a bare `.mmoh` height file |
 | `--secs S` | Quit after S seconds |
 | `--cam-yaw DEG` | Starting camera yaw, 0 looking north (-z) |
 | `--trace` | Log where each other entity is drawn every frame, to measure smoothness |

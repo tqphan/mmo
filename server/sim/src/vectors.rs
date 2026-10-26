@@ -43,7 +43,9 @@ pub fn generate() -> String {
          # yaw_to_u16 <radians> <wire>\n\
          # yaw_from_u16 <wire> <radians>\n\
          # mmoh <hex bytes of a height file>\n\
-         # mmoh_sample <i> <j> <height>\n",
+         # mmoh_sample <i> <j> <height>\n\
+         # chunk_hash <cell key> <hash>, for each chunk of the mmoh file\n\
+         # terrain_hash <hash of the whole mmoh file>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -128,6 +130,12 @@ pub fn generate() -> String {
         let (i, j) = ((rng.next() * w as f32) as usize % w, (rng.next() * h as f32) as usize % h);
         out.push_str(&format!("mmoh_sample {i} {j} {}\n", f(terrain::decode(file.samples[j * w + i]))));
     }
+    let chunks = file.chunks();
+    for (cell, samples) in &chunks {
+        out.push_str(&format!("chunk_hash {cell} {}\n", terrain::chunk_hash(*cell, samples)));
+    }
+    let total = terrain::terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())));
+    out.push_str(&format!("terrain_hash {total}\n"));
     out
 }
 

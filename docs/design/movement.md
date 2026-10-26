@@ -47,7 +47,7 @@ Our speed numbers are placeholders until the research is done. They live in `con
 - Every reducer reads game time through `time::now(ctx)`. In `dev` builds it adds the offset from the private `dev_clock` row, which `dev_advance_clock(micros)` moves forward only. Production builds compile all of this out.
 
 ## 3. Deviations and not yet done
-- **No obstacle checks yet.** Vertical checks against the heightmap came with spike 5 (docs/design/terrain.md); walls and buildings come with the world exporter and housing.
+- **No obstacle checks yet.** Vertical checks against the heightmap came with spike 5 (docs/design/terrain.md); walls and buildings come with world-building tooling and housing.
 - **No speed modifiers** (buffs, packs, mounts, gliding). These come with those systems.
 - **Corrections are rate-free**, so a client that keeps cheating gets corrected each time but isn't kicked. Kicking and thresholds come once the anomaly data has been looked at.
 - **Public positions are readable by any client** (PLAN §4.5). That's accepted.

@@ -1,0 +1,41 @@
+# Land use and climate (docs/design/world.md): what each 4 m texel of the world's land-use raster
+# means. `wire` is the value stored in the raster: the use class in the low 4 bits, the climate in
+# bits 4–6, so there can be at most 16 uses and 8 climates. The values must run 0, 1, 2, … with no
+# gaps. Which uses allow building is from RESEARCH §2.4 (A); climate growth multipliers come with
+# farming (M2).
+
+[[land_use]]
+id = "wild"
+wire = 0
+buildable = false
+
+[[land_use]]
+id = "housing"
+wire = 1
+buildable = true
+
+[[land_use]]
+id = "town"
+wire = 2
+buildable = false
+
+[[land_use]]
+id = "road"
+wire = 3
+buildable = false
+
+[[climate]]
+id = "temperate"
+wire = 0
+
+[[climate]]
+id = "tropical"
+wire = 1
+
+[[climate]]
+id = "arid"
+wire = 2
+
+[[climate]]
+id = "subarctic"
+wire = 3

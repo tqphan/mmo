@@ -12,16 +12,20 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 2";
+const FORMAT: &str = "contentgen 3";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
 const MAX_MOUNTS: usize = 16;
+/// The land-use raster packs a use class into 4 bits and a climate into 3 (docs/design/world.md).
+pub const MAX_LAND_USES: usize = 16;
+pub const MAX_CLIMATES: usize = 8;
 
 /// The raw text of every content file.
 pub struct Sources {
     pub movement: String,
     pub ships: String,
+    pub land: String,
 }
 
 impl Sources {
@@ -29,7 +33,7 @@ impl Sources {
         let read = |name: &str| {
             std::fs::read_to_string(dir.join(name)).map_err(|e| vec![format!("{name}: {e}")])
         };
-        Ok(Self { movement: read("movement.toml")?, ships: read("ships.toml")? })
+        Ok(Self { movement: read("movement.toml")?, ships: read("ships.toml")?, land: read("land.toml")? })
     }
 }
 
@@ -96,6 +100,28 @@ pub struct MountDef {
     pub facing_deg: f32,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LandFile {
+    land_use: Vec<LandUseDef>,
+    climate: Vec<ClimateDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LandUseDef {
+    pub id: String,
+    pub wire: u8,
+    pub buildable: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ClimateDef {
+    pub id: String,
+    pub wire: u8,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -103,6 +129,9 @@ pub struct Content {
     pub move_modes: Vec<MoveModeDef>,
     /// Sorted by `wire`, like the modes.
     pub hulls: Vec<HullDef>,
+    /// Sorted by `wire`, like the modes.
+    pub land_uses: Vec<LandUseDef>,
+    pub climates: Vec<ClimateDef>,
     pub hash: u64,
 }
 
@@ -111,19 +140,24 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let mut errors = Vec::new();
     let movement: Result<MovementFile, _> = from_toml("movement.toml", &src.movement);
     let ships: Result<ShipsFile, _> = from_toml("ships.toml", &src.ships);
-    let (mut modes, mut hulls) = match (movement, ships) {
-        (Ok(m), Ok(s)) => (m.mode, s.hull),
-        (m, s) => return Err(m.err().into_iter().chain(s.err()).flatten().collect()),
+    let land: Result<LandFile, _> = from_toml("land.toml", &src.land);
+    let (mut modes, mut hulls, mut land) = match (movement, ships, land) {
+        (Ok(m), Ok(s), Ok(l)) => (m.mode, s.hull, l),
+        (m, s, l) => return Err(m.err().into_iter().chain(s.err()).chain(l.err()).flatten().collect()),
     };
     modes.sort_by_key(|m| m.wire);
     hulls.sort_by_key(|h| h.wire);
+    land.land_use.sort_by_key(|u| u.wire);
+    land.climate.sort_by_key(|c| c.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
+    check_land(&land, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let hash = hash(&canonical(&modes, &hulls));
-    Ok(Content { move_modes: modes, hulls, hash })
+    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, hash: 0 };
+    c.hash = hash(&canonical(&c));
+    Ok(c)
 }
 
 fn from_toml<T: serde::de::DeserializeOwned>(name: &str, text: &str) -> Result<T, Vec<String>> {
@@ -217,6 +251,17 @@ fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
     }
 }
 
+fn check_land(land: &LandFile, errors: &mut Vec<String>) {
+    check_ids("land.toml", "land_use", land.land_use.iter().map(|u| (u.id.as_str(), u.wire)), errors);
+    check_ids("land.toml", "climate", land.climate.iter().map(|c| (c.id.as_str(), c.wire)), errors);
+    if land.land_use.len() > MAX_LAND_USES {
+        errors.push(format!("land.toml: at most {MAX_LAND_USES} land uses (4 bits of the raster)"));
+    }
+    if land.climate.len() > MAX_CLIMATES {
+        errors.push(format!("land.toml: at most {MAX_CLIMATES} climates (3 bits of the raster)"));
+    }
+}
+
 fn is_id(s: &str) -> bool {
     let mut chars = s.chars();
     chars.next().is_some_and(|c| c.is_ascii_lowercase())
@@ -224,12 +269,12 @@ fn is_id(s: &str) -> bool {
 }
 
 /// The data the hash covers, independent of how the TOML is laid out or commented.
-fn canonical(modes: &[MoveModeDef], hulls: &[HullDef]) -> String {
+fn canonical(c: &Content) -> String {
     let mut s = format!("{FORMAT}\n");
-    for m in modes {
+    for m in &c.move_modes {
         writeln!(s, "move_mode\t{}\t{}\t{:08x}", m.id, m.wire, m.max_speed_mps.to_bits()).unwrap();
     }
-    for h in hulls {
+    for h in &c.hulls {
         write!(s, "hull\t{}\t{}", h.id, h.wire).unwrap();
         for f in hull_fields(h).iter().chain(&cannon_fields(&h.cannon)) {
             write!(s, "\t{}", f.value.bits()).unwrap();
@@ -242,6 +287,12 @@ fn canonical(modes: &[MoveModeDef], hulls: &[HullDef]) -> String {
             }
             s += "\n";
         }
+    }
+    for u in &c.land_uses {
+        writeln!(s, "land_use\t{}\t{}\t{}", u.id, u.wire, u.buildable).unwrap();
+    }
+    for cl in &c.climates {
+        writeln!(s, "climate\t{}\t{}", cl.id, cl.wire).unwrap();
     }
     s
 }
@@ -454,7 +505,45 @@ pub fn render_rust(c: &Content) -> String {
     s += "    pub fn from_u8(v: u8) -> Option<Self> {\n";
     s += "        HULLS.get(usize::from(v)).map(|d| d.hull)\n    }\n\n";
     s += "    pub fn data(self) -> &'static HullData {\n";
-    s += "        &HULLS[self as usize]\n    }\n}\n";
+    s += "        &HULLS[self as usize]\n    }\n}\n\n";
+
+    s += "/// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant\n";
+    s += "/// is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum LandUse {\n";
+    for u in &c.land_uses {
+        writeln!(s, "    {} = {},", pascal(&u.id), u.wire).unwrap();
+    }
+    s += "}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct LandUseData {\n";
+    s += "    pub land_use: LandUse,\n    pub id: &'static str,\n";
+    s += "    /// Houses and farms may be placed here.\n    pub buildable: bool,\n}\n\n";
+    writeln!(s, "pub static LAND_USES: [LandUseData; {}] = [", c.land_uses.len()).unwrap();
+    for u in &c.land_uses {
+        writeln!(s, "    LandUseData {{ land_use: LandUse::{}, id: {:?}, buildable: {} }},", pascal(&u.id), u.id, u.buildable)
+            .unwrap();
+    }
+    s += "];\n\n";
+    s += "impl LandUse {\n";
+    s += "    pub fn from_u8(v: u8) -> Option<Self> {\n";
+    s += "        LAND_USES.get(usize::from(v)).map(|d| d.land_use)\n    }\n\n";
+    s += "    pub fn data(self) -> &'static LandUseData {\n";
+    s += "        &LAND_USES[self as usize]\n    }\n}\n\n";
+
+    s += "/// Climates (`content/land.toml`): bits 4–6 of a land-use texel. The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum Climate {\n";
+    for cl in &c.climates {
+        writeln!(s, "    {} = {},", pascal(&cl.id), cl.wire).unwrap();
+    }
+    s += "}\n\n";
+    let ids: Vec<String> = c.climates.iter().map(|cl| format!("{:?}", cl.id)).collect();
+    writeln!(s, "pub static CLIMATE_IDS: [&str; {}] = [{}];\n", c.climates.len(), ids.join(", ")).unwrap();
+    s += "impl Climate {\n";
+    s += "    pub fn from_u8(v: u8) -> Option<Self> {\n        match v {\n";
+    for cl in &c.climates {
+        writeln!(s, "            {} => Some(Self::{}),", cl.wire, pascal(&cl.id)).unwrap();
+    }
+    s += "            _ => None,\n        }\n    }\n\n";
+    s += "    pub fn id(self) -> &'static str {\n        CLIMATE_IDS[self as usize]\n    }\n}\n";
     s
 }
 
@@ -487,6 +576,20 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <summary>A cannon's place on deck.</summary>\n";
     csharp_param_docs(&mut s, &mount);
     writeln!(s, "    public sealed record Mount({});\n", csharp_params(&mount)).unwrap();
+    s += "    /// <summary>Land-use classes (content/land.toml): the low 4 bits of a land-use texel. The value is the wire value.</summary>\n";
+    s += "    public enum LandUse : byte\n    {\n";
+    for u in &c.land_uses {
+        writeln!(s, "        {} = {},", pascal(&u.id), u.wire).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <param name=\"Buildable\">Houses and farms may be placed here.</param>\n";
+    s += "    public sealed record LandUseData(LandUse Use, string Id, bool Buildable);\n\n";
+    s += "    /// <summary>Climates (content/land.toml): bits 4–6 of a land-use texel. The value is the wire value.</summary>\n";
+    s += "    public enum Climate : byte\n    {\n";
+    for cl in &c.climates {
+        writeln!(s, "        {} = {},", pascal(&cl.id), cl.wire).unwrap();
+    }
+    s += "    }\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -521,7 +624,17 @@ pub fn render_csharp(c: &Content) -> String {
         .unwrap();
     }
     s += "        };\n\n";
-    s += "        public static HullData Data(this Hull hull) => Hulls[(int)hull];\n    }\n}\n";
+    s += "        public static HullData Data(this Hull hull) => Hulls[(int)hull];\n\n";
+    s += "        public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]\n        {\n";
+    for u in &c.land_uses {
+        writeln!(s, "            new(LandUse.{}, {:?}, {}),", pascal(&u.id), u.id, u.buildable).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        public static LandUseData Data(this LandUse use) => LandUses[(int)use];\n\n";
+    s += "        public static readonly IReadOnlyList<string> ClimateIds = new[] { ";
+    s += &c.climates.iter().map(|cl| format!("{:?}", cl.id)).collect::<Vec<_>>().join(", ");
+    s += " };\n\n";
+    s += "        public static string Id(this Climate climate) => ClimateIds[(int)climate];\n    }\n}\n";
     s
 }
 
@@ -583,12 +696,36 @@ mod tests {
         facing_deg = -90.0
     "#;
 
+    const LAND: &str = r#"
+        [[land_use]]
+        id = "wild"
+        wire = 0
+        buildable = false
+
+        [[land_use]]
+        id = "housing"
+        wire = 1
+        buildable = true
+
+        [[climate]]
+        id = "temperate"
+        wire = 0
+
+        [[climate]]
+        id = "arid"
+        wire = 1
+    "#;
+
     fn parse_movement(movement: &str) -> Result<Content, Vec<String>> {
-        parse(&Sources { movement: movement.into(), ships: SHIPS.into() })
+        parse(&Sources { movement: movement.into(), ships: SHIPS.into(), land: LAND.into() })
     }
 
     fn parse_ships(ships: &str) -> Result<Content, Vec<String>> {
-        parse(&Sources { movement: MOVEMENT.into(), ships: ships.into() })
+        parse(&Sources { movement: MOVEMENT.into(), ships: ships.into(), land: LAND.into() })
+    }
+
+    fn parse_land(land: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: land.into() })
     }
 
     fn ship_errors(ships: &str) -> String {
@@ -717,8 +854,10 @@ mod tests {
 
     #[test]
     fn errors_in_both_files_are_reported() {
-        let e = parse(&Sources { movement: "[[mode]\n".into(), ships: "[[hull]\n".into() }).unwrap_err().join("\n");
-        assert!(e.contains("movement.toml") && e.contains("ships.toml"), "{e}");
+        let e = parse(&Sources { movement: "[[mode]\n".into(), ships: "[[hull]\n".into(), land: "[[x]\n".into() })
+            .unwrap_err()
+            .join("\n");
+        assert!(e.contains("movement.toml") && e.contains("ships.toml") && e.contains("land.toml"), "{e}");
     }
 
     #[test]
@@ -730,6 +869,50 @@ mod tests {
         assert!(rs.contains("Mount { x: 2.0, z: 0.0, facing_deg: -90.0 },"));
         assert!(cs.contains(r#"new(Hull.Clipper, "clipper", 11.0f,"#));
         assert!(cs.contains("new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }"));
+    }
+
+    #[test]
+    fn land_uses_and_climates_parse_in_wire_order_and_reach_both_outputs() {
+        let swapped = LAND.replace("\"wild\"\n        wire = 0", "\"wild\"\n        wire = 1").replacen(
+            "\"housing\"\n        wire = 1",
+            "\"housing\"\n        wire = 0",
+            1,
+        );
+        let c = parse_land(&swapped).unwrap();
+        assert_eq!(c.land_uses.iter().map(|u| u.id.as_str()).collect::<Vec<_>>(), ["housing", "wild"]);
+        let c = parse_land(LAND).unwrap();
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("Housing = 1,") && cs.contains("Housing = 1,"));
+        assert!(rs.contains(r#"LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true },"#));
+        assert!(cs.contains(r#"new(LandUse.Housing, "housing", true),"#));
+        assert!(rs.contains("Arid = 1,") && cs.contains("Arid = 1,"));
+        assert!(rs.contains(r#"CLIMATE_IDS: [&str; 2] = ["temperate", "arid"];"#));
+        assert!(cs.contains(r#"ClimateIds = new[] { "temperate", "arid" };"#));
+    }
+
+    #[test]
+    fn any_land_change_changes_the_hash() {
+        let a = parse_land(LAND).unwrap().hash;
+        for changed in [
+            LAND.replace("buildable = true", "buildable = false"),
+            LAND.replace("\"arid\"", "\"dry\""),
+            LAND.replace("\"housing\"", "\"farmland\""),
+        ] {
+            assert_ne!(parse_land(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn land_tables_are_checked_and_fit_the_raster() {
+        let e = |land: &str| parse_land(land).unwrap_err().join("\n");
+        assert!(e(&LAND.replace("wire = 1\n        buildable", "wire = 2\n        buildable")).contains("no gaps"));
+        assert!(e(&LAND.replace("\"arid\"", "\"temperate\"")).contains("duplicate id"));
+        assert!(e("land_use = []\nclimate = []").contains("no land_uses"));
+        let many_uses: String = (0..17).map(|i| format!("[[land_use]]\nid = \"u{i}\"\nwire = {i}\nbuildable = false\n")).collect();
+        assert!(e(&format!("{many_uses}[[climate]]\nid = \"c\"\nwire = 0\n")).contains("at most 16 land uses"));
+        let many_climates: String = (0..9).map(|i| format!("[[climate]]\nid = \"c{i}\"\nwire = {i}\n")).collect();
+        let one_use = "[[land_use]]\nid = \"wild\"\nwire = 0\nbuildable = false\n";
+        assert!(e(&format!("{one_use}{many_climates}")).contains("at most 8 climates"));
     }
 
     #[test]

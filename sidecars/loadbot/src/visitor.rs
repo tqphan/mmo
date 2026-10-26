@@ -5,13 +5,13 @@
 //! its Near tier and prints each one the first time it sees it. With `--expect N` it fails unless
 //! it saw at least N other characters; it always fails if it's corrected.
 //!
-//! It runs on the ground of the world file (`--file`, default `target/world.mmoh`) when there is
-//! one, so it isn't corrected where the server has that terrain, and at y = 0 when there isn't.
+//! It runs on the ground of the world's files (`--world`, default `world/`), or of a height file with
+//! `--file`, and fails at once if the server's terrain hash differs from theirs (docs/design/world.md).
 
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
-use sim::terrain::{FileChunks, HeightFile, ground};
+use sim::terrain::{FileChunks, HeightFile, ground, terrain_hash};
 use spacetimedb_sdk::{DbContext, Table};
 
 use crate::module_bindings::*;
@@ -21,13 +21,14 @@ pub struct VisitorArgs {
     pub secs: u64,
     /// Fail unless at least this many other characters were seen.
     pub expect: usize,
-    /// The world's height file, if not the default.
+    /// A height file to run on instead of the world's files.
     pub file: Option<String>,
+    pub world: String,
 }
 
 impl Default for VisitorArgs {
     fn default() -> Self {
-        Self { secs: 60, expect: 0, file: None }
+        Self { secs: 60, expect: 0, file: None, world: worldtool::DEFAULT_DIR.into() }
     }
 }
 
@@ -37,18 +38,32 @@ const RADIUS: f32 = 4.0;
 const STEP: Duration = Duration::from_millis(150);
 
 pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
-    let path = va.file.as_deref().unwrap_or(crate::world::DEFAULT_FILE);
-    let world = match std::fs::read(path) {
-        Ok(bytes) => Some(HeightFile::from_bytes(&bytes).map_err(|e| format!("{path}: {e}"))?),
-        Err(_) if va.file.is_none() => None,
-        Err(e) => return Err(format!("{path}: {e}")),
+    let (path, world, hash) = match &va.file {
+        Some(path) => {
+            let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+            let f = HeightFile::from_bytes(&bytes).map_err(|e| format!("{path}: {e}"))?;
+            let hash = terrain_hash(f.chunks().iter().map(|(c, s)| (*c, s.as_slice())));
+            (path.as_str(), f, hash)
+        }
+        None => {
+            let w = worldtool::World::load(std::path::Path::new(&va.world))?;
+            let hash = w.terrain_hash();
+            (va.world.as_str(), w.heights, hash)
+        }
     };
-    println!("V: running on {}", if world.is_some() { path } else { "flat ground (no world file)" });
-    let mut chunks = world.as_ref().map(FileChunks::new);
-    let mut height = |x: f32, z: f32| chunks.as_mut().and_then(|c| ground(c, x, z)).map_or(0.0, |g| g.hi);
+    println!("V: running on {path}");
+    let mut chunks = FileChunks::new(&world);
+    let mut height = |x: f32, z: f32| ground(&mut chunks, x, z).map_or(0.0, |g| g.hi);
 
     let mut bot = Bot::connect(args, "V")?;
     bot.subscribe_self()?;
+    let server = bot.server_terrain();
+    if server.hash != hash {
+        return Err(format!(
+            "the server's terrain ({:016x}, {} chunks) isn't {path}'s ({hash:016x}); run `cargo xtask world`",
+            server.hash, server.chunks
+        ));
+    }
     let me = bot.arrive()?;
     let start = [CENTER[0] + RADIUS, CENTER[1]];
     bot.teleport(start[0], start[1])?;

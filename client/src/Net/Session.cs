@@ -10,7 +10,7 @@ namespace Mmo.Net
     /// <summary>
     /// The connection to the world module: connects with Gzip (ADR 0011), keeps a token per profile,
     /// subscribes to our own views, makes a character if there isn't one and enters the world with
-    /// our content hash. Once we're in, it runs the Near tier's subscription director.
+    /// our content hash and the terrain hash of the world we loaded (docs/design/world.md). Once we're in, it runs the Near tier's subscription director.
     /// The SDK's callbacks run inside <see cref="DbConnection.FrameTick"/>, on the main thread.
     /// </summary>
     public partial class Session : Node
@@ -20,11 +20,13 @@ namespace Mmo.Net
         public const ushort NearRadius = 2;
 
         private readonly ClientOptions options;
+        private readonly ulong terrainHash;
         private bool entering;
 
-        public Session(ClientOptions options)
+        public Session(ClientOptions options, ulong terrainHash)
         {
             this.options = options;
+            this.terrainHash = terrainHash;
             Name = "Session";
         }
 
@@ -107,7 +109,7 @@ namespace Mmo.Net
             }
             entering = true;
             SetStatus("entering the world");
-            Conn.Reducers.EnterWorld(mine.CharId, GameContent.Hash);
+            Conn.Reducers.EnterWorld(mine.CharId, GameContent.Hash, terrainHash);
         }
 
         private void OnPresenceChanged(Presence old, Presence p)

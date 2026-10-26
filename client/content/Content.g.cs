@@ -41,6 +41,27 @@ namespace Mmo.Content
     /// <param name="FacingDeg">Yaw on deck: 0 the bow, 90 port, -90 starboard.</param>
     public sealed record Mount(float X, float Z, float FacingDeg);
 
+    /// <summary>Land-use classes (content/land.toml): the low 4 bits of a land-use texel. The value is the wire value.</summary>
+    public enum LandUse : byte
+    {
+        Wild = 0,
+        Housing = 1,
+        Town = 2,
+        Road = 3,
+    }
+
+    /// <param name="Buildable">Houses and farms may be placed here.</param>
+    public sealed record LandUseData(LandUse Use, string Id, bool Buildable);
+
+    /// <summary>Climates (content/land.toml): bits 4–6 of a land-use texel. The value is the wire value.</summary>
+    public enum Climate : byte
+    {
+        Temperate = 0,
+        Tropical = 1,
+        Arid = 2,
+        Subarctic = 3,
+    }
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -58,7 +79,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x176c4ad5fc4f49e1UL;
+        public const ulong Hash = 0x9a1205fde59b4b39UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -75,5 +96,19 @@ namespace Mmo.Content
         };
 
         public static HullData Data(this Hull hull) => Hulls[(int)hull];
+
+        public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]
+        {
+            new(LandUse.Wild, "wild", false),
+            new(LandUse.Housing, "housing", true),
+            new(LandUse.Town, "town", false),
+            new(LandUse.Road, "road", false),
+        };
+
+        public static LandUseData Data(this LandUse use) => LandUses[(int)use];
+
+        public static readonly IReadOnlyList<string> ClimateIds = new[] { "temperate", "tropical", "arid", "subarctic" };
+
+        public static string Id(this Climate climate) => ClimateIds[(int)climate];
     }
 }

@@ -42,19 +42,15 @@ namespace Mmo.Presentation
             GetWindow().Size = new Vector2I(1920, 1080);
             if (options.NoVsync)
                 DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-            string path = ClientOptions.RepoPath(options.WorldTest!);
-            if (!System.IO.File.Exists(path))
+            if (Main.LoadWorld(options.WorldTest!) is not { } world)
             {
-                GD.PushError($"world: no map at {path}; write one with `cargo xtask bot world-gen`");
                 SetProcess(false);
                 GetTree().Quit(2);
                 return;
             }
+            map = world.Heights;
             var clock = Stopwatch.StartNew();
-            map = HeightMap.Load(path);
-            GD.Print($"world: read {path} ({map.Width} × {map.Depth} samples) in {clock.ElapsedMilliseconds} ms");
-            clock.Restart();
-            terrain = new Terrain(map);
+            terrain = new Terrain(map, world.Land);
             GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned in {clock.ElapsedMilliseconds} ms");
             AddChild(terrain);
 

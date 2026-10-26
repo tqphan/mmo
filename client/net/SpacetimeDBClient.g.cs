@@ -33,6 +33,7 @@ namespace SpacetimeDB.Types
             AddTable(Entity = new(conn));
             AddTable(MyCharacters = new(conn));
             AddTable(MyPresence = new(conn));
+            AddTable(TerrainInfo = new(conn));
             AddTable(Transform = new(conn));
             AddTable(Vehicle = new(conn));
         }
@@ -537,6 +538,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
+            new QueryBuilder().From.TerrainInfo().ToSql(),
             new QueryBuilder().From.Transform().ToSql(),
             new QueryBuilder().From.Vehicle().ToSql(),
         }
@@ -551,6 +553,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
+        public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
         public global::SpacetimeDB.Table<Transform, TransformCols, TransformIxCols> Transform() => new("transform", new TransformCols("transform"), new TransformIxCols("transform"));
         public global::SpacetimeDB.Table<Vehicle, VehicleCols, VehicleIxCols> Vehicle() => new("vehicle", new VehicleCols("vehicle"), new VehicleIxCols("vehicle"));
     }

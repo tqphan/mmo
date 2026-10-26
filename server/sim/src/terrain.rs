@@ -127,7 +127,8 @@ pub fn line_of_sight(src: &mut impl Chunks, a: [f32; 3], b: [f32; 3]) -> bool {
     })
 }
 
-/// A rectangle of whole cells of terrain, as written by the world exporter and uploaded by an admin
+/// A rectangle of whole cells of terrain, uploaded by an admin: test terrain, or the world put
+/// together from its region files (`tools/worldtool`)
 /// (`.mmoh`, docs/design/terrain.md).
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeightFile {
@@ -248,6 +249,27 @@ impl Chunks for FileChunks<'_> {
         }
         Some(self.cut.entry(cell).or_insert_with(|| f.chunk_at(dx as usize, dz as usize)))
     }
+}
+
+/// One chunk's part of the terrain hash (docs/design/world.md): FNV-1a 64 over the cell key and
+/// the samples, little-endian, then the splitmix64 finaliser so that sums of hashes mix well.
+pub fn chunk_hash(cell: u64, samples: &[u16]) -> u64 {
+    let fnv = |h: u64, b: u8| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+    let mut h = cell.to_le_bytes().into_iter().fold(0xcbf2_9ce4_8422_2325, fnv);
+    for s in samples {
+        h = s.to_le_bytes().into_iter().fold(h, fnv);
+    }
+    h ^= h >> 30;
+    h = h.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    h ^= h >> 27;
+    h = h.wrapping_mul(0x94d0_49bb_1331_11eb);
+    h ^ (h >> 31)
+}
+
+/// The terrain hash: the wrapping sum of every chunk's `chunk_hash`, so it doesn't depend on order
+/// and can follow uploads one chunk at a time. No terrain is 0.
+pub fn terrain_hash<'a>(chunks: impl IntoIterator<Item = (u64, &'a [u16])>) -> u64 {
+    chunks.into_iter().fold(0, |sum, (cell, samples)| sum.wrapping_add(chunk_hash(cell, samples)))
 }
 
 /// Whether `cell` can hold a chunk: an open-world cell on the map.
@@ -406,6 +428,36 @@ mod tests {
         let (x0, z0) = f.origin();
         let g = ground(&mut lazy, x0 + 100.0, z0 + 50.0).unwrap();
         assert!((g.hi - ((x0 + 100.0) * 0.1 - (z0 + 50.0) * 0.05)).abs() < 0.05);
+    }
+
+    #[test]
+    fn chunk_hashes_cover_the_cell_and_every_sample() {
+        let f = HeightFile::generate(0, 0, 1, 1, |x, z| x * 0.3 + z * 0.1);
+        let (cell, samples) = &f.chunks()[0];
+        let h = chunk_hash(*cell, samples);
+        assert_ne!(chunk_hash(cell + 1, samples), h);
+        for i in [0, 500, CHUNK_LEN - 1] {
+            let mut changed = samples.clone();
+            changed[i] ^= 1;
+            assert_ne!(chunk_hash(*cell, &changed), h, "sample {i}");
+        }
+    }
+
+    #[test]
+    fn the_terrain_hash_ignores_order_and_follows_replacements() {
+        let f = HeightFile::generate(10, 20, 3, 2, |x, z| (x * 0.05).sin() * 9.0 + z * 0.01);
+        let chunks = f.chunks();
+        let all = terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())));
+        assert_eq!(terrain_hash(chunks.iter().rev().map(|(c, s)| (*c, s.as_slice()))), all);
+        assert_eq!(terrain_hash([]), 0);
+        // Swap one chunk's samples by subtracting the old hash and adding the new.
+        let (cell, old) = &chunks[2];
+        let new = vec![7u16; CHUNK_LEN];
+        let followed = all.wrapping_sub(chunk_hash(*cell, old)).wrapping_add(chunk_hash(*cell, &new));
+        let recomputed =
+            terrain_hash(chunks.iter().map(|(c, s)| (*c, if c == cell { new.as_slice() } else { s.as_slice() })));
+        assert_eq!(followed, recomputed);
+        assert_ne!(followed, all);
     }
 
     #[test]

@@ -7,6 +7,10 @@
 //! must never be corrected. A cheater's cliff teleport, fly hack and dive underground must each be
 //! corrected, and a swing over a cliff edge must be refused for line of sight. The terrain is
 //! cleared at the end, so the other scenarios run on bare ground.
+//!
+//! `terrain-upload` and `world-upload` send a height file or the world's files (docs/design/world.md)
+//! as an admin: the publisher, when `MMO_ADMIN_TOKEN` holds its token (`cargo xtask world` sets it),
+//! or else a fresh identity made a GM with the dev-only `dev_set_gm`.
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -25,11 +29,13 @@ pub struct TerrainArgs {
     pub secs: u64,
     /// Where the height file goes; generated first if it doesn't exist.
     pub file: String,
+    /// The world's files, for `world-upload`.
+    pub world: String,
 }
 
 impl Default for TerrainArgs {
     fn default() -> Self {
-        Self { bots: 8, secs: 30, file: "target/terrain-test.mmoh".into() }
+        Self { bots: 8, secs: 30, file: "target/terrain-test.mmoh".into(), world: worldtool::DEFAULT_DIR.into() }
     }
 }
 
@@ -119,9 +125,25 @@ pub(crate) fn flatten<E: std::fmt::Display>(r: Result<Result<(), String>, E>) ->
     r.map_err(|e| e.to_string())?
 }
 
-/// Upload a height file as `admin`, which becomes a GM first (dev builds only).
+/// The token's environment variable: the publisher's token, which makes its holder an admin.
+const ADMIN_TOKEN: &str = "MMO_ADMIN_TOKEN";
+
+/// Connect as an admin: the publisher if `MMO_ADMIN_TOKEN` is set, else a fresh identity that makes
+/// itself a GM (dev builds only).
+fn admin(args: &Args) -> Result<Bot, String> {
+    if let Some(token) = std::env::var(ADMIN_TOKEN).ok().filter(|t| !t.is_empty()) {
+        let bot = Bot::connect_as(args, "admin", Some(token))?;
+        println!("admin: the publisher ({})", bot.identity().to_hex());
+        return Ok(bot);
+    }
+    let bot = Bot::connect(args, "admin")?;
+    outcome(|tx| bot.conn.reducers.dev_set_gm_then(3, move |_, r| drop(tx.send(flatten(r)))))
+        .map_err(|e| format!("becoming a GM: {e} (a --prod build has no dev_set_gm; set {ADMIN_TOKEN} to the publisher's token)"))?;
+    Ok(bot)
+}
+
+/// Upload a height file as `admin`.
 fn upload(admin: &Bot, f: &HeightFile) -> Check {
-    outcome(|tx| admin.conn.reducers.dev_set_gm_then(3, move |_, r| drop(tx.send(flatten(r)))))?;
     let chunks: Vec<TerrainChunk> = f.chunks().into_iter().map(|(cell, samples)| TerrainChunk { cell, samples }).collect();
     let started = Instant::now();
     for batch in chunks.chunks(UPLOAD_BATCH) {
@@ -138,8 +160,26 @@ fn clear(admin: &Bot) -> Check {
 
 /// `loadbot terrain-upload --file F`.
 pub fn upload_file(args: &Args, ta: &TerrainArgs) -> Check {
-    let admin = Bot::connect(args, "admin")?;
+    let admin = admin(args)?;
     upload(&admin, &read(&ta.file)?)?;
+    admin.conn.disconnect().map_err(|e| e.to_string())
+}
+
+/// `loadbot world-upload [--world DIR]`: replace the server's terrain with the world's, then check
+/// that the server's terrain hash is the manifest's.
+pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
+    let started = Instant::now();
+    let world = worldtool::World::load(std::path::Path::new(&ta.world))?;
+    let want = world.terrain_hash();
+    println!("read {} in {:.1} s, terrain hash {want:016x}", ta.world, started.elapsed().as_secs_f32());
+    let admin = admin(args)?;
+    admin.subscribe_self()?;
+    clear(&admin)?;
+    upload(&admin, &world.heights)?;
+    let got = || admin.server_terrain();
+    wait_for("the server's terrain hash", || got().hash == want)
+        .map_err(|_| format!("the server's terrain hash is {:016x} over {} chunks, expected {want:016x}", got().hash, got().chunks))?;
+    println!("the server's terrain hash matches: {want:016x} over {} chunks", got().chunks);
     admin.conn.disconnect().map_err(|e| e.to_string())
 }
 
@@ -478,7 +518,7 @@ pub fn scenario(args: &Args, ta: &TerrainArgs) -> Check {
         write(&ta.file)?;
     }
     let f = read(&ta.file)?;
-    let admin = Bot::connect(args, "admin")?;
+    let admin = admin(args)?;
     admin.subscribe_self()?;
     upload(&admin, &f)?;
     let result = run(args, ta, &f);

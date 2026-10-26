@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x176c4ad5fc4f49e1;
+pub const CONTENT_HASH: u64 = 0x9a1205fde59b4b39;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,5 +138,69 @@ impl Hull {
 
     pub fn data(self) -> &'static HullData {
         &HULLS[self as usize]
+    }
+}
+
+/// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant
+/// is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LandUse {
+    Wild = 0,
+    Housing = 1,
+    Town = 2,
+    Road = 3,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LandUseData {
+    pub land_use: LandUse,
+    pub id: &'static str,
+    /// Houses and farms may be placed here.
+    pub buildable: bool,
+}
+
+pub static LAND_USES: [LandUseData; 4] = [
+    LandUseData { land_use: LandUse::Wild, id: "wild", buildable: false },
+    LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true },
+    LandUseData { land_use: LandUse::Town, id: "town", buildable: false },
+    LandUseData { land_use: LandUse::Road, id: "road", buildable: false },
+];
+
+impl LandUse {
+    pub fn from_u8(v: u8) -> Option<Self> {
+        LAND_USES.get(usize::from(v)).map(|d| d.land_use)
+    }
+
+    pub fn data(self) -> &'static LandUseData {
+        &LAND_USES[self as usize]
+    }
+}
+
+/// Climates (`content/land.toml`): bits 4–6 of a land-use texel. The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Climate {
+    Temperate = 0,
+    Tropical = 1,
+    Arid = 2,
+    Subarctic = 3,
+}
+
+pub static CLIMATE_IDS: [&str; 4] = ["temperate", "tropical", "arid", "subarctic"];
+
+impl Climate {
+    pub fn from_u8(v: u8) -> Option<Self> {
+        match v {
+            0 => Some(Self::Temperate),
+            1 => Some(Self::Tropical),
+            2 => Some(Self::Arid),
+            3 => Some(Self::Subarctic),
+            _ => None,
+        }
+    }
+
+    pub fn id(self) -> &'static str {
+        CLIMATE_IDS[self as usize]
     }
 }

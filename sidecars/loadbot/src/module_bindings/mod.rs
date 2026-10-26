@@ -41,6 +41,8 @@ pub mod ship_motion_type;
 pub mod suspicion_type;
 pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
+pub mod terrain_info_table;
+pub mod terrain_info_type;
 pub mod tick_state_type;
 pub mod transform_table;
 pub mod transform_type;
@@ -83,6 +85,8 @@ pub use ship_motion_type::ShipMotion;
 pub use suspicion_type::Suspicion;
 pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
+pub use terrain_info_table::*;
+pub use terrain_info_type::TerrainInfo;
 pub use tick_state_type::TickState;
 pub use transform_table::*;
 pub use transform_type::Transform;
@@ -130,6 +134,7 @@ pub enum Reducer {
     EnterWorld {
         char_id: u64,
         content_hash: u64,
+        terrain_hash: u64,
     },
     Fire {
         mount: u8,
@@ -234,9 +239,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::EnterWorld {
                 char_id,
                 content_hash,
+                terrain_hash,
             } => __sats::bsatn::to_vec(&enter_world_reducer::EnterWorldArgs {
                 char_id: char_id.clone(),
                 content_hash: content_hash.clone(),
+                terrain_hash: terrain_hash.clone(),
             }),
             Reducer::Fire { mount, yaw, pitch } => __sats::bsatn::to_vec(&fire_reducer::FireArgs {
                 mount: mount.clone(),
@@ -284,6 +291,7 @@ pub struct DbUpdate {
     entity: __sdk::TableUpdate<Entity>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_presence: __sdk::TableUpdate<Presence>,
+    terrain_info: __sdk::TableUpdate<TerrainInfo>,
     transform: __sdk::TableUpdate<Transform>,
     vehicle: __sdk::TableUpdate<Vehicle>,
 }
@@ -312,6 +320,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
+                "terrain_info" => db_update
+                    .terrain_info
+                    .append(terrain_info_table::parse_table_update(table_update)?),
                 "transform" => db_update
                     .transform
                     .append(transform_table::parse_table_update(table_update)?),
@@ -351,6 +362,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
+        diff.terrain_info = cache
+            .apply_diff_to_table::<TerrainInfo>("terrain_info", &self.terrain_info)
+            .with_updates_by_pk(|row| &row.id);
         diff.transform = cache
             .apply_diff_to_table::<Transform>("transform", &self.transform)
             .with_updates_by_pk(|row| &row.entity_id);
@@ -385,6 +399,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "terrain_info" => db_update
+                    .terrain_info
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "transform" => db_update
                     .transform
@@ -423,6 +440,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "terrain_info" => db_update
+                    .terrain_info
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "transform" => db_update
                     .transform
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -450,6 +470,7 @@ pub struct AppliedDiff<'r> {
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
+    terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
     vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
     __unused: std::marker::PhantomData<&'r ()>,
@@ -483,6 +504,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
+        callbacks.invoke_table_row_callbacks::<TerrainInfo>(
+            "terrain_info",
+            &self.terrain_info,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Transform>("transform", &self.transform, event);
         callbacks.invoke_table_row_callbacks::<Vehicle>("vehicle", &self.vehicle, event);
     }
@@ -1151,6 +1177,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         entity_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
+        terrain_info_table::register_table(client_cache);
         transform_table::register_table(client_cache);
         vehicle_table::register_table(client_cache);
     }
@@ -1161,6 +1188,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "entity",
         "my_characters",
         "my_presence",
+        "terrain_info",
         "transform",
         "vehicle",
     ];
