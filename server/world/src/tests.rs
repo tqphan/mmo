@@ -453,3 +453,189 @@ fn others_see_moves_only_when_the_tick_publishes_them() {
     // Nothing moved since, so the next tick publishes nothing.
     assert_eq!(publish(&t), 0);
 }
+
+// Terrain (docs/design/terrain.md) -----------------------------------------------------------
+
+/// A 3 m platform west of x = 0, a 0.5 slope up to 18 m at x = 30, a cliff (5 m per metre) to a
+/// plateau at 38 m from x = 34. The same along z.
+fn cliff_height(x: f32, _z: f32) -> f32 {
+    if x < 0.0 {
+        3.0
+    } else if x < 30.0 {
+        3.0 + 0.5 * x
+    } else if x < 34.0 {
+        18.0 + 5.0 * (x - 30.0)
+    } else {
+        38.0
+    }
+}
+
+const ADMIN: u128 = 99;
+
+fn upload_cliff(t: &TestContext) {
+    use crate::terrain::{TerrainChunk, admin_put_terrain};
+    call(t, ADMIN, |ctx| {
+        on_connect(ctx);
+        record_owner(ctx);
+        Ok(())
+    })
+    .unwrap();
+    let file = sim::terrain::HeightFile::generate(124, 124, 3, 2, cliff_height);
+    let chunks = file.chunks().into_iter().map(|(cell, samples)| TerrainChunk { cell, samples }).collect();
+    call(t, ADMIN, |ctx| admin_put_terrain(ctx, chunks)).unwrap();
+}
+
+fn step_y(t: &TestContext, player: u128, seq: u32, x: f32, y: f32, z: f32) {
+    call(t, player, |ctx| move_event(ctx, seq, x, y, z, 0, 540, 1)).unwrap();
+}
+
+fn suspicions(t: &TestContext) -> Vec<String> {
+    read(t, |ctx| ctx.db.suspicion().iter().map(|s| s.reason).collect())
+}
+
+#[test]
+fn only_admins_upload_terrain_and_chunks_are_checked() {
+    use crate::terrain::{TerrainChunk, admin_clear_terrain, admin_put_terrain, terrain_chunk};
+    let t = world();
+    arrive(&t, 1, "Mira");
+    let chunk = || vec![TerrainChunk { cell: sim::cell::pack(0, 3, 4), samples: vec![0; sim::terrain::CHUNK_LEN] }];
+    assert_eq!(call(&t, 1, |ctx| admin_put_terrain(ctx, chunk())).unwrap_err(), "admins only");
+    assert!(call(&t, 1, admin_clear_terrain).is_err());
+
+    upload_cliff(&t);
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_chunk().count()), 6);
+    call(&t, ADMIN, |ctx| admin_put_terrain(ctx, chunk())).unwrap();
+    call(&t, ADMIN, |ctx| admin_put_terrain(ctx, chunk())).unwrap(); // replaces, doesn't duplicate
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_chunk().count()), 7);
+
+    let short = vec![TerrainChunk { cell: 0, samples: vec![0; 10] }];
+    assert!(call(&t, ADMIN, |ctx| admin_put_terrain(ctx, short)).is_err());
+    let other_instance = vec![TerrainChunk { cell: sim::cell::pack(1, 0, 0), samples: vec![0; sim::terrain::CHUNK_LEN] }];
+    assert!(call(&t, ADMIN, |ctx| admin_put_terrain(ctx, other_instance)).is_err());
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_chunk().count()), 7);
+
+    call(&t, ADMIN, admin_clear_terrain).unwrap();
+    assert_eq!(read(&t, |ctx| ctx.db.terrain_chunk().count()), 0);
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn dev_builds_let_anyone_become_admin() {
+    use crate::terrain::admin_clear_terrain;
+    let t = world();
+    arrive(&t, 1, "Mira");
+    assert!(call(&t, 1, admin_clear_terrain).is_err());
+    call(&t, 1, |ctx| crate::dev::dev_set_gm(ctx, gm::ADMIN)).unwrap();
+    call(&t, 1, admin_clear_terrain).unwrap();
+}
+
+#[test]
+fn entering_settles_on_the_ground() {
+    let t = world();
+    upload_cliff(&t);
+    // Saved at the origin at y = 0, now 3 m under the platform.
+    let p = arrive(&t, 1, "Mira");
+    assert!((p.y - 3.0).abs() < 0.05, "{}", p.y);
+    assert!((transform_of(&t, p.entity_id).y - 3.0).abs() < 0.05);
+    assert_eq!((p.anchor_x, p.anchor_y, p.anchor_z), (p.x, p.y, p.z));
+}
+
+#[test]
+fn walking_up_a_slope_is_accepted() {
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    for i in 1..=10u32 {
+        advance_ms(&t, 500);
+        let x = 2.7 * i as f32;
+        step_y(&t, 1, i, x, cliff_height(x, 0.0), 0.0);
+    }
+    let p = presence_of(&t, 1);
+    assert_eq!((p.corrections, p.x), (0, 27.0));
+    assert_eq!(p.anchor_x, 27.0, "standing moves the anchor");
+    assert!(suspicions(&t).is_empty());
+}
+
+#[test]
+fn jumping_up_the_cliff_is_corrected_and_settled() {
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    let route = [2.7, 5.4, 8.1, 10.8, 13.5, 16.2, 18.9, 21.6, 24.3, 27.0, 29.0];
+    for (i, &x) in route.iter().enumerate() {
+        advance_ms(&t, 500);
+        step_y(&t, 1, i as u32 + 1, x, cliff_height(x, 0.0), 0.0);
+    }
+    // 2.5 m on, 7.5 m up the face: more than a jump plus the slope credit.
+    advance_ms(&t, 500);
+    step_y(&t, 1, 20, 31.5, 25.5, 0.0);
+    let p = presence_of(&t, 1);
+    assert_eq!((p.corrections, p.x), (1, 29.0));
+    assert!((p.y - 17.5).abs() < 0.05, "settled on the ground: {}", p.y);
+    assert!(suspicions(&t)[0].contains("above the ceiling"), "{:?}", suspicions(&t));
+}
+
+#[test]
+fn a_fly_hack_is_corrected_after_the_grace() {
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    // Stay 1.5 m up while running west: fine for a jump's worth of time, not for 3.5 s.
+    for i in 1..=7u32 {
+        advance_ms(&t, 500);
+        step_y(&t, 1, i, -2.7 * i as f32, 4.5, 0.0);
+        assert_eq!(presence_of(&t, 1).corrections, u32::from(i == 7), "after {} s", i as f32 / 2.0);
+    }
+    let p = presence_of(&t, 1);
+    assert!((p.y - 3.0).abs() < 0.05, "settled back on the platform: {}", p.y);
+}
+
+#[test]
+fn going_underground_is_corrected() {
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    advance_ms(&t, 500);
+    step_y(&t, 1, 1, -2.0, 1.0, 0.0);
+    assert_eq!(presence_of(&t, 1).corrections, 1);
+    assert!(suspicions(&t)[0].contains("below the ground"));
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn running_off_the_cliff_and_falling_is_accepted() {
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    call(&t, 1, |ctx| crate::dev::dev_teleport(ctx, 40.0, 0.0)).unwrap();
+    assert!((presence_of(&t, 1).y - 38.0).abs() < 0.05, "teleport lands on the plateau");
+    // West at run speed, leaving the edge at x = 34 and falling at 9.8 m/s² until landing.
+    for k in 1..=8u32 {
+        advance_ms(&t, 500);
+        let x = 40.0 - 2.7 * k as f32;
+        let air = ((34.0 - x) / 5.4).max(0.0);
+        let y = (38.0 - 4.9 * air * air).max(cliff_height(x, 0.0));
+        step_y(&t, 1, k, x, y, 0.0);
+    }
+    let p = presence_of(&t, 1);
+    assert_eq!(p.corrections, 0, "{:?}", suspicions(&t));
+    assert!(p.y < 15.0 && p.anchor_y == p.y, "landed and anchored at {}", p.y);
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn dev_swing_needs_line_of_sight() {
+    use crate::dev::{dev_swing, dev_teleport};
+    let t = world();
+    upload_cliff(&t);
+    arrive(&t, 1, "Mira");
+    let b = arrive(&t, 2, "Tobin");
+    // Below the cliff looking up at the plateau, 20 m apart: the face is in the way.
+    call(&t, 1, |ctx| dev_teleport(ctx, 20.0, 0.0)).unwrap();
+    call(&t, 2, |ctx| dev_teleport(ctx, 40.0, 0.0)).unwrap();
+    assert_eq!(call(&t, 1, |ctx| dev_swing(ctx, b.entity_id)).unwrap_err(), "no line of sight");
+    // Out on the open platform it lands.
+    call(&t, 1, |ctx| dev_teleport(ctx, -25.0, 0.0)).unwrap();
+    call(&t, 2, |ctx| dev_teleport(ctx, -10.0, 5.0)).unwrap();
+    call(&t, 1, |ctx| dev_swing(ctx, b.entity_id)).unwrap();
+}

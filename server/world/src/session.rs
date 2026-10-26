@@ -3,6 +3,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
 
 use crate::movement::moved;
+use crate::terrain::Terrain;
 use crate::time::now;
 
 pub const MAX_CHARACTERS_PER_ACCOUNT: usize = 4;
@@ -14,6 +15,20 @@ pub const SPAWN: [f32; 3] = [0.0, 0.0, 0.0];
 
 pub mod entity_kind {
     pub const CHARACTER: u8 = 1;
+}
+
+/// `account.gm_level` values.
+pub mod gm {
+    /// May change the world itself: upload terrain and the like.
+    pub const ADMIN: u8 = 3;
+}
+
+/// Single row, private: the identity that published the database, which is always an admin.
+#[spacetimedb::table(accessor = owner)]
+pub struct Owner {
+    #[primary_key]
+    pub id: u8,
+    pub identity: Identity,
 }
 
 #[spacetimedb::table(accessor = account)]
@@ -105,6 +120,12 @@ pub struct Presence {
     pub yaw: u16,
     pub speed: i16,
     pub mode: u8,
+    /// The last solid footing, which vertical moves are measured from, and when the character last
+    /// touched the ground (docs/design/terrain.md).
+    pub anchor_x: f32,
+    pub anchor_y: f32,
+    pub anchor_z: f32,
+    pub contact_at: Timestamp,
 }
 
 #[spacetimedb::view(accessor = my_characters, public)]
@@ -125,6 +146,19 @@ pub fn on_connect(ctx: &ReducerContext) {
     if ctx.db.account().identity().find(ctx.sender()).is_none() {
         ctx.db.account().insert(Account { identity: ctx.sender(), created_at: now(ctx), gm_level: 0 });
     }
+}
+
+/// Called by `init`: the publisher becomes the owner.
+pub fn record_owner(ctx: &ReducerContext) {
+    if ctx.db.owner().id().find(0).is_none() {
+        ctx.db.owner().insert(Owner { id: 0, identity: ctx.sender() });
+    }
+}
+
+pub fn require_admin(ctx: &ReducerContext) -> Result<(), String> {
+    let owner = ctx.db.owner().id().find(0).is_some_and(|o| o.identity == ctx.sender());
+    let gm = ctx.db.account().identity().find(ctx.sender()).is_some_and(|a| a.gm_level >= gm::ADMIN);
+    if owner || gm { Ok(()) } else { Err("admins only".into()) }
 }
 
 #[spacetimedb::reducer(client_disconnected)]
@@ -195,6 +229,9 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Res
         .ok_or("no such character")?;
     // Re-entering, with the same or another character, replaces the old presence.
     despawn(ctx, ctx.sender());
+    let mode = sim::movement::MoveMode::Run;
+    // Saved before the terrain there existed, or under it since: start on the ground.
+    let y = sim::movement::settle(Terrain::new(ctx).ground(c.x, c.z), [c.x, c.y, c.z], mode);
     let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, c.x, c.z);
     let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::CHARACTER, ref_id: char_id });
     ctx.db.transform().insert(Transform {
@@ -202,11 +239,11 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Res
         cell,
         parent: 0,
         x: c.x,
-        y: c.y,
+        y,
         z: c.z,
         yaw: 0,
         speed: 0,
-        mode: sim::movement::MoveMode::Run as u8,
+        mode: mode as u8,
     });
     let t = now(ctx);
     ctx.db.presence().insert(Presence {
@@ -218,11 +255,15 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Res
         last_move_at: t,
         corrections: 0,
         x: c.x,
-        y: c.y,
+        y,
         z: c.z,
         yaw: 0,
         speed: 0,
-        mode: sim::movement::MoveMode::Run as u8,
+        mode: mode as u8,
+        anchor_x: c.x,
+        anchor_y: y,
+        anchor_z: c.z,
+        contact_at: t,
     });
     Ok(())
 }

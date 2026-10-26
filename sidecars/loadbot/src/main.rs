@@ -1,7 +1,8 @@
 //! Headless bots that play scripted scenarios against a running server and check what they see.
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
-//! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`.
+//! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
+//! `terrain` takes `--bots N --secs S --file F`, and `terrain-gen` and `terrain-upload` take `--file F`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
@@ -9,6 +10,7 @@ mod module_bindings;
 mod director;
 mod metrics;
 mod swarm;
+mod terrain;
 
 use std::time::{Duration, Instant};
 
@@ -28,9 +30,10 @@ struct Args {
     scenario: String,
 }
 
-fn parse_args() -> (Args, swarm::SwarmArgs) {
+fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs) {
     let mut a = Args { uri: "http://127.0.0.1:3000".into(), db: "mmo-world".into(), scenario: "help".into() };
     let mut sw = swarm::SwarmArgs::default();
+    let mut ta = terrain::TerrainArgs::default();
     let mut it = std::env::args().skip(1);
     fn num<T: std::str::FromStr>(flag: &str, v: Option<String>) -> T {
         v.and_then(|v| v.parse().ok()).unwrap_or_else(|| panic!("{flag} needs a number"))
@@ -39,10 +42,17 @@ fn parse_args() -> (Args, swarm::SwarmArgs) {
         match arg.as_str() {
             "--uri" => a.uri = it.next().expect("--uri needs a value"),
             "--db" => a.db = it.next().expect("--db needs a value"),
-            "--bots" => sw.bots = num("--bots", it.next()),
+            "--bots" => {
+                sw.bots = num("--bots", it.next());
+                ta.bots = sw.bots;
+            }
             "--combat" => sw.combat = num("--combat", it.next()),
             "--area" => sw.area = num("--area", it.next()),
-            "--secs" => sw.secs = num("--secs", it.next()),
+            "--secs" => {
+                sw.secs = num("--secs", it.next());
+                ta.secs = sw.secs;
+            }
+            "--file" => ta.file = it.next().expect("--file needs a path"),
             "--compression" => {
                 sw.compression = match it.next().as_deref() {
                     Some("none") => spacetimedb_sdk::Compression::None,
@@ -54,11 +64,11 @@ fn parse_args() -> (Args, swarm::SwarmArgs) {
             s => a.scenario = s.into(),
         }
     }
-    (a, sw)
+    (a, sw, ta)
 }
 
 fn main() {
-    let (args, sw) = parse_args();
+    let (args, sw, ta) = parse_args();
     let scenario = args.scenario.clone();
     let result = match scenario.as_str() {
         "see-each-other" => see_each_other(&args),
@@ -66,6 +76,9 @@ fn main() {
         "cross-cells" => cross_cells(&args),
         "metrics" => metrics::read(&args.uri, &args.db).map(|r| print!("{r}")),
         "swarm" => swarm::swarm(args, sw),
+        "terrain" => terrain::scenario(&args, &ta),
+        "terrain-gen" => terrain::write(&ta.file),
+        "terrain-upload" => terrain::upload_file(&args, &ta),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -73,7 +86,10 @@ fn main() {
                  tick             the world tick runs at 10 Hz and its timings can be read\n  \
                  cross-cells      a bot walks 300 m through cell borders and never loses sight of anyone\n  \
                  metrics          print the server's tick timings and reducer counts\n  \
-                 swarm            the throughput spike: many bots moving and fighting, measured"
+                 swarm            the throughput spike: many bots moving and fighting, measured\n  \
+                 terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
+                 terrain-gen      write the procedural test terrain to a .mmoh file\n  \
+                 terrain-upload   upload a .mmoh height file as a dev admin"
             );
             std::process::exit(2);
         }

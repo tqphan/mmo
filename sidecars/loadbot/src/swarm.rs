@@ -61,10 +61,10 @@ struct Shared {
 }
 
 /// A tiny xorshift generator, so each bot wanders differently without another dependency.
-struct Rng(u64);
+pub(crate) struct Rng(pub(crate) u64);
 
 impl Rng {
-    fn unit(&mut self) -> f32 {
+    pub(crate) fn unit(&mut self) -> f32 {
         self.0 ^= self.0 << 13;
         self.0 ^= self.0 >> 7;
         self.0 ^= self.0 << 17;

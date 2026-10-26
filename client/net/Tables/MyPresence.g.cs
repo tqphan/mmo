@@ -40,6 +40,10 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Presence, ushort> Yaw { get; }
         public global::SpacetimeDB.Col<Presence, short> Speed { get; }
         public global::SpacetimeDB.Col<Presence, byte> Mode { get; }
+        public global::SpacetimeDB.Col<Presence, float> AnchorX { get; }
+        public global::SpacetimeDB.Col<Presence, float> AnchorY { get; }
+        public global::SpacetimeDB.Col<Presence, float> AnchorZ { get; }
+        public global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp> ContactAt { get; }
 
         public MyPresenceCols(string tableName)
         {
@@ -56,6 +60,10 @@ namespace SpacetimeDB.Types
             Yaw = new global::SpacetimeDB.Col<Presence, ushort>(tableName, "yaw");
             Speed = new global::SpacetimeDB.Col<Presence, short>(tableName, "speed");
             Mode = new global::SpacetimeDB.Col<Presence, byte>(tableName, "mode");
+            AnchorX = new global::SpacetimeDB.Col<Presence, float>(tableName, "anchor_x");
+            AnchorY = new global::SpacetimeDB.Col<Presence, float>(tableName, "anchor_y");
+            AnchorZ = new global::SpacetimeDB.Col<Presence, float>(tableName, "anchor_z");
+            ContactAt = new global::SpacetimeDB.Col<Presence, SpacetimeDB.Timestamp>(tableName, "contact_at");
         }
     }
 

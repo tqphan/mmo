@@ -39,6 +39,14 @@ namespace SpacetimeDB.Types
         public short Speed;
         [DataMember(Name = "mode")]
         public byte Mode;
+        [DataMember(Name = "anchor_x")]
+        public float AnchorX;
+        [DataMember(Name = "anchor_y")]
+        public float AnchorY;
+        [DataMember(Name = "anchor_z")]
+        public float AnchorZ;
+        [DataMember(Name = "contact_at")]
+        public SpacetimeDB.Timestamp ContactAt;
 
         public Presence(
             SpacetimeDB.Identity Identity,
@@ -53,7 +61,11 @@ namespace SpacetimeDB.Types
             float Z,
             ushort Yaw,
             short Speed,
-            byte Mode
+            byte Mode,
+            float AnchorX,
+            float AnchorY,
+            float AnchorZ,
+            SpacetimeDB.Timestamp ContactAt
         )
         {
             this.Identity = Identity;
@@ -69,6 +81,10 @@ namespace SpacetimeDB.Types
             this.Yaw = Yaw;
             this.Speed = Speed;
             this.Mode = Mode;
+            this.AnchorX = AnchorX;
+            this.AnchorY = AnchorY;
+            this.AnchorZ = AnchorZ;
+            this.ContactAt = ContactAt;
         }
 
         public Presence()

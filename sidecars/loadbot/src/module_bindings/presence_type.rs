@@ -20,6 +20,10 @@ pub struct Presence {
     pub yaw: u16,
     pub speed: i16,
     pub mode: u8,
+    pub anchor_x: f32,
+    pub anchor_y: f32,
+    pub anchor_z: f32,
+    pub contact_at: __sdk::Timestamp,
 }
 
 impl __sdk::InModule for Presence {
@@ -43,6 +47,10 @@ pub struct PresenceCols {
     pub yaw: __sdk::__query_builder::Col<Presence, u16>,
     pub speed: __sdk::__query_builder::Col<Presence, i16>,
     pub mode: __sdk::__query_builder::Col<Presence, u8>,
+    pub anchor_x: __sdk::__query_builder::Col<Presence, f32>,
+    pub anchor_y: __sdk::__query_builder::Col<Presence, f32>,
+    pub anchor_z: __sdk::__query_builder::Col<Presence, f32>,
+    pub contact_at: __sdk::__query_builder::Col<Presence, __sdk::Timestamp>,
 }
 
 impl __sdk::__query_builder::HasCols for Presence {
@@ -62,6 +70,10 @@ impl __sdk::__query_builder::HasCols for Presence {
             yaw: __sdk::__query_builder::Col::new(table_name, "yaw"),
             speed: __sdk::__query_builder::Col::new(table_name, "speed"),
             mode: __sdk::__query_builder::Col::new(table_name, "mode"),
+            anchor_x: __sdk::__query_builder::Col::new(table_name, "anchor_x"),
+            anchor_y: __sdk::__query_builder::Col::new(table_name, "anchor_y"),
+            anchor_z: __sdk::__query_builder::Col::new(table_name, "anchor_z"),
+            contact_at: __sdk::__query_builder::Col::new(table_name, "contact_at"),
         }
     }
 }

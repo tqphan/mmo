@@ -7,6 +7,8 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod account_type;
+pub mod admin_clear_terrain_reducer;
+pub mod admin_put_terrain_reducer;
 pub mod character_private_type;
 pub mod character_public_table;
 pub mod character_public_type;
@@ -15,6 +17,7 @@ pub mod combat_event_type;
 pub mod create_character_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_clock_type;
+pub mod dev_set_gm_reducer;
 pub mod dev_swing_reducer;
 pub mod dev_teleport_reducer;
 pub mod dev_tick_table;
@@ -26,14 +29,18 @@ pub mod move_event_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
 pub mod my_presence_table;
+pub mod owner_type;
 pub mod presence_type;
 pub mod suspicion_type;
+pub mod terrain_chunk_type;
 pub mod tick_state_type;
 pub mod transform_table;
 pub mod transform_type;
 pub mod world_tick_timer_type;
 
 pub use account_type::Account;
+pub use admin_clear_terrain_reducer::admin_clear_terrain;
+pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
@@ -42,6 +49,7 @@ pub use combat_event_type::CombatEvent;
 pub use create_character_reducer::create_character;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_clock_type::DevClock;
+pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_swing_reducer::dev_swing;
 pub use dev_teleport_reducer::dev_teleport;
 pub use dev_tick_table::*;
@@ -53,8 +61,10 @@ pub use move_event_reducer::move_event;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
 pub use my_presence_table::*;
+pub use owner_type::Owner;
 pub use presence_type::Presence;
 pub use suspicion_type::Suspicion;
+pub use terrain_chunk_type::TerrainChunk;
 pub use tick_state_type::TickState;
 pub use transform_table::*;
 pub use transform_type::Transform;
@@ -68,11 +78,18 @@ pub use world_tick_timer_type::WorldTickTimer;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
+    AdminClearTerrain,
+    AdminPutTerrain {
+        chunks: Vec<TerrainChunk>,
+    },
     CreateCharacter {
         name: String,
     },
     DevAdvanceClock {
         micros: i64,
+    },
+    DevSetGm {
+        level: u8,
     },
     DevSwing {
         target: u64,
@@ -104,8 +121,11 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
+            Reducer::AdminClearTerrain => "admin_clear_terrain",
+            Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSwing { .. } => "dev_swing",
             Reducer::DevTeleport { .. } => "dev_teleport",
             Reducer::EnterWorld { .. } => "enter_world",
@@ -117,6 +137,14 @@ impl __sdk::Reducer for Reducer {
     #[allow(clippy::clone_on_copy)]
     fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
+            Reducer::AdminClearTerrain => {
+                __sats::bsatn::to_vec(&admin_clear_terrain_reducer::AdminClearTerrainArgs {})
+            }
+            Reducer::AdminPutTerrain { chunks } => {
+                __sats::bsatn::to_vec(&admin_put_terrain_reducer::AdminPutTerrainArgs {
+                    chunks: chunks.clone(),
+                })
+            }
             Reducer::CreateCharacter { name } => {
                 __sats::bsatn::to_vec(&create_character_reducer::CreateCharacterArgs {
                     name: name.clone(),
@@ -125,6 +153,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevAdvanceClock { micros } => {
                 __sats::bsatn::to_vec(&dev_advance_clock_reducer::DevAdvanceClockArgs {
                     micros: micros.clone(),
+                })
+            }
+            Reducer::DevSetGm { level } => {
+                __sats::bsatn::to_vec(&dev_set_gm_reducer::DevSetGmArgs {
+                    level: level.clone(),
                 })
             }
             Reducer::DevSwing { target } => {

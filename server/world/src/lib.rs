@@ -4,6 +4,7 @@
 mod dev;
 mod movement;
 mod session;
+mod terrain;
 mod tick;
 mod time;
 
@@ -12,6 +13,7 @@ mod tests;
 
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &spacetimedb::ReducerContext) {
+    session::record_owner(ctx);
     tick::start(ctx);
     log::info!("world module initialised");
 }

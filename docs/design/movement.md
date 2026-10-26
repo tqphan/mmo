@@ -1,6 +1,6 @@
 # Sessions, movement and cells
 
-Status: v0.2, 2026-10-25. M0 slice; v0.2 publishes moves once per tick (ADR 0011). Code: `server/sim/src/{cell,movement}.rs`, `server/world/src/{session,movement,time}.rs`, `sidecars/loadbot`.
+Status: v0.3, 2026-10-25. M0 slice; v0.2 publishes moves once per tick (ADR 0011); v0.3 adds the terrain checks (docs/design/terrain.md). Code: `server/sim/src/{cell,movement}.rs`, `server/world/src/{session,movement,time}.rs`, `sidecars/loadbot`.
 
 ## 1. How the original worked
 
@@ -21,7 +21,7 @@ Our speed numbers are placeholders until the research is done. They live in `con
 - A character has a public part (`character_public`: id, name) and a private part (`character_private`: owner, saved position), which the owner reads through the `my_characters` view.
 
 ### Entering and leaving
-- `enter_world(char_id, content_hash)`: the client's content hash must match the server's (docs/design/content.md), and the caller must own the character. Inserts an `entity` (cold) and a `transform` (hot) at the saved position, plus a private `presence` row (identity ↔ character ↔ entity, movement bookkeeping), which the owner reads through `my_presence`. Entering again first removes the old presence, so one identity has at most one entity in the world.
+- `enter_world(char_id, content_hash)`: the client's content hash must match the server's (docs/design/content.md), and the caller must own the character. Inserts an `entity` (cold) and a `transform` (hot) at the saved position (settled on the ground where there is terrain), plus a private `presence` row (identity ↔ character ↔ entity, movement bookkeeping), which the owner reads through `my_presence`. Entering again first removes the old presence, so one identity has at most one entity in the world.
 - `leave_world`, or disconnecting, saves the position and deletes the entity, transform and presence.
 - New characters start at `SPAWN` (the origin) until the world has spawn points.
 
@@ -39,14 +39,15 @@ Our speed numbers are placeholders until the research is done. They live in `con
   - Placeholder limits from `content/movement.toml`: walk 2.0 m/s, run 5.4 m/s, swim 3.5 m/s (confidence C).
 - **The authoritative position lives in the private `presence` row** (x, y, z, yaw, speed, mode). Moves are checked against it and update it at once.
 - **Others see moves once per tick** (ADR 0011). An accepted move also adds the entity to the private `moved` set. `world_tick` copies every moved position into the public `transform` (and `entity.cell`) in one transaction every 100 ms, so observers lag by 0–100 ms. Game rules that need a character's position read `presence`.
-- **Rejected move:** the position stays where it was with speed 0, a row goes into the private `suspicion` log, and `presence.corrections` goes up by one. The client watches `my_presence.corrections` and snaps to the position in that row when the count changes. `seq` and the time still advance, so the next legal step counts from the server position.
+- **Then the height is checked against the terrain** (docs/design/terrain.md): not below the ground, no higher than a jump and a 51° climb from the last solid footing (the anchor, kept in `presence`), falling once airborne for more than 1.5 s, and swimming only in water. Where there's no terrain, height is accepted as sent.
+- **Rejected move:** the position stays where it was with speed 0, a row goes into the private `suspicion` log, and `presence.corrections` goes up by one. The client watches `my_presence.corrections` and snaps to the position in that row when the count changes. `seq` and the time still advance, so the next legal step counts from the server position. Where there's terrain, the kept position is also settled on the ground.
 - Unknown mode → `Err`. NaN or infinite position → treated as a rejected move.
 
 ### Time
 - Every reducer reads game time through `time::now(ctx)`. In `dev` builds it adds the offset from the private `dev_clock` row, which `dev_advance_clock(micros)` moves forward only. Production builds compile all of this out.
 
 ## 3. Deviations and not yet done
-- **No vertical or obstacle checks yet.** They need the server heightmap (M0 spike 5). Height is accepted as sent.
+- **No obstacle checks yet.** Vertical checks against the heightmap came with spike 5 (docs/design/terrain.md); walls and buildings come with the world exporter and housing.
 - **No speed modifiers** (buffs, packs, mounts, gliding). These come with those systems.
 - **Corrections are rate-free**, so a client that keeps cheating gets corrected each time but isn't kicked. Kicking and thresholds come once the anomaly data has been looked at.
 - **Public positions are readable by any client** (PLAN §4.5). That's accepted.

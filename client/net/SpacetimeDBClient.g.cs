@@ -631,8 +631,11 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.AdminClearTerrain args => Reducers.InvokeAdminClearTerrain(eventContext, args),
+                Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
+                Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
                 Reducer.DevSwing args => Reducers.InvokeDevSwing(eventContext, args),
                 Reducer.DevTeleport args => Reducers.InvokeDevTeleport(eventContext, args),
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),
