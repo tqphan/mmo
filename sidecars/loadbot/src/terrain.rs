@@ -2,10 +2,11 @@
 //!
 //! Procedural test terrain (hills, and mesas with cliff edges) goes to a `.mmoh` file, which is read
 //! back and uploaded by a dev admin. Walkers then roam it with simple client-like physics: gravity,
-//! 1.5 m jumps, Godot's 45° floor limit, walking off edges and sliding down what's too steep. Half
-//! of them collide with one triangulation of the heightmap and half with the other. An honest walk
-//! must never be corrected. A cheater's cliff teleport, fly hack and dive underground must each be
-//! corrected, and a swing over a cliff edge must be refused for line of sight. The terrain is
+//! 1.5 m jumps, Godot's 45° floor limit, walking off edges and sliding down what's too steep. A
+//! walker stuck sliding in a steep-sided dip tries new headings, then respawns on walkable ground.
+//! Half of them collide with one triangulation of the heightmap and half with the other. An honest
+//! walk must never be corrected. A cheater's cliff teleport, fly hack and dive underground must each
+//! be corrected, and a swing over a cliff edge must be refused for line of sight. The terrain is
 //! cleared at the end, so the other scenarios run on bare ground.
 //!
 //! `terrain-upload` and `world-upload` send a height file or the world's files (docs/design/world.md)
@@ -55,6 +56,11 @@ const WALKABLE: f32 = 1.0;
 const PHYSICS_STEP: Duration = Duration::from_millis(50);
 /// Turn events closer together than this wait for the next send.
 const MIN_SEND_GAP: Duration = Duration::from_millis(100);
+/// A slide that gets less than `STUCK_M` anywhere in this long is stuck: try a random heading, and
+/// after `STUCK_TURNS` of them, respawn somewhere walkable.
+const STUCK_AFTER: Duration = Duration::from_millis(1500);
+const STUCK_M: f32 = 1.0;
+const STUCK_TURNS: u32 = 2;
 const UPLOAD_BATCH: usize = 32;
 
 /// A flat-topped hill with a cliff all round: centre (from the corner), radius and height.
@@ -191,8 +197,10 @@ struct WalkStats {
     jumps: u32,
     /// Walked off an edge steeper than the floor limit.
     drops: u32,
-    /// Landed on ground too steep to stand on.
+    /// Landed on ground too steep to stand on (once per fall).
     slides: u32,
+    /// Stuck sliding in a steep-sided dip and moved elsewhere.
+    respawns: u32,
     blocked: u32,
     /// The highest drop from leaving the ground to landing.
     biggest_fall_m: f32,
@@ -206,6 +214,7 @@ impl WalkStats {
         self.jumps += o.jumps;
         self.drops += o.drops;
         self.slides += o.slides;
+        self.respawns += o.respawns;
         self.blocked += o.blocked;
         self.biggest_fall_m = self.biggest_fall_m.max(o.biggest_fall_m);
         self.corrections += o.corrections;
@@ -215,6 +224,13 @@ impl WalkStats {
 /// An honest client: predicts its own movement on its own collision triangles and reports it.
 struct Walker {
     bot: Bot,
+    body: Body,
+    last_send: Instant,
+    corrections_seen: u32,
+}
+
+/// A walker's physics, apart from its connection.
+struct Body {
     map: HashMap<u64, Vec<u16>>,
     diag: Diagonal,
     rng: Rng,
@@ -226,20 +242,50 @@ struct Walker {
     heading: f32,
     next_jump: Instant,
     next_turn: Instant,
-    last_send: Instant,
-    corrections_seen: u32,
+    /// Set while sliding on ground too steep to stand on.
+    slide: Option<Slide>,
     stats: WalkStats,
 }
 
+/// Where and when a slide last made progress, and the random headings tried since.
+struct Slide {
+    since: Instant,
+    at: [f32; 2],
+    turns: u32,
+}
+
+#[derive(Debug, PartialEq)]
 enum Send {
     No,
     /// Turned, blocked or slid: send soon.
     Soon,
     /// Jumped or landed: send now.
     Now,
+    /// Stuck sliding: teleport somewhere walkable.
+    Respawn,
 }
 
-impl Walker {
+impl Body {
+    fn new(map: HashMap<u64, Vec<u16>>, diag: Diagonal, rng: Rng, x: f32, z: f32, now: Instant) -> Option<Self> {
+        let mut b = Body {
+            map,
+            diag,
+            rng,
+            pos: [x, 0.0, z],
+            vy: 0.0,
+            grounded: true,
+            took_off_at: 0.0,
+            heading: 0.0,
+            next_jump: now,
+            next_turn: now,
+            slide: None,
+            stats: WalkStats::default(),
+        };
+        b.pos[1] = b.surface(x, z)?.0;
+        b.turn_randomly(now);
+        Some(b)
+    }
+
     /// Height and slope of this walker's own collision triangle at `(x, z)`.
     fn surface(&mut self, x: f32, z: f32) -> Option<(f32, f32)> {
         quad(&mut self.map, x, z).map(|q| q.triangle(self.diag))
@@ -253,9 +299,9 @@ impl Walker {
         Duration::from_secs_f32(lo + (hi - lo) * self.rng.unit())
     }
 
-    fn turn_randomly(&mut self) {
+    fn turn_randomly(&mut self, now: Instant) {
         self.heading = self.rng.unit() * std::f32::consts::TAU;
-        self.next_turn = Instant::now() + self.secs(2.0, 6.0);
+        self.next_turn = now + self.secs(2.0, 6.0);
     }
 
     /// Head down the slope at the current position.
@@ -273,9 +319,16 @@ impl Walker {
         self.vy = 0.0;
     }
 
-    /// One physics step of `dt` seconds.
-    fn step(&mut self, dt: f32) -> Send {
-        let now = Instant::now();
+    /// Put down at `pos` on the ground, as after a correction or a teleport.
+    fn settle(&mut self, pos: [f32; 3]) {
+        self.pos = pos;
+        self.grounded = true;
+        self.vy = 0.0;
+        self.slide = None;
+    }
+
+    /// One physics step of `dt` seconds, ending at `now`.
+    fn step(&mut self, now: Instant, dt: f32) -> Send {
         let [x, y, z] = self.pos;
         let run = RUN_SPEED * dt;
         let (nx, nz) = (x + self.heading.cos() * run, z + self.heading.sin() * run);
@@ -296,13 +349,13 @@ impl Walker {
                 return Send::Now; // at take-off, before moving
             }
             if now >= self.next_turn {
-                self.turn_randomly();
+                self.turn_randomly(now);
                 return Send::Soon;
             }
             let rise = ng - y;
             if rise > 0.0 && (rise > run * WALKABLE || nslope > WALKABLE) {
                 self.stats.blocked += 1;
-                self.turn_randomly();
+                self.turn_randomly(now);
                 return Send::Soon;
             }
             self.stats.metres += run;
@@ -335,20 +388,64 @@ impl Walker {
         self.land(mg);
         if mslope <= WALKABLE {
             self.grounded = true;
-            Send::Now
-        } else {
-            self.stats.slides += 1;
-            self.face_downhill();
-            Send::Soon
+            self.slide = None;
+            return Send::Now;
         }
+        let at = [mx, mz];
+        let Some(s) = &mut self.slide else {
+            self.stats.slides += 1;
+            self.slide = Some(Slide { since: now, at, turns: 0 });
+            self.face_downhill();
+            return Send::Soon;
+        };
+        if (at[0] - s.at[0]).hypot(at[1] - s.at[1]) > STUCK_M {
+            *s = Slide { since: now, at, turns: 0 };
+        } else if now - s.since >= STUCK_AFTER {
+            if s.turns == STUCK_TURNS {
+                return Send::Respawn;
+            }
+            s.turns += 1;
+            s.since = now;
+            self.heading = self.rng.unit() * std::f32::consts::TAU;
+            return Send::Soon;
+        }
+        // Downhill, unless trying a way out.
+        if s.turns == 0 {
+            self.face_downhill();
+        }
+        Send::Soon
+    }
+
+    /// A random place inside the terrain that isn't too steep to stand on.
+    fn walkable_spot(&mut self) -> Result<(f32, f32), String> {
+        let span = SIZE_M - 2.0 * MARGIN_M;
+        for _ in 0..100 {
+            let (x, z) = (X0 + MARGIN_M + span * self.rng.unit(), Z0 + MARGIN_M + span * self.rng.unit());
+            if self.surface(x, z).is_some_and(|(_, slope)| slope <= WALKABLE) {
+                return Ok((x, z));
+            }
+        }
+        Err("no walkable ground found".into())
+    }
+}
+
+impl Walker {
+    fn respawn(&mut self) -> Check {
+        let (x, z) = self.body.walkable_spot()?;
+        self.bot.teleport(x, z)?;
+        let p = self.bot.presence().ok_or("left the world")?;
+        self.body.settle([p.x, p.y, p.z]);
+        self.body.stats.respawns += 1;
+        self.body.turn_randomly(Instant::now());
+        Ok(())
     }
 
     fn send(&mut self) -> Check {
         self.bot.seq += 1;
         self.last_send = Instant::now();
-        self.stats.events += 1;
-        let [x, y, z] = self.pos;
-        let yaw = (self.heading.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU * 65536.0) as u16;
+        self.body.stats.events += 1;
+        let [x, y, z] = self.body.pos;
+        let yaw = (self.body.heading.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU * 65536.0) as u16;
         self.bot.conn.reducers.move_event(self.bot.seq, 0, x, y, z, yaw, (RUN_SPEED * 100.0) as i16, 1).map_err(|e| e.to_string())
     }
 
@@ -356,22 +453,21 @@ impl Walker {
     fn follow_corrections(&mut self) {
         let Some(p) = self.bot.presence() else { return };
         if p.corrections != self.corrections_seen {
+            let b = &self.body;
             println!(
                 "{}: corrected at ({:.1}, {:.2}, {:.1}) -> ({:.1}, {:.2}, {:.1}), {}",
                 self.bot.label,
-                self.pos[0],
-                self.pos[1],
-                self.pos[2],
+                b.pos[0],
+                b.pos[1],
+                b.pos[2],
                 p.x,
                 p.y,
                 p.z,
-                if self.grounded { "grounded" } else { "airborne" }
+                if b.grounded { "grounded" } else { "airborne" }
             );
-            self.stats.corrections += p.corrections - self.corrections_seen;
+            self.body.stats.corrections += p.corrections - self.corrections_seen;
             self.corrections_seen = p.corrections;
-            self.pos = [p.x, p.y, p.z];
-            self.grounded = true;
-            self.vy = 0.0;
+            self.body.settle([p.x, p.y, p.z]);
         }
     }
 
@@ -383,10 +479,14 @@ impl Walker {
             let dt = (now - last).as_secs_f32().min(0.1);
             last = now;
             self.follow_corrections();
-            let due = match self.step(dt) {
+            let due = match self.body.step(now, dt) {
                 Send::Now => true,
                 Send::Soon => now - self.last_send >= MIN_SEND_GAP,
                 Send::No => false,
+                Send::Respawn => {
+                    self.respawn()?;
+                    continue;
+                }
             };
             if due || now - self.last_send >= HEARTBEAT {
                 self.send()?;
@@ -395,7 +495,7 @@ impl Walker {
         std::thread::sleep(Duration::from_millis(500));
         self.follow_corrections();
         self.bot.conn.disconnect().map_err(|e| e.to_string())?;
-        Ok(self.stats)
+        Ok(self.body.stats)
     }
 }
 
@@ -425,30 +525,14 @@ fn spawn_walker(args: &Args, f: &HeightFile, i: usize) -> Result<Walker, String>
     };
     bot.teleport(x, z)?;
     let now = Instant::now();
-    let mut w = Walker {
-        bot,
-        map: f.chunks().into_iter().collect(),
-        diag: if i.is_multiple_of(2) { Diagonal::Main } else { Diagonal::Anti },
-        rng,
-        pos: [x, 0.0, z],
-        vy: 0.0,
-        grounded: true,
-        took_off_at: 0.0,
-        heading: 0.0,
-        next_jump: now,
-        next_turn: now,
-        last_send: now,
-        corrections_seen: 0,
-        stats: WalkStats::default(),
-    };
-    w.pos[1] = w.surface(x, z).ok_or("spawned off the terrain")?.0;
-    w.turn_randomly();
+    let diag = if i.is_multiple_of(2) { Diagonal::Main } else { Diagonal::Anti };
+    let mut body = Body::new(f.chunks().into_iter().collect(), diag, rng, x, z, now).ok_or("spawned off the terrain")?;
     if let Some(h) = heading {
-        w.heading = h;
-        w.next_turn = now + Duration::from_secs(4);
+        body.heading = h;
+        body.next_turn = now + Duration::from_secs(4);
     }
-    w.next_jump = now + w.secs(1.0, 5.0);
-    Ok(w)
+    body.next_jump = now + body.secs(1.0, 5.0);
+    Ok(Walker { bot, body, last_send: now, corrections_seen: 0 })
 }
 
 fn move_to(bot: &mut Bot, x: f32, y: f32, z: f32) -> Check {
@@ -541,8 +625,15 @@ fn run(args: &Args, ta: &TerrainArgs, f: &HeightFile) -> Check {
         total.add(&h.join().map_err(|_| "a walker panicked")??);
     }
     println!(
-        "walked {:.0} m: {} events, {} jumps, {} drops off edges, {} slides, {} times blocked, biggest fall {:.1} m",
-        total.metres, total.events, total.jumps, total.drops, total.slides, total.blocked, total.biggest_fall_m
+        "walked {:.0} m: {} events, {} jumps, {} drops off edges, {} slides, {} respawns from dips, {} times blocked, biggest fall {:.1} m",
+        total.metres,
+        total.events,
+        total.jumps,
+        total.drops,
+        total.slides,
+        total.respawns,
+        total.blocked,
+        total.biggest_fall_m
     );
     cheats?;
     if total.corrections > 0 {
@@ -553,4 +644,67 @@ fn run(args: &Args, ta: &TerrainArgs, f: &HeightFile) -> Check {
     }
     println!("no false corrections");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The test terrain's middle, on a sample.
+    const CX: f32 = X0 + SIZE_M / 2.0;
+    const CZ: f32 = Z0 + SIZE_M / 2.0;
+
+    /// A body dropped just above `(x, z)` on flat ground at 40 m reshaped by `height`, with no jumps due.
+    fn falling_body(height: impl Fn(f32, f32) -> f32, x: f32, z: f32, now: Instant) -> Body {
+        let f = HeightFile::generate(0, 0, CELLS, CELLS, height);
+        let mut b = Body::new(f.chunks().into_iter().collect(), Diagonal::Main, Rng(0x1234_5678), x, z, now).unwrap();
+        b.next_jump = now + Duration::from_secs(3600);
+        b.grounded = false;
+        b.pos[1] += 0.5;
+        b
+    }
+
+    /// Steps of `PHYSICS_STEP` until `done` or `secs` pass; the outcome and the time taken.
+    fn run(b: &mut Body, mut now: Instant, secs: f32, done: impl Fn(&Body, &Send) -> bool) -> (Send, f32) {
+        let dt = PHYSICS_STEP.as_secs_f32();
+        let mut t = 0.0;
+        while t < secs {
+            now += PHYSICS_STEP;
+            t += dt;
+            let s = b.step(now, dt);
+            if done(b, &s) {
+                return (s, t);
+            }
+        }
+        (Send::No, t)
+    }
+
+    #[test]
+    fn stuck_in_a_steep_pit_tries_headings_then_respawns() {
+        // A cone 6 m across falling 3 m per metre: no way out on foot.
+        let pit = |x: f32, z: f32| 40.0 - 3.0 * (6.0 - (x - CX).hypot(z - CZ)).max(0.0);
+        let now = Instant::now();
+        let mut b = falling_body(pit, CX, CZ, now);
+        let (s, t) = run(&mut b, now, 30.0, |_, s| *s == Send::Respawn);
+        assert_eq!(s, Send::Respawn);
+        let expected = STUCK_AFTER.as_secs_f32() * (STUCK_TURNS + 1) as f32;
+        assert!((expected..expected + 1.0).contains(&t), "respawned after {t} s");
+        assert_eq!(b.stats.slides, 1, "one slide, counted once");
+        // Somewhere walkable to go instead.
+        let (x, z) = b.walkable_spot().unwrap();
+        assert!(b.surface(x, z).unwrap().1 <= WALKABLE);
+    }
+
+    #[test]
+    fn a_slide_down_a_steep_bank_lands_once_and_walks_on() {
+        // A bank rising 2 m per metre east of the middle, for 10 m.
+        let bank = |x: f32, _: f32| 40.0 + 2.0 * (x - CX).clamp(0.0, 10.0);
+        let now = Instant::now();
+        let mut b = falling_body(bank, CX + 5.0, CZ, now);
+        let (s, _) = run(&mut b, now, 10.0, |b, s| b.grounded || *s == Send::Respawn);
+        assert_ne!(s, Send::Respawn);
+        assert!(b.grounded && b.pos[0] < CX, "slid to the foot of the bank: {:?}", b.pos);
+        assert_eq!(b.stats.slides, 1);
+        assert!(b.slide.is_none());
+    }
 }

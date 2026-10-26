@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (world building v0).
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (loadbot terrain walkers unstuck).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -47,9 +47,9 @@
   - The levers for siege-sized crowds are written down for M3.
   - Ships: four bots walked, jumped and swung at each other on a clipper turning at full speed with zero corrections, and the gunner hit the second ship with every shot after its 1.27 s flight time. Extrapolating the 5 Hz ship publishes with the shared step is 0.2 m off one second ahead (mean), against 1.2 m for a straight line. A 10-minute run: 3,782 moves on deck and 280 jumps with no false corrections, 7,103° of turning, 595 swings landed and 106 of 106 shots hit.
   - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.5–0.7 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. On the Radeon 610M integrated GPU, far below mid-range, it holds 36–60 fps at 1080p with no frame over 33 ms, which puts mid-range inside the 4 ms budget (docs/spikes/world-scale.md).
-  - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected.
+  - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected. Walkers now count a slide once per fall and respawn when stuck sliding in a steep dip. A rerun on 2026-10-26 walked 151 km with 17 slides (against 10,020 counted frame by frame in the worst earlier run), no respawns needed and no false corrections.
 - **Tests:**
-  - 65 `sim` unit tests (one checks the client's golden vectors are current), 17 `contentgen` tests, 58 module tests (in-memory datastore), 14 `worldtool` tests (including one that loads the committed world against its manifest) and 3 loadbot tests, with clippy clean
+  - 65 `sim` unit tests (one checks the client's golden vectors are current), 17 `contentgen` tests, 58 module tests (in-memory datastore), 14 `worldtool` tests (including one that loads the committed world against its manifest) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
   - 50 client xUnit tests: the C# ports match `sim` on 588 generated vectors (including a `.mmoh` file and its chunk and terrain hashes), plus the director, the move sender, the snapshot buffer, the autopilot, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
   - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
