@@ -28,7 +28,7 @@ Only the player-facing result matters: no loading screens in the open world, and
 - The choice of tiles and levels is pure code (`World/TerrainPlan.cs`) and unit-tested.
 
 ### Building meshes
-- Mesh arrays (positions, normals, colours, indices) are built on worker threads, at most 4 at a time, nearest tiles first.
+- Mesh arrays (positions, normals, colours, indices) are built on up to 4 worker threads, each taking a batch of the 16 nearest waiting tiles. Batches keep streaming speed independent of the frame rate.
 - The main thread turns finished arrays into meshes, up to **2 ms per frame**. A tile keeps its old mesh until the new one is in, so nothing pops out.
 - Normals come from central differences in the heightmap at the tile's own spacing. Colours are placeholders: sand near sea level, grass, rock on steep slopes and high up, sea floor under water.
 
@@ -48,7 +48,7 @@ Only the player-facing result matters: no loading screens in the open world, and
 It logs once a second, and prints a summary on exit: frame time (median, 99th percentile and worst), triangles and draw calls, video memory, process memory, tiles per level, the build queue and the longest time spent applying meshes in one frame.
 
 ### Budget (PLAN §6.3)
-- **Mid-range** means a GPU around a GTX 1660 or RX 6600 at 1080p. The spike measures on the RTX 5070 Ti Mobile and on the laptop's Radeon 610M integrated GPU, which is far below mid-range, so passing there passes with room to spare.
+- **Mid-range** means a GPU around a GTX 1660 or RX 6600 at 1080p. The spike measures on the RTX 5070 Ti Mobile and on the laptop's Radeon 610M integrated GPU, which bracket it (docs/spikes/world-scale.md). On the Radeon, run Godot with `--display-driver wayland --gpu-index 1`.
 - **Pass:** at 1080p, the terrain and sea take at most **4 ms of a 16.7 ms frame** on mid-range hardware, leaving the rest for characters, effects and UI. No frame over 33 ms while streaming at sailing speed. Terrain memory under 300 MB of video memory.
 
 ## 3. Deviations and not yet done

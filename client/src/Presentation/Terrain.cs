@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using Mmo.World;
@@ -10,13 +11,15 @@ namespace Mmo.Presentation
     /// <summary>
     /// Terrain drawn from the shared heightmap in 256 m tiles at six levels of detail
     /// (docs/design/worldstream.md, ADR 0017). <see cref="TerrainPlan"/> picks each tile's level
-    /// from the distance to <see cref="Focus"/>; meshes are built on worker threads, nearest first,
+    /// from the distance to <see cref="Focus"/>; meshes are built on worker threads in batches, nearest first,
     /// and swapped in on the main thread within <see cref="ApplyBudgetMs"/> a frame. A tile keeps its
     /// old mesh until the new one is in. Placeholder colours only (ADR 0004).
     /// </summary>
     public partial class Terrain : Node3D
     {
         public const int MaxWorkers = 4;
+        /// <summary>Tiles a worker builds before the main thread re-sorts what's left by distance.</summary>
+        public const int BatchSize = 16;
         public const double ApplyBudgetMs = 2.0;
         /// <summary>Tiles at this level or finer cast shadows; the sun's shadows don't reach further.</summary>
         private const int ShadowLevels = 1;
@@ -40,6 +43,7 @@ namespace Mmo.Presentation
         /// <summary>Tiles waiting for a worker, with the level wanted.</summary>
         private readonly Dictionary<int, int> pending = new();
         private readonly HashSet<int> building = new();
+        private int running;
         private readonly ConcurrentQueue<TileMesh> done = new();
 
         /// <summary>Counters for the world test's readout.</summary>
@@ -95,24 +99,46 @@ namespace Mmo.Presentation
             Apply();
         }
 
+        /// <summary>
+        /// Hand the nearest waiting tiles to workers, a batch each, so streaming speed doesn't
+        /// depend on the frame rate (one tile per worker per frame streamed 10× slower at 55 fps).
+        /// </summary>
         private void StartWorkers()
         {
-            if (building.Count >= MaxWorkers || pending.Count == 0)
+            if (Volatile.Read(ref running) >= MaxWorkers || pending.Count == 0)
                 return;
             var order = new List<int>(pending.Keys);
             order.Sort((a, b) => Plan.Distance(a, Focus.X, Focus.Z).CompareTo(Plan.Distance(b, Focus.X, Focus.Z)));
+            var batch = new List<(int Tile, int Level)>();
             foreach (int tile in order)
             {
-                if (building.Count >= MaxWorkers)
-                    break;
                 // One build per tile at a time; a newer level waits for it.
                 if (building.Contains(tile))
                     continue;
-                int level = pending[tile];
+                batch.Add((tile, pending[tile]));
                 pending.Remove(tile);
                 building.Add(tile);
-                Task.Run(() => done.Enqueue(Build(tile, level)));
+                if (batch.Count == BatchSize)
+                {
+                    Run(batch);
+                    batch = new List<(int Tile, int Level)>();
+                    if (Volatile.Read(ref running) >= MaxWorkers)
+                        return;
+                }
             }
+            if (batch.Count > 0)
+                Run(batch);
+        }
+
+        private void Run(List<(int Tile, int Level)> batch)
+        {
+            Interlocked.Increment(ref running);
+            Task.Run(() =>
+            {
+                foreach (var (tile, level) in batch)
+                    done.Enqueue(Build(tile, level));
+                Interlocked.Decrement(ref running);
+            });
         }
 
         private void Apply()

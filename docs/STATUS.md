@@ -37,7 +37,7 @@
   - With batched publishing and Gzip, a 150-player fight costs each client about 19 KB/s (reducer p99 3 ms), and 500 all in view about 44 KB/s.
   - The levers for siege-sized crowds are written down for M3.
   - Ships: four bots walked, jumped and swung at each other on a clipper turning at full speed with zero corrections, and the gunner hit the second ship with every shot after its 1.27 s flight time. Extrapolating the 5 Hz ship publishes with the shared step is 0.2 m off one second ahead (mean), against 1.2 m for a straight line. A 10-minute run: 3,782 moves on deck and 280 jumps with no false corrections, 7,103° of turning, 595 swings landed and 106 of 106 shots hit.
-  - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.8–1.3 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. Mid-range is estimated at 4–6 ms for the whole scene, not yet measured.
+  - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.5–0.7 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. On the Radeon 610M integrated GPU, far below mid-range, it holds 36–60 fps at 1080p with no frame over 33 ms, which puts mid-range inside the 4 ms budget (docs/spikes/world-scale.md).
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected.
 - **Tests:**
   - 62 `sim` unit tests (one checks the client's golden vectors are current), 14 `contentgen` tests, 55 module tests (in-memory datastore) and 5 loadbot tests, with clippy clean
@@ -53,7 +53,7 @@
 | Rust | 1.99.1 + wasm32 target | 1.90, wasm32 target missing |
 | SpacetimeDB CLI | 2.13.0 (`~/.local/bin`, not on PATH) | 1.10, needs upgrading |
 | .NET | SDK 8.0.132 and 10.0.113 (pacman, `/usr/share/dotnet`) | 7 and 10 |
-| Godot | 4.7.2 .NET (`~/.local/opt`, linked as `~/.local/bin/godot`) | none |
+| Godot | 4.7.2 .NET (`~/.local/opt`, linked as `~/.local/bin/godot`). Mesa RADV (`vulkan-radeon`) for the Radeon 610M: run with `--display-driver wayland --gpu-index 1` | none |
 | Blender | none | none |
 
 ## Next
@@ -61,6 +61,5 @@
 2. **Try the client:** run `cargo xtask server` and `cargo xtask publish`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
 
 ## Blockers and open questions
-- **Mid-range GPU numbers are estimates.** Measuring needs the Windows PC set up, or Mesa's `vulkan-radeon` on the laptop to use its Radeon 610M (pacman; needs your OK).
 - **PLAN Q3:** anything from the final version to leave out or bring forward? Still open.
 - **Crowd measurements need a second machine for the bots.** Spread-out runs fit on the laptop (500 bots used 0.5 cores and 0.4 GB). Crowds are heavier for the bots: 500 in one place took 3 cores even after spike 2. The Windows PC could host the bots once it has the toolchain (the Windows task in BACKLOG). This matters for M3's large battles.
