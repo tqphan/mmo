@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (loadbot terrain walkers unstuck).
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (the client walks on decks, drives ships and swims).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -25,6 +25,8 @@
   - Two windows and `bot visitor` all saw each other with zero corrections. Remote runners were drawn with no reversals. A test cheat was corrected and snapped back.
   - **The client walks on the server's terrain** (docs/design/worldstream.md). It loads the world's files (`--world`, default `world/`) and draws them with the spike's tiles and sea. The player stands on `HeightMapShape3D`s for the 3 × 3 cells around it, holding the server's own samples, and the camera stays above the ground. The flat placeholder ground is gone.
   - Spawn (0, 0) is now on the placeholder world's trade island, about 13 m up. `cargo xtask world` uploads the world, and `bot visitor` runs on its ground.
+  - **Ships and decks** (docs/design/ships.md, ADR 0019). Ships are drawn at the present with a C# port of `sim::ship` (checked against vectors) and the helm's input from `vehicle`. The hull is solid. The player swims in deep water, climbs aboard with F, and walks the deck in the ship's frame, sending `parent` and ship-local moves. It takes no momentum when it steps off. F works the helm (W/S throttle, A/D rudder) and cannons (aim, elevation, a landing preview, Space to fire). Dev keys: F9 spawns a clipper, F10 removes one, and `--spawn-ship` does it from the command line. New autopilot routes: `deck`, `helm`, `gun`.
+  - Three autopilot clients crewed a clipper for 6 minutes: it turned 3,689°, the deck walker sent 476 moves and then went over the side, the gunner fired 72 shots, all with **zero corrections**. Captures: `docs/captures/2026-10-26-deck-*.png`.
 - **The world's files are in the repo** (docs/design/world.md, ADR 0018):
   - `world/` holds a manifest and 625 region files of 640 m (9.4 MB, against 128 MB raw). Each region has zlib-compressed heights, stored as differences from a planar prediction, and a 4 m land-use raster (use class plus climate). `tools/worldtool` writes them (`gen`, from the placeholder generator that moved out of loadbot) and checks them (`info`).
   - Land-use classes (`wild`, `housing`, `town`, `road`) and climates (`temperate`, `tropical`, `arid`, `subarctic`) are content, in `content/land.toml`. The placeholder world has six housing areas on the continents' lowlands, a town round spawn and four climate bands. There are no roads yet.
@@ -50,7 +52,7 @@
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected. Walkers now count a slide once per fall and respawn when stuck sliding in a steep dip. A rerun on 2026-10-26 walked 151 km with 17 slides (against 10,020 counted frame by frame in the worst earlier run), no respawns needed and no false corrections.
 - **Tests:**
   - 65 `sim` unit tests (one checks the client's golden vectors are current), 17 `contentgen` tests, 58 module tests (in-memory datastore), 14 `worldtool` tests (including one that loads the committed world against its manifest) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
-  - 50 client xUnit tests: the C# ports match `sim` on 588 generated vectors (including a `.mmoh` file and its chunk and terrain hashes), plus the director, the move sender, the snapshot buffer, the autopilot, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
+  - 72 client xUnit tests: the C# ports match `sim` on 864 generated vectors (including a `.mmoh` file and its chunk and terrain hashes, and ship frames, steps, courses and cannon flights), plus the director, the move sender (frame changes, mode changes inside the swim limit), the snapshot buffer, the ship predictor, boarding, swimming, the autopilot and its ship routes, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
   - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **Client toolchain:** Godot 4.7.2 .NET with `SpacetimeDB.ClientSDK.Godot` 2.13.0 on Linux. The SDK declares GodotSharp 4.6.2, and NuGet resolves it to 4.7.2 without complaint. Movie Maker captures work under Wayland on the laptop's GPU.
@@ -67,7 +69,7 @@
 
 ## Next
 1. Verify on the Windows PC (top of BACKLOG).
-2. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
+2. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
 
 ## Blockers and open questions
 - **PLAN Q3:** anything from the final version to leave out or bring forward? Still open.

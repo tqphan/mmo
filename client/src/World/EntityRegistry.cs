@@ -10,13 +10,17 @@ namespace Mmo.World
     /// <summary>
     /// Entity id → view node (PLAN §6.1). Spawns a view when a <c>transform</c> row arrives in a
     /// subscribed cell, feeds its snapshot buffer on updates, and despawns it when the row goes.
-    /// Our own entity is drawn by the player controller, not here.
+    /// Our own entity is drawn by the player controller, not here. Ships get a <see cref="ShipView"/>,
+    /// fed by <c>transform</c> and <c>vehicle</c>, and are placed every physics frame before the
+    /// player steps, since the player may be standing on one.
     /// </summary>
     public partial class EntityRegistry : Node3D
     {
         private readonly Session session;
         private readonly bool trace;
         private readonly Dictionary<ulong, RemoteView> views = new();
+        private readonly Dictionary<ulong, ShipView> ships = new();
+        private readonly List<Gameplay.Deck> decks = new();
         /// <summary>Rows deleted this frame. A row that moves between two subscribed cells can arrive as a delete and an insert.</summary>
         private readonly HashSet<ulong> gone = new();
 
@@ -25,9 +29,16 @@ namespace Mmo.World
             this.session = session;
             this.trace = trace;
             Name = "Entities";
+            // Before the player, which runs at the default priority.
+            ProcessPhysicsPriority = -1;
         }
 
-        public int Count => views.Count;
+        public int Count => views.Count + ships.Count;
+
+        public ShipView? Ship(ulong id) => ships.GetValueOrDefault(id);
+
+        /// <summary>Every ship in view, where it was placed this physics frame.</summary>
+        public IReadOnlyList<Gameplay.Deck> Decks => decks;
 
         public override void _Ready()
         {
@@ -35,6 +46,8 @@ namespace Mmo.World
             db.Transform.OnInsert += (_, t) => Receive(t);
             db.Transform.OnUpdate += (_, _, t) => Receive(t);
             db.Transform.OnDelete += (_, t) => gone.Add(t.EntityId);
+            db.Vehicle.OnInsert += (_, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
+            db.Vehicle.OnUpdate += (_, _, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
             db.CharacterPublic.OnInsert += (_, c) =>
             {
                 foreach (var v in views.Values)
@@ -48,9 +61,26 @@ namespace Mmo.World
             gone.Remove(t.EntityId);
             if (t.EntityId == session.Me?.EntityId)
                 return;
+            if (ships.TryGetValue(t.EntityId, out var ship))
+            {
+                ship.Push(t, Clock.Now);
+                return;
+            }
             if (!views.TryGetValue(t.EntityId, out var view))
             {
                 var e = session.Conn!.Db.Entity.Id.Find(t.EntityId);
+                if (e?.Kind == EntityKind.Ship && e.RefId < (ulong)GameContent.Hulls.Count)
+                {
+                    ship = new ShipView(t.EntityId, GameContent.Hulls[(int)e.RefId]);
+                    ships[t.EntityId] = ship;
+                    AddChild(ship);
+                    ship.Push(t, Clock.Now);
+                    if (session.Conn.Db.Vehicle.EntityId.Find(t.EntityId) is Vehicle v)
+                        ship.SetVehicle(v, Clock.Now);
+                    ship.Place(Clock.Now);
+                    session.Log($"sees ship {t.EntityId} ({ship.Hull.Id}) at ({t.X:F1}, {t.Z:F1})");
+                    return;
+                }
                 view = new RemoteView(t.EntityId, e?.Kind ?? EntityKind.Character, e?.RefId ?? 0);
                 views[t.EntityId] = view;
                 AddChild(view);
@@ -59,6 +89,18 @@ namespace Mmo.World
                 session.Log($"sees entity {t.EntityId} ({view.Label}) at ({t.X:F1}, {t.Z:F1})");
             }
             view.Push(t, Clock.Now);
+        }
+
+        public override void _PhysicsProcess(double delta)
+        {
+            double now = Clock.Now;
+            decks.Clear();
+            foreach (var s in ships.Values)
+            {
+                s.Place(now);
+                if (s.Predictor.HasRow)
+                    decks.Add(s.Deck);
+            }
         }
 
         public override void _Process(double delta)
@@ -72,8 +114,8 @@ namespace Mmo.World
             double now = Clock.Now;
             foreach (var v in views.Values)
             {
-                RemoteView? parent = null;
-                if (v.ParentId != 0 && !views.TryGetValue(v.ParentId, out parent))
+                ShipView? parent = null;
+                if (v.ParentId != 0 && !ships.TryGetValue(v.ParentId, out parent))
                 {
                     // On a ship we can't see: nothing to draw it relative to.
                     v.Visible = false;
@@ -93,6 +135,12 @@ namespace Mmo.World
                 session.Log($"lost entity {id} ({view.Label}): {why}");
                 view.QueueFree();
             }
+            if (ships.Remove(id, out var ship))
+            {
+                session.Log($"lost ship {id}: {why}");
+                ship.QueueFree();
+                decks.RemoveAll(d => d.Ship == id);
+            }
         }
     }
 
@@ -103,7 +151,7 @@ namespace Mmo.World
         public const byte Ship = 2;
     }
 
-    /// <summary>Another player or a ship, drawn from its snapshot buffer.</summary>
+    /// <summary>Another player, drawn from its snapshot buffer, in its ship's frame when it's aboard one.</summary>
     public partial class RemoteView : Node3D
     {
         /// <summary>How fast the drawn pose catches up with the buffer, per second.</summary>
@@ -121,15 +169,7 @@ namespace Mmo.World
             Name = $"Entity{id}";
             Kind = kind;
             RefId = refId;
-            if (kind == EntityKind.Ship && refId < (ulong)GameContent.Hulls.Count)
-            {
-                var hull = GameContent.Hulls[(int)refId];
-                body = Views.Ship(new Vector3(hull.DeckHalfWidthM * 2, hull.DeckHeightM + hull.DraftM, hull.DeckHalfLengthM * 2));
-            }
-            else
-            {
-                body = Views.Capsule(Views.ColorFor(id));
-            }
+            body = Views.Capsule(Views.ColorFor(id));
             AddChild(body);
             label = new Label3D
             {
@@ -143,11 +183,6 @@ namespace Mmo.World
                 NoDepthTest = true,
             };
             AddChild(label);
-            if (kind == EntityKind.Ship && refId < (ulong)GameContent.Hulls.Count)
-            {
-                label.Text = GameContent.Hulls[(int)refId].Id;
-                label.Position = new Vector3(0, 6.0f, 0);
-            }
         }
 
         public byte Kind { get; }
@@ -171,7 +206,7 @@ namespace Mmo.World
         }
 
         /// <summary>Draw at <paramref name="now"/>, in <paramref name="parent"/>'s frame when on a ship.</summary>
-        public void Place(double now, RemoteView? parent)
+        public void Place(double now, Node3D? parent)
         {
             if (buffer.Count == 0)
                 return;

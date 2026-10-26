@@ -1,6 +1,6 @@
 # Client skeleton (Godot)
 
-Status: v0.2, 2026-10-26 (walking on terrain). M0 slice. Code: `client/` (`src/`, `tests/`), `server/sim/src/vectors.rs`, `sidecars/loadbot/src/visitor.rs`. Decision: ADR 0015.
+Status: v0.3, 2026-10-26 (decks and ships). M0 slice. Code: `client/` (`src/`, `tests/`), `server/sim/src/vectors.rs`, `sidecars/loadbot/src/visitor.rs`. Decisions: ADR 0015, ADR 0019.
 
 ## 1. How the original worked
 
@@ -17,14 +17,14 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 ### Layout (PLAN §4.8, §6.1)
 - `client/` is the Godot 4.7.2 .NET project (`project.godot`, `Mmo.csproj`). `net/` holds the generated bindings (`cargo xtask generate`) and `content/` the generated game data (`cargo xtask content`). Both are compiled into the game.
 - `src/` is split by layer:
-  - `Sim/`: ports of `sim` (cells, yaws), checked against golden vectors.
+  - `Sim/`: ports of `sim` (cells, yaws, ships, the move allowance), checked against golden vectors.
   - `Net/`: `Session` (the connection) and `SubscriptionDirector`.
-  - `World/`: `EntityRegistry`, `RemoteView`, `SnapshotBuffer`, placeholder meshes, and `HeightMap`, `TerrainPlan` and `TerrainCollision` for terrain (docs/design/worldstream.md).
-  - `Gameplay/`: `PlayerController`, `MoveSender`, `FollowCamera`, `Autopilot`.
+  - `World/`: `EntityRegistry`, `RemoteView`, `SnapshotBuffer`, `ShipView` and `ShipPredictor`, placeholder meshes, and `HeightMap`, `TerrainPlan` and `TerrainCollision` for terrain (docs/design/worldstream.md).
+  - `Gameplay/`: `PlayerController`, `MoveSender`, `FollowCamera`, `Autopilot`, `Boarding` and `ShipControls` (docs/design/ships.md).
   - `UI/`: the debug HUD.
   - `Presentation/`: the art style test scene and the pieces it's built from (docs/design/art.md), terrain tiles and the world test scene (docs/design/worldstream.md).
 - The scene tree is built in code by `src/Main.cs` from a one-node `main.tscn`. Scenes as files come with real art.
-- Files under `Sim/`, `Net/SubscriptionDirector.cs`, `World/SnapshotBuffer.cs`, `Gameplay/MoveSender.cs`, `Gameplay/Autopilot.cs`, `World/HeightMap.cs` and `World/TerrainPlan.cs` don't use Godot, so the xUnit project in `tests/` compiles and tests them directly.
+- Files under `Sim/`, `Net/SubscriptionDirector.cs`, `World/SnapshotBuffer.cs`, `Gameplay/MoveSender.cs`, `Gameplay/Autopilot.cs`, `Gameplay/Boarding.cs`, `Gameplay/Swimming.cs`, `World/ShipPredictor.cs`, `World/HeightMap.cs` and `World/TerrainPlan.cs` don't use Godot, so the xUnit project in `tests/` compiles and tests them directly.
 
 ### Connecting and entering
 - One `DbConnection` with Gzip (ADR 0011). `FrameTick` runs in `Session._Process`, so every SDK callback runs on the main thread.
@@ -39,15 +39,20 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 
 ### The local player
 - A `CharacterBody3D` with its origin at the feet, where the server measures. It can climb slopes up to Godot's default 45°; the server allows 51° (docs/design/terrain.md). Gravity is 15 m/s² and a jump starts at 5 m/s, for an apex of about 0.8 m. That's inside the server's 2 m jump allowance and falls faster than its minimum-fall check.
-- Speed is the content limit for the mode: run 5.4 m/s, or walk 2.0 with `--walk`. Input is relative to the camera, and the character faces the way it moves, so the heading it sends is also its direction of travel.
-- `MoveSender` sends a `move_event` on start, stop, a turn of more than 10° (at most every 0.1 s), a jump, landing, a mode change or a speed change of more than 0.5 m/s. It also sends a heartbeat every 0.5 s while moving or in the air. Numbering continues from the server's `last_seq`.
+- Speed is the content limit for the mode: run 5.4 m/s, walk 2.0 with `--walk`, or swim 3.5.
+- **Swimming** (`Gameplay/Swimming.cs`): where the sea floor is more than 1.5 m down, the player swims, with its feet held 1.2 m under the surface and no jumping. It walks again where the floor is less than 1.3 m down. Falling in, it starts swimming once it has come down to that depth. The server allows swim mode from the sea floor to 1 m above the surface (docs/design/terrain.md).
+- **A mode change is sent in two events:** first the old mode where it got us, then the new one on the next frame. The server checks the distance since the last event at the new mode's speed, and swimming is slower than running.
+- Input is relative to the camera, and the character faces the way it moves, so the heading it sends is also its direction of travel.
+- `MoveSender` sends a `move_event` on start, stop, a turn of more than 10° (at most every 0.1 s), a jump, landing, boarding or leaving a ship, a mode change or a speed change of more than 0.5 m/s. It also sends a heartbeat every 0.5 s while moving or in the air. Numbering continues from the server's `last_seq`.
 - **Snapping.** On entering, and whenever `my_presence.corrections` changes, the player is put at the presence position with zero velocity, and the sender restarts from there. If that moved the collision window, the player waits two physics frames so the engine has the new ground before gravity applies.
-- The Near-tier director is updated with the predicted position each time a move is sent.
+- The Near-tier director is updated with the predicted position every physics frame, since a ship can carry us across cells while we stand still.
+- **On a ship** the position, the heading and the moves sent are in the ship's frame, and the body never takes on the ship's velocity (ADR 0019, docs/design/ships.md). F climbs aboard from alongside, and works the helm and cannons.
 
 ### Other entities
 - `EntityRegistry` makes a `RemoteView` for every `transform` row in a subscribed cell, except our own entity. It deletes the view when the row goes. A row that moves between two subscribed cells may arrive as a delete and an insert in one frame, so deletions are applied at the end of the frame, after the matching insert has had its chance to cancel them.
 - **Where to draw (ADR 0015):** `SnapshotBuffer` stamps each row with its local receive time and draws 200 ms (two ticks) in the past. It interpolates between the rows either side of that time. Past the newest row, it carries on along that row's yaw at its speed for up to 0.8 s (dead reckoning). A jump that the rows' speeds can't explain, by more than 8 m, is a teleport: the history is dropped and the view snaps there. The view then eases towards the buffer's answer at a rate of 15/s, which hides the small steps when a late row arrives.
-- Characters are capsules with a nose that shows their facing, and a nameplate taken from `character_public`. Ships (`entity.kind` 2) are boxes the size of their hull from content. Passengers (`transform.parent` ≠ 0) are drawn in their ship's frame. Ships are only extrapolated in a straight line so far.
+- Characters are capsules with a nose that shows their facing, and a nameplate taken from `character_public`. Passengers (`transform.parent` ≠ 0) are drawn in their ship's frame.
+- **Ships** (`entity.kind` 2) are `ShipView`s: boxes the size of their hull from content, with a helm, cannons and a label with their HP. They're drawn at the present by `ShipPredictor`, with the shared step and the helm's input from `vehicle`, which joins the Near tier's tables (ADR 0019).
 
 ### Command line (after `--`)
 | Option | Effect |
@@ -55,6 +60,10 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--uri`, `--db` | Server (default `http://127.0.0.1:3000`, `mmo-world`) |
 | `--profile NAME` | Identity token and character name |
 | `--autopilot circle:X,Z,R` / `pace:X,Z,LEN` | Run a scripted route instead of reading the keyboard |
+| `--autopilot deck:X,Z,S` | Board the ship nearest (X, Z) and run laps of its deck, jumping every 3 s; after S s aboard (0: never) go over the starboard side |
+| `--autopilot helm:X,Z,R` | Board the ship nearest (X, Z), take the helm, wait 20 s for the crew, sail at full throttle, and put the rudder to R% 15 s later |
+| `--autopilot gun:X,Z,M` | Board the ship nearest (X, Z), man cannon mount M and fire whenever it's loaded |
+| `--spawn-ship X,Z,YAW` | Dev builds: once within 60 m of (X, Z), replace any ship within 30 m of it with a fresh clipper facing YAW degrees |
 | `--walk` | Walk mode |
 | `--world DIR` | The world's files (default `world`), or a bare `.mmoh` height file |
 | `--secs S` | Quit after S seconds |
@@ -63,15 +72,13 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
 | `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |
 
-Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump.
+Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump, F to climb aboard or use the helm or a cannon (docs/design/ships.md). Dev builds: F9 spawns a clipper 30 m ahead, F10 removes the nearest ship.
 
 ### Captures
 `cargo xtask capture <name> <frames> [client args]` runs Godot's Movie Maker at 30 fps and writes PNGs to `target/captures/<name>/`. Movie Maker renders as fast as it can, but the server checks moves against its own clock, so in movie mode the client holds each frame back to real time. Encoding can still make it slower than real time (about 70% with two windows and a bot on the laptop). Our own movement then looks slower in the video and other players faster, but nothing is corrected.
 
 ## 3. Deviations and not yet done
-- **The world file isn't shipped with the client yet.** It's generated into `target/` by `cargo xtask world` or on the first `cargo xtask client`. If the server's terrain came from a different file, moves are corrected. Checked-in world files are BACKLOG "World building v0".
-- **No swimming.** In water the player runs along the sea floor. The server allows it in run mode, since the swimming rule only applies to swim mode.
-- **No walking on decks yet.** The local player always sends `parent = 0`. Helm and cannon controls come with M1 ships. Ships should be extrapolated with `sim::ship::step` ported to C# (ADR 0014).
+- **Swimming is simple.** You float at one depth. There's no diving, jumping from the water, stamina or breath.
 - **No reconnect.** A dropped connection ends the session.
 - **Characters face their direction of travel**, including when walking backwards. Strafing and backpedalling with the original's feel come with animation.
 - **No `.sln`.** `dotnet build client/Mmo.csproj` and the xtask commands work without one. Opening the project in the editor offers to create it.
@@ -90,6 +97,8 @@ Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to
 | live | `--trace` on a watching client: no reversals and no big frame steps for a client-driven or bot-driven runner | manual, with a script over the log |
 | live | `--test-cheat`: one correction, the client snaps back, and later moves are accepted | manual |
 | C# | `HeightMap.CellHeights` gives each cell's 33 × 33 samples, edges shared, null outside the file | `client/tests/HeightMapTests.cs` |
+| C# | Ships: the port of `sim::ship`, the predictor, boarding, frame events and the ship routes. Swimming: when it starts and ends, the float height within the server's limits, running into the sea inside the swim speed check | `client/tests/SimVectorTests.cs`, `ShipTests.cs`, `MovementTests.cs` |
+| live | Decks: three clients crew a clipper, see docs/design/ships.md | manual, results there |
 | live | On the uploaded world: two autopilot clients for 10 minutes over hills, coast and shallow water with `bot visitor --expect 2`: zero corrections; the body stands within a few cm of the heightmap's height | manual, results below |
 
 ### Results, 2026-10-26 (Linux laptop, local server)

@@ -45,7 +45,11 @@ pub fn generate() -> String {
          # mmoh <hex bytes of a height file>\n\
          # mmoh_sample <i> <j> <height>\n\
          # chunk_hash <cell key> <hash>, for each chunk of the mmoh file\n\
-         # terrain_hash <hash of the whole mmoh file>\n",
+         # terrain_hash <hash of the whole mmoh file>\n\
+         # ship_pose <x> <y> <z> <yaw> <local x> <y> <z> <world x> <y> <z>\n\
+         # ship_step <hull> <x> <z> <yaw> <speed> <throttle> <rudder> <dt> <x> <z> <yaw> <speed>\n\
+         # ship_sail <hull> <throttle> <rudder> <10 Hz steps from rest at the origin> <x> <z> <yaw> <speed>\n\
+         # cannon_flight <x> <y> <z> <yaw> <pitch> <speed> <secs> <landing x> <landing z>, or none\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -136,7 +140,66 @@ pub fn generate() -> String {
     }
     let total = terrain::terrain_hash(chunks.iter().map(|(c, s)| (*c, s.as_slice())));
     out.push_str(&format!("terrain_hash {total}\n"));
+    ships(&mut out, &mut rng);
     out
+}
+
+/// `sim::ship`'s frames, step and cannon flight, for the client's port.
+fn ships(out: &mut String, rng: &mut Lcg) {
+    use ship::{Hull, Input, Motion, Pose};
+    for _ in 0..30 {
+        let pose = Pose { x: rng.range(-8000.0, 8000.0), y: rng.range(0.0, 4.0), z: rng.range(-8000.0, 8000.0), yaw: rng.range(-7.0, 7.0) };
+        let l = [rng.range(-4.0, 4.0), rng.range(-2.0, 2.0), rng.range(-10.0, 10.0)];
+        let w = pose.to_world(l);
+        out.push_str(&format!(
+            "ship_pose {} {} {} {} {} {} {} {} {} {}\n",
+            f(pose.x), f(pose.y), f(pose.z), f(pose.yaw), f(l[0]), f(l[1]), f(l[2]), f(w[0]), f(w[1]), f(w[2])
+        ));
+    }
+    let hull = Hull::Clipper;
+    let input = |rng: &mut Lcg| {
+        // Mostly the extremes and zero, which is where the step's branches are.
+        let pick = |rng: &mut Lcg| match (rng.next() * 6.0) as i32 {
+            0 => 0,
+            1 => 100,
+            2 => -100,
+            _ => (rng.range(-100.0, 100.0)) as i8,
+        };
+        Input { throttle: pick(rng), rudder: pick(rng) }
+    };
+    for k in 0..200 {
+        let speed = match k % 5 {
+            0 => 0.0,
+            1 => hull.data().max_speed_mps,
+            _ => rng.range(-4.0, 12.0),
+        };
+        let m = Motion { x: rng.range(-8000.0, 8000.0), z: rng.range(-8000.0, 8000.0), yaw: rng.range(0.0, std::f32::consts::TAU), speed };
+        let i = input(rng);
+        let dt = if k % 3 == 0 { 0.1 } else { rng.range(0.0, 0.25) };
+        let n = ship::step(m, hull.data(), i, dt);
+        out.push_str(&format!(
+            "ship_step {} {} {} {} {} {} {} {} {} {} {} {}\n",
+            hull as u8, f(m.x), f(m.z), f(m.yaw), f(m.speed), i.throttle, i.rudder, f(dt), f(n.x), f(n.z), f(n.yaw), f(n.speed)
+        ));
+    }
+    for (throttle, rudder, steps) in [(100, 0, 150), (100, 100, 400), (60, -40, 300), (-100, 50, 100), (0, 100, 50), (100, 7, 600)] {
+        let i = Input { throttle, rudder };
+        let mut m = Motion { x: 0.0, z: 0.0, yaw: 0.0, speed: 0.0 };
+        for _ in 0..steps {
+            m = ship::step(m, hull.data(), i, 0.1);
+        }
+        out.push_str(&format!("ship_sail {} {throttle} {rudder} {steps} {} {} {} {}\n", hull as u8, f(m.x), f(m.z), f(m.yaw), f(m.speed)));
+    }
+    let c = &hull.data().cannon;
+    for k in 0..40 {
+        let from = [rng.range(-8000.0, 8000.0), if k == 0 { 0.0 } else { rng.range(0.5, 5.0) }, rng.range(-8000.0, 8000.0)];
+        let (yaw, pitch) = (rng.range(-7.0, 7.0), rng.range(c.min_pitch_deg, c.max_pitch_deg).to_radians());
+        let line = format!("cannon_flight {} {} {} {} {} {}", f(from[0]), f(from[1]), f(from[2]), f(yaw), f(pitch), f(c.muzzle_speed_mps));
+        match ship::cannon_flight(from, yaw, pitch, c.muzzle_speed_mps) {
+            Some(fl) => out.push_str(&format!("{line} {} {} {}\n", f(fl.secs), f(fl.landing[0]), f(fl.landing[2]))),
+            None => out.push_str(&format!("{line} none\n")),
+        }
+    }
 }
 
 #[test]

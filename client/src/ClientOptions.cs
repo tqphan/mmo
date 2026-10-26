@@ -9,7 +9,8 @@ namespace Mmo
     /// <list type="bullet">
     /// <item><c>--uri URI</c>, <c>--db NAME</c>: the server (default the local dev server).</item>
     /// <item><c>--profile NAME</c>: keeps its own identity token, and names the character it makes.</item>
-    /// <item><c>--autopilot circle:X,Z,R | pace:X,Z,LEN | none</c>: run a scripted route instead of reading the keyboard.</item>
+    /// <item><c>--autopilot circle:X,Z,R | pace:X,Z,LEN | deck:X,Z,S | helm:X,Z,R | gun:X,Z,M | none</c>: run a scripted route instead of reading the keyboard (<see cref="Gameplay.Autopilot"/>).</item>
+    /// <item><c>--spawn-ship X,Z,YAW</c>: dev builds; once within 60 m of (X, Z), replace any ship within 30 m of it with a fresh clipper facing YAW degrees.</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
@@ -30,6 +31,7 @@ namespace Mmo
         public string Db = "mmo-world";
         public string Profile = "player";
         public Gameplay.Autopilot? Autopilot;
+        public (float X, float Z, float YawDeg)? SpawnShip;
         public bool Walk;
         public float CamYawDeg;
         public bool Trace;
@@ -69,6 +71,7 @@ namespace Mmo
                     case "--profile": o.Profile = Next(); break;
                     case "--autopilot": o.Autopilot = Gameplay.Autopilot.Parse(Next()); break;
                     case "--walk": o.Walk = true; break;
+                    case "--spawn-ship": o.SpawnShip = Triple(Next()); break;
                     case "--trace": o.Trace = true; break;
                     case "--test-cheat": o.TestCheat = true; break;
                     case "--world": o.World = Next(); break;
@@ -91,6 +94,15 @@ namespace Mmo
             System.IO.Path.IsPathRooted(path)
                 ? path
                 : System.IO.Path.GetFullPath(System.IO.Path.Combine(Godot.ProjectSettings.GlobalizePath("res://"), "..", path));
+
+        private static (float, float, float) Triple(string value)
+        {
+            var nums = value.Split(',');
+            if (nums.Length != 3 || !nums.All(n => float.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out _)))
+                throw new ArgumentException($"{value}: expected X,Z,YAW");
+            float N(int i) => float.Parse(nums[i], CultureInfo.InvariantCulture);
+            return (N(0), N(1), N(2));
+        }
 
         private static string OneOf(string value, params string[] allowed) =>
             Array.IndexOf(allowed, value) >= 0 ? value : throw new ArgumentException($"{value} is not one of {string.Join(", ", allowed)}");

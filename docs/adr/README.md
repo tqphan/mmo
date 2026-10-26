@@ -22,3 +22,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0016](0016-assets-inside-the-godot-project.md) | Third-party and generated assets live in `client/assets/`; the ledger stays in `assets/` | Accepted |
 | [0017](0017-client-terrain-from-the-server-heightmap.md) | The client draws terrain from the server's `.mmoh` heightmap in LOD tiles; no Terrain3D | Accepted |
 | [0018](0018-world-files-in-the-repo-and-a-terrain-hash.md) | The world's files live in the repo as compressed regions; clients send a terrain hash | Accepted |
+| [0019](0019-client-ships-at-the-present-player-in-the-ships-frame.md) | The client draws ships at the present, and keeps a passenger in the ship's frame | Accepted |

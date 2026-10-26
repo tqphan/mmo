@@ -67,7 +67,7 @@ namespace Mmo.Net
         /// <summary>Whether <paramref name="cell"/> is in the current window.</summary>
         public bool Wants(ulong cell) => wanted.Contains(cell);
 
-        /// <summary>Call with the player's predicted position after every move. Returns whether the window moved.</summary>
+        /// <summary>Call with the player's predicted position every frame. Returns whether the window moved.</summary>
         public bool Update(float x, float z)
         {
             ulong center = Center is ulong c

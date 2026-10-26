@@ -108,7 +108,54 @@ namespace Mmo.Tests
             Assert.Null(s.Update(0.2, At(0, 0, grounded: false), false));
             Assert.Equal(MoveReason.Heartbeat, s.Update(0.65, At(0, 0, grounded: false), false)?.Reason);
             Assert.Equal(MoveReason.Stop, s.Update(0.8, At(0, 0), false)?.Reason);
-            Assert.Equal(MoveReason.Mode, s.Update(0.9, At(0, 0, mode: Walk), false)?.Reason);
+            // A mode change first reports the old mode where it got us, then changes.
+            var flush = s.Update(0.9, At(0, 0, mode: Walk), false);
+            Assert.Equal((MoveReason.Mode, Run), (flush?.Reason, flush?.Mode));
+            var change = s.Update(0.92, At(0, 0, mode: Walk), false);
+            Assert.Equal((MoveReason.Mode, Walk), (change?.Reason, change?.Mode));
+            Assert.Null(s.Update(0.94, At(0, 0, mode: Walk), false));
+        }
+
+        [Fact]
+        public void RunningIntoTheSeaStaysInsideTheSwimLimit()
+        {
+            // Running at 5.4 m/s, then swimming at 3.5: the event that changes mode is checked at
+            // the swim speed for the whole gap since the last event.
+            var s = Started();
+            float swim = MoveMode.Swim.Data().MaxSpeedMps, run = MoveMode.Run.Data().MaxSpeedMps;
+            var last = (Pos: Vector3.Zero, T: 0.0);
+            float x = 0;
+            for (double t = 1.0 / 60; t < 4; t += 1.0 / 60)
+            {
+                bool swimming = t > 1.4;
+                x += (swimming ? swim : run) / 60;
+                byte mode = swimming ? (byte)MoveMode.Swim : Run;
+                if (s.Update(t, At(x, 0, yaw: -MathF.PI / 2, speed: swimming ? swim : run, mode: mode), false) is MoveMsg m)
+                {
+                    float limit = MoveMode.Swim == (MoveMode)m.Mode ? swim : run;
+                    float allowed = limit * 1.15f * (float)(t - last.T) + 0.5f;
+                    Assert.True(m.Pos.X - last.Pos.X <= allowed, $"{m.Reason} as {(MoveMode)m.Mode}: moved {m.Pos.X - last.Pos.X} m in {t - last.T} s, allowed {allowed}");
+                    last = (m.Pos, t);
+                }
+            }
+        }
+
+        [Fact]
+        public void BoardingAndLeavingAShipAreSentAtOnce()
+        {
+            var s = Started();
+            s.Update(0.0, At(0, 0, speed: 5.4f), false);
+            // A heartbeat went 0.05 s ago, but a frame change can't wait.
+            var board = s.Update(0.05, At(0.3f, 0, speed: 5.4f) with { Parent = 7, Pos = new Vector3(1, 0, 2) }, false);
+            Assert.Equal(MoveReason.Frame, board?.Reason);
+            Assert.Equal(7ul, board?.Parent);
+            Assert.Equal(new Vector3(1, 0, 2), board?.Pos);
+            Assert.Equal(7ul, s.Last.Parent);
+            Assert.Equal(0.05, s.LastAt);
+            // Standing still on a turning ship sends nothing: the yaw is the ship's.
+            for (double t = 0.1; t < 2; t += 1.0 / 60)
+                Assert.Null(s.Update(t, At(1, 2) with { Parent = 7 }, false) is { Reason: not MoveReason.Stop } m ? m : null);
+            Assert.Equal(MoveReason.Frame, s.Update(2.0, At(40, 2), false)?.Reason);
         }
 
         [Fact]

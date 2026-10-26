@@ -68,11 +68,14 @@ namespace Mmo
             AddChild(entities);
             var ground = new TerrainCollision(map);
             AddChild(ground);
-            var player = new PlayerController(session, options, ground);
+            var player = new PlayerController(session, options, ground, entities);
             AddChild(player);
+            var controls = new ShipControls(session, player, entities, map, options);
+            AddChild(controls);
+            player.Controls = controls;
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
-            AddChild(new Hud(session, player, entities, world.Land));
+            AddChild(new Hud(session, player, entities, world.Land, controls));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -160,6 +163,9 @@ namespace Mmo
             Bind("turn_left", Key.Q, Key.Left);
             Bind("turn_right", Key.E, Key.Right);
             Bind("jump", Key.Space);
+            Bind("interact", Key.F);
+            Bind("dev_spawn_ship", Key.F9);
+            Bind("dev_remove_ship", Key.F10);
         }
     }
 }

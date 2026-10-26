@@ -1,6 +1,6 @@
 # Ships and moving decks
 
-Status: v0.2, 2026-10-26. M0 spike 3. Code: `content/ships.toml`, `server/sim/src/ship.rs`, `server/world/src/{ship,movement}.rs`, `sidecars/loadbot/src/ship.rs`. Decision: ADR 0014.
+Status: v0.3, 2026-10-26 (the client walks on decks and drives ships). M0 spike 3, then BACKLOG M0 task 2. Code: `content/ships.toml`, `server/sim/src/ship.rs`, `server/world/src/{ship,movement}.rs`, `sidecars/loadbot/src/ship.rs`; client `client/src/Sim/Ship.cs`, `World/{ShipPredictor,ShipView}.cs`, `Gameplay/{Boarding,ShipControls,PlayerController}.cs`. Decisions: ADR 0014, ADR 0019.
 
 ## 1. How the original worked
 
@@ -68,6 +68,18 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 - The server inserts a `cannon_shot` row scheduled for the landing time, and sets the mount's reload (5 s).
 - **Impact** (`cannon_impact`, scheduled): every ship in the 3 × 3 cells around the landing point except the shooter's is tested. A hit is a landing point inside the hull's deck rectangle grown by the splash radius (2 m), in that ship's pose at impact time. A hit takes the damage (1,500) off `hp`, never below 0. A `combat_event` (`skill_id` 2, `flags` 1 for a hit, 0 for a splash, `target` the ship or 0) goes to the landing cell either way.
 
+### The client (ADR 0019)
+- **Prediction.** `client/src/Sim/Ship.cs` ports `sim::ship` (poses, step, decks, aim, muzzle, flight), checked against generated vectors within a tolerance. Ships are drawn **at the present**, not 200 ms back like characters: `ShipPredictor` steps the newest `transform` row forward at 10 Hz with the input from `vehicle`. A new row or input restarts it, and the jump is kept as an offset that fades at 4/s (snapping past 8 m). The helmsman predicts their own input at once.
+- **The hull** is a static body, a box of the deck's size from the deck down to the keel. Ships are placed every physics frame before the player, so it stands on the deck and bumps into the hull's sides.
+- **On deck** the player's position is kept in the ship's frame. Each physics frame it's put on the ship's pose, steps in world space with its own velocity only, and the step is turned back into the ship's frame. Moves are sent with `parent` and ship-local positions and yaw. Standing still on a turning ship sends nothing. The camera turns with the ship.
+- **Frames** (`Boarding.FrameAfter`): landing on a deck joins its frame. Over the rail or in the air you stay aboard until 0.25 m inside the 1.5 m rail limit, or 1 m below the deck; then you're in the world, with no momentum. A frame change is sent at once.
+- **Climbing aboard:** F within 1.5 m of a deck's edge, from up to 8 m below it (swimming alongside, or on the sea floor beside a hull in shallow water), puts you 0.5 m inside the edge. It waits, up to 1 s, until the server's frame-change allowance covers the distance from the last position sent.
+- **The helm:** F within 2.2 m of it takes it, if it's free. W and S step the throttle by 25%, and A and D hold the rudder hard over while pressed. F lets go. While at the helm you don't walk.
+- **Cannons:** F within 2.2 m of a mount mans it (client-side; the server only checks reach when firing). A and D aim within the arc (0.5 rad/s), W and S set the elevation (0.2 rad/s), and Space fires when loaded. An arc and a ring show where the shot will land, computed with the shared flight. Our own shots are drawn along that flight and splash when they land. Reloads are timed locally.
+- **HUD:** the ship's HP, speed, throttle and rudder, and what F will do.
+- **Dev keys** (dev builds): F9 puts a clipper side-on 30 m ahead of the camera, if the water there is at least the draft plus 0.3 m deep. F10 removes the nearest ship within 60 m. `--spawn-ship X,Z,YAW` replaces any ship within 30 m of (X, Z) with a fresh one, once we're within 60 m of it.
+- **Autopilot routes** for tests without a person: `deck:X,Z,S`, `helm:X,Z,R` and `gun:X,Z,M` (docs/design/client.md).
+
 ### Dev reducers
 - `dev_spawn_ship(hull, x, z, yaw)` puts a ship on the water at full HP. Ships are built at shipyards in M1.
 - `dev_remove_ship(ship)` removes it. Its passengers are put in the water where they stood, swimming, with a correction so their clients snap.
@@ -81,6 +93,7 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 - **No buoyancy.** Waves, roll and pitch are cosmetic; the deck's height is constant.
 - **Changing frame trusts the client's view of the ship** within the lag allowance, so a cheater can gain about 6 m (11 m/s × 0.5 s) when boarding or stepping off a fast ship.
 - **A character who leaves the world on a deck** comes back at that spot in the water, with no ship. Ships don't persist players across sessions yet.
+- **Client:** other players' shots aren't drawn (the `combat_event` row has no position), and hits show only as HP on the target's label. The client doesn't predict groundings; it sails on until the server's row stops the ship.
 
 ## 4. Test plan
 
@@ -95,4 +108,22 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 | module | Fire: in reach, loaded, in the arc; a shot is scheduled for its flight time; impact hits the target ship's HP and logs an event, misses splash; the shooter's ship is never hit | same |
 | module | Range and saving on leave use world positions for passengers | same |
 | module | Grounding: a ship stops at a shoal and can back off | same |
+| C# | The port matches `sim` on 30 frame, 200 step, 6 long-course and 40 flight vectors | `client/tests/SimVectorTests.cs` |
+| C# | Predictor: within 5 cm of the server's course between 5 Hz rows, sails on under the helm without rows, eases a correction and snaps a teleport, an input change takes effect from then. Boarding: standing on a deck joins it; rail and air keep you aboard; past the rail or below the deck leaves; climb targets and reach; the climb waits for the allowance; stations in reach. Sender: a frame change goes at once. Autopilot ship routes | `client/tests/ShipTests.cs`, `MovementTests.cs` |
+| live | Three autopilot clients: one spawns a clipper and takes the helm, one runs laps of the deck and jumps, then goes over the side, one mans a cannon and fires on every reload. Pass: no corrections, the ship turns at least 360° | manual, results below |
 | scenario | `loadbot ship`: a dev admin uploads a flat seabed and spawns two clippers. A helmsman and four walkers swim to the first and board it; the helmsman runs it up to speed and then holds it in a turn while the walkers roam the deck, jump and swing at each other. One walker mans the starboard cannon and shells the second ship, which sits at the centre of the turn. Pass: no corrections on any honest bot, the ship turns at least 360°, every swing lands, at least one shot hits after its flight time, and passengers are published in the ship's cell with the ship as parent. A deck speed hack and a long-range boarding are corrected, an out-of-reach shot is refused, and a ship left with nobody at the helm slows down. Everyone steps off into the water, and the ships and seabed are removed. Acceptance run: 10 minutes. | `cargo xtask bot ship` |
+
+### Client results, 2026-10-26 (Linux laptop, local server, the placeholder world)
+- **Three clients crewing one clipper for 6 minutes.** Alpha (`--spawn-ship -430,0,90 --autopilot helm:-430,0,100`) put a clipper in 2.3 m of water off the trade island's west coast, climbed aboard over the stern and took the helm. Bravo (`deck:-430,0,180`) and Charlie (`gun:-430,0,1`) walked out along the sea floor and climbed aboard. After the 20 s wait Alpha sailed at full ahead, then held full starboard rudder on the 52.5 m circle.
+  - The ship turned **3,689°** under the three of them.
+  - **0 corrections** for all three.
+  - Bravo ran laps of the deck, jumping every 3 s, and sent 476 moves. After 180 s aboard it ran over the starboard side at 11 m/s and fell into the sea with only its own speed.
+  - Charlie fired **72 shots** from the starboard cannon, one per reload. None was refused.
+  - Alpha stood at the helm and sent 37 moves.
+- **In deep water, with captures.** Two more runs crewed a clipper in 10–20 m of water further west, with Bravo and Charlie recording. The crew swam out to the ship (or started under its hull) and climbed aboard. In one run the ship turned 1,919°, Bravo sent 489 deck moves and Charlie fired 41 shots. In the other it turned 1,727°, Charlie fired 39 shots, and after 60 s aboard Bravo went over the side at 11 m/s and floated where it fell. All with **0 corrections**. Captures: `docs/captures/2026-10-26-deck-crew.png` (the crew at sea, mid-turn), `-overboard.png` (Bravo swimming as the ship sails on) and `-cannon.png` (the aiming arc, the landing ring and a shot in flight).
+- **Found by these runs:**
+  - The Near window only followed the player when a move was sent. A helmsman standing still was carried out of their own ship's cells, and the ship vanished from their view. The window now follows every physics frame.
+  - The first helm route sailed before the others had boarded, so it now waits 20 s at the helm.
+  - Without swimming, a player in deep water walked on the sea floor, more than 8 m below the deck and out of climbing reach. The client now swims (docs/design/client.md).
+  - The camera behind a gunner looked back inboard, so it now swings round to look along the cannon. The aiming arc and ring were drawn under the sea, which is transparent and sorts closer because it follows the camera, so they now render last.
+  - `--spawn-ship` can lose a race: a client that reaches an older ship within 60 m of the spot boards it before the new one is spawned. That only matters for tests.

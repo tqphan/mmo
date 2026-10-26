@@ -15,8 +15,8 @@ namespace Mmo.Net
     /// </summary>
     public partial class Session : Node
     {
-        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells.</summary>
-        public static readonly string[] NearTables = { "entity", "transform" };
+        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP.</summary>
+        public static readonly string[] NearTables = { "entity", "transform", "vehicle" };
         public const ushort NearRadius = 2;
 
         private readonly ClientOptions options;
@@ -138,7 +138,7 @@ namespace Mmo.Net
         {
             if (Conn is null || Me is null)
                 return;
-            Conn.Reducers.MoveEvent(m.Seq, 0, m.Pos.X, m.Pos.Y, m.Pos.Z, m.Yaw, m.SpeedCmS, m.Mode);
+            Conn.Reducers.MoveEvent(m.Seq, m.Parent, m.Pos.X, m.Pos.Y, m.Pos.Z, m.Yaw, m.SpeedCmS, m.Mode);
         }
 
         private void SetStatus(string status, bool error = false)
