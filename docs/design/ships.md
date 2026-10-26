@@ -8,12 +8,13 @@ Status: v0.3, 2026-10-26 (the client walks on decks and drives ships). M0 spike 
 |---|---|---|
 | Players build ships and sail them; several players share one, walking about on deck while it moves | A | RESEARCH §2.7 |
 | The crew splits into helm, cannons, repairs and harpoon; if the helmsman dies, the ship drifts | B | RESEARCH §2.7 |
-| The clipper is the fastest hull at about 11 m/s; the merchant schooner about 10 m/s | B | RESEARCH §2.7 (fan wikis) |
+| The clipper is the fastest hull at about 11.1 m/s with one cannon and 7,000–9,000 HP; the merchant schooner about 10 m/s with two cannons and 42,000 HP; the rowboat 4 m/s | B | RESEARCH §2.7, §2A.4 (fan wikis) |
+| A clipper add-on cannon: 48 m range, 4 m splash, 700 damage, an 88 m/s shell, 3 s cooldown. Range was capped, not left to ballistics | B | RESEARCH §2A.4 (item database) |
 | Cannons are manned by players, aimed within an arc on one side of the ship, and fire visible shots on an arc that land after a flight time | B | common player knowledge, RESEARCH §2.7 |
-| Ships carry a lot of HP (tens of thousands) and are repaired at sea | B | RESEARCH §2.7 |
-| Acceleration, turn rate, cannon range, damage and reload | **Unknown** | not public in a usable form |
+| Larger ships carry tens of thousands of HP, and ships are repaired at sea | B | RESEARCH §2.7 |
+| Acceleration, turn rate, and the stock cannon's range, damage and reload | **Unknown** | searched 2026-10-26, not found |
 
-Every hull and cannon number below is a placeholder, confidence C, in `content/ships.toml`. The speed matches the clipper's reported 11 m/s.
+Every hull and cannon number below is a placeholder, confidence C, in `content/ships.toml`. The speed matches the clipper's reported 11 m/s. Two known differences wait for M1 tuning: our clipper has 12,000 HP where the original had 7,000–9,000, and two cannons (spike 3 asked for two) where the original had one.
 
 ## 2. Our rules
 

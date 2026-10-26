@@ -8,10 +8,13 @@ Status: v0.3, 2026-10-25. M0 slice; v0.2 publishes moves once per tick (ADR 0011
 |---|---|---|
 | Tab-target MMO with client-side movement; speed and teleport hacks recurred throughout its life, which means server checks were weak | C | RESEARCH §2.11 |
 | Carrying a trade pack makes you much slower, and rules out gliders and teleports | B | [gamepressure trade guide](https://www.gamepressure.com/archeage/6-trade/z669eb) |
-| A donkey mount moves at about 5 m/s, which players describe as slow | C | [Magic Game World: the donkey](https://www.magicgameworld.com/?p=42608) |
-| Base on-foot run speed | **Unknown** | Not found in a first search; added to RESEARCH §2A.3 |
+| A donkey mount moves at about 5 m/s, which players describe as slow; with a pack, a donkey keeps about 4 m/s and a horse drops to about 1.8 m/s | C | [Magic Game World: the donkey](https://www.magicgameworld.com/?p=42608), RESEARCH §2A.4 |
+| Base on-foot run speed is 5.4 m/s | B | RESEARCH §2A.4 (fan wiki and a gear calculator agree) |
+| A sprint skill from level 3 runs at 8 m/s while it drains mana | B | RESEARCH §2A.4 |
+| Swimming was fast: about 6.8 m/s unbuffed in early play, later slowed by a nerf of unknown size | C | RESEARCH §2A.4 |
+| Walk speed and the pack slowdown as a percentage | **Unknown** | RESEARCH §2A.3 |
 
-Our speed numbers are placeholders until the research is done. They live in `content/movement.toml` (docs/design/content.md), so tuning them is a one-line change plus `cargo xtask content`.
+The run speed matches the original. Walk and swim are placeholders: walk is unknown, and the only swim figure predates a nerf, so we keep a conservative 3.5 m/s until M1 tuning. Sprint comes with skills in M1. They live in `content/movement.toml` (docs/design/content.md), so tuning them is a one-line change plus `cargo xtask content`.
 
 ## 2. Our rules
 

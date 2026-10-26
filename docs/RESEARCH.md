@@ -76,8 +76,9 @@ The fidelity target is **the final Western version, as it stood at shutdown in J
 
   | Ship | Speed | HP | Cannons | Role |
   |---|---|---|---|---|
-  | Clipper | ~11 m/s (fastest) | | 1 | Scouting, quick runs, hit-and-run |
-  | Harpoon clipper | | | Harpoon | Pulls ships and players in; pirates used it to catch traders |
+  | Clipper | ~11.1 m/s (fastest) | 7k–9k (wikis disagree) | 1 | Scouting, quick runs, hit-and-run |
+  | Harpoon clipper | ~11.1 m/s | ~9k | Harpoon | Pulls ships and players in; pirates used it to catch traders |
+  | Rowboat | ~4 m/s | | 0 | |
   | Merchant schooner | ~10 m/s | ~42k | 2 | About 20 pack slots |
   | Galleon / warship | | ~52k | 8 | Upgraded variants with more HP |
 
@@ -156,7 +157,29 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 - The rules for the flag war and Guardian Scramble
 - Sport fishing details
 - The formula for power-scaled dungeons
-- On-foot movement speeds (walk, run, swim, sprint) and the slowdown from carrying a pack. A first search found nothing authoritative (docs/design/movement.md).
+- The slowdown from carrying a pack, as a percentage, and on-foot walk and swim speeds (§2A.4)
+- Jump height, gravity and the fall-damage threshold (§2A.4)
+- Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (§2A.4)
+
+### 2A.4 Movement and ship numbers (searched 2026-10-26)
+Fan wikis on Fandom sit behind a bot check, so these come from search extracts of them and from one item database. Wikis for private servers and emulators were left out on purpose (CLAUDE.md), and a wiki titled for *ArcheAge Chronicles*, a different game, was not relied on.
+
+| Fact | Value | Conf. | Source |
+|---|---|---|---|
+| Base run speed | 5.4 m/s; a gear calculator shows the same default | B | [Fandom: Transportation](https://archeage.fandom.com/wiki/Transportation), [DaruGear](https://darugear.com/) |
+| Sprint | A skill gained at level 3: 8 m/s while it drains mana | B | Fandom: Transportation |
+| Carrying a pack | "Greatly" slows the carrier, on foot and on any mount except donkeys. No percentage published | B | [Fandom: Trade Packages](https://archeage.fandom.com/wiki/Trade_Packages) |
+| Mounts with a pack | Horse about 1.8 m/s, donkey 4.0 m/s (2014 guides); a donkey's speed buff adds about 30% | C | [HubPages trade guide](https://discover.hubpages.com/games-hobbies/Archeage-trade-routes-east-and-west-continents), [Anypost Owls: Trade 101](https://glremoved1anypostowlsaa.gamerlaunch.com/forums/viewtopic.php?t=10954753) |
+| Swimming | About 6.8 m/s unbuffed, 10–11 m/s with buffs, in a player's estimate from the early official forums; the thread is about a swim-speed nerf, so it was lower later | C | Official forums, thread 181023 ("My thoughts on the swim speed nerf"; the archive's TLS fails, so read from a search extract) |
+| Walk speed, jump height, gravity, fall-damage threshold | Not found. Falls and dismounting high up do damage, and a glider that runs out of flight time drops its rider, who takes fall damage | — | Fandom glider pages (search extract) |
+| Clipper | 11.1 m/s, one cannon; HP 7,000 (archive wiki) or 9,000 (main wiki) | B | [Fandom archive: Adventure Clipper](https://archeage-archive.fandom.com/wiki/Adventure_Clipper), [Fandom: Ships](https://archeage.fandom.com/wiki/Ships) |
+| Merchant schooner | 10 m/s with basic sails, 42,000 HP, two cannons, 20 pack slots | B | Fandom: Ships |
+| Rowboat | 4 m/s | B | Fandom: Ships |
+| Clipper add-on cannon ("captain's cannon") | 48 m range, 4 m splash, 700 damage (400 siege), 88 m/s shell, 3 s cooldown; fits only clippers. The stock cannon's numbers were not found | B | [Archeage Codex item 28854](https://archeagecodex.com/us/item/28854/) |
+| Naval arena (a late event mode) | Clipper cannons hit everything within 4 m; rank-1 cannon range 90 m | B | [Kakao: Naval Arena](https://archeage.playkakaogames.com/news/1172) |
+| Ship acceleration and turn rates | Not found | — | — |
+
+What this means for us: the range cap matters more than the shell's speed. At 88 m/s a free ballistic shot would carry several hundred metres, so the original must have limited range (48–90 m) rather than letting gravity do it. Our placeholder cannon (40 m/s, −5° to 15° elevation, 25–90 m) covers the same band of engagement distances. Tuning is M1 work.
 
 ---
 

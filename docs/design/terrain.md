@@ -10,6 +10,7 @@ Status: v0.1, 2026-10-25. M0 spike 5. Code: `server/sim/src/{terrain,movement}.r
 | Characters jump about their own height, take damage from long falls, and can glide down from height with a glider | B | common player knowledge; gliders RESEARCH §2.6 |
 | Skills need line of sight to the target; terrain and buildings block it | B | common to tab-target MMOs; PLAN §4.2 |
 | The server's terrain resolution and how it checked height | **Unknown** | not public |
+| Jump height, gravity and the fall-damage threshold | **Unknown** | searched 2026-10-26, nothing found (RESEARCH §2A.4); falls, high dismounts and a glider running out of flight time all did damage |
 
 The original's numbers (jump height, gravity, fall damage) aren't known. Ours are placeholders, chosen to be lenient, and live in `sim::movement` until the client needs them too; then they move to `content/`.
 

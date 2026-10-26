@@ -1,6 +1,6 @@
 # Movement modes (docs/design/movement.md). `wire` is the value sent in `move_event.mode`; the
-# values must run 0, 1, 2, … with no gaps. Speeds are placeholders, confidence C, until the
-# research backlog item on on-foot speeds is done.
+# values must run 0, 1, 2, … with no gaps. Run is the original's 5.4 m/s (B); walk and swim are
+# placeholders, confidence C, until M1 tuning (RESEARCH §2A.4).
 
 [[mode]]
 id = "walk"
