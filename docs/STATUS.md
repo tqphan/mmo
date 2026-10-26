@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (art style test).
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (art look deferred).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -23,7 +23,7 @@
   - Other entities are capsules with nameplates (ships are hull-sized boxes), drawn 200 ms back: interpolated, then dead-reckoned along their heading.
   - There is a debug HUD, `--autopilot` routes, `cargo xtask client`, and `cargo xtask capture` for Movie Maker frames.
   - Two windows and `bot visitor` all saw each other with zero corrections. Remote runners were drawn with no reversals. A test cheat was corrected and snapped back.
-- **Art style test scene, waiting for the user's choice** (docs/design/art.md, ADR 0016):
+- **Art: deferred.** The user chose simple placeholder geometry until the game systems are built (ADR 0004, 2026-10-26). The style test scene stays as a reference (docs/design/art.md, ADR 0016):
   - `cargo xtask client --style-test flat` (or `gradient`) runs offline. It shows a procedural island, Gerstner water with turquoise shallows and a foam line, procedural low-poly trees and rocks, and three KayKit Adventurers characters (CC0) walking, running and idling.
   - `--outline` outlines the characters, and `--shot wide` circles the island instead of following the knight.
   - Captures: `docs/captures/2026-10-26-style-*.png`.
@@ -52,11 +52,9 @@
 | Blender | none | none |
 
 ## Next
-1. **The user chooses the art look** (top of BACKLOG): flat or gradient, outlines or not, and KayKit's proportions or not. Look at `docs/captures/2026-10-26-style-*.png`, or run `cargo xtask client --style-test flat` (or `gradient`, with `--outline` and `--shot wide`).
-2. Meanwhile, spike 4 (world scale) and the world exporter, which give the client real terrain. Neither depends on the choice.
-3. **Try the client:** run `cargo xtask server` and `cargo xtask publish`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
+1. Spike 4 (world scale) with placeholder terrain, then the world exporter, which give the client real terrain.
+2. **Try the client:** run `cargo xtask server` and `cargo xtask publish`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
 
 ## Blockers and open questions
-- **Art look:** the style test is ready for review (ADR 0004, BACKLOG task 1).
 - **PLAN Q3:** anything from the final version to leave out or bring forward? Still open.
 - **Crowd measurements need a second machine for the bots.** Spread-out runs fit on the laptop (500 bots used 0.5 cores and 0.4 GB). Crowds are heavier for the bots: 500 in one place took 3 cores even after spike 2. The Windows PC could host the bots once it has the toolchain (the Windows task in BACKLOG). This matters for M3's large battles.

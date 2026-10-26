@@ -4,17 +4,14 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 
 ## M0: Foundations and risk spikes
 
-1. **[needs OK] Choose the art look.** The style test scene is built (docs/design/art.md); captures are in `docs/captures/2026-10-26-style-*.png`.
-   *Done when:* the user has picked flat or gradient low-poly (or hand-painted), outlines or not, and whether KayKit's chibi proportions suit the characters. Record it in ADR 0004.
+1. **Spike 4: world scale**: a 16 km Terrain3D map with water and streaming, within budget at mid-range settings. Placeholder look only (ADR 0004): terrain coloured by height and slope, no art.
+2. **World exporter v0**: Godot plugin → heightmap as a `.mmoh` file (docs/design/terrain.md) and a land-use raster → uploaded as an admin. Production uploads need the publisher's identity (the owner), since `dev_set_gm` is dev-only.
+3. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, install Godot 4.7.2 .NET, and check that `cargo xtask check` passes and `cargo xtask client` runs.
 
-2. **Spike 4: world scale**: a 16 km Terrain3D map with water and streaming, within budget at mid-range settings.
-3. **World exporter v0**: Godot plugin → heightmap as a `.mmoh` file (docs/design/terrain.md) and a land-use raster → uploaded as an admin. Production uploads need the publisher's identity (the owner), since `dev_set_gm` is dev-only.
-4. **Verify on the Windows PC**: upgrade the SpacetimeDB CLI to 2.13.0, add the wasm target, install Godot 4.7.2 .NET, and check that `cargo xtask check` passes and `cargo xtask client` runs.
+4. **Loadbot: unstick terrain walkers.** A walker that lands in a steep-sided dip slides every frame (one 30-minute run counted 10,020 slides against 19 in another). Count a slide once per fall, and pick a new heading or respawn after a few seconds stuck.
 
-5. **Loadbot: unstick terrain walkers.** A walker that lands in a steep-sided dip slides every frame (one 30-minute run counted 10,020 slides against 19 in another). Count a slide once per fall, and pick a new heading or respawn after a few seconds stuck.
-
-6. **Client: walk on decks and drive ships** (M1 ships). Send `parent` and ship-local positions, extrapolate ships with `sim::ship::step` ported to C# and checked against vectors, and don't let a body inherit the deck's velocity when it steps off (ADR 0014). Add the helm and cannon controls.
-7. **Client: reconnect.** Use the SDK's `WithAutomaticReconnect`, and re-enter and resubscribe the director after a drop.
+5. **Client: walk on decks and drive ships** (M1 ships). Send `parent` and ship-local positions, extrapolate ships with `sim::ship::step` ported to C# and checked against vectors, and don't let a body inherit the deck's velocity when it steps off (ADR 0014). Add the helm and cannon controls.
+6. **Client: reconnect.** Use the SDK's `WithAutomaticReconnect`, and re-enter and resubscribe the director after a drop.
 
 ## Research backlog
 - Original on-foot speeds (walk, run, swim, sprint) and the pack-carrying slowdown. Needed before M1 tuning (docs/design/movement.md §1).
@@ -36,3 +33,4 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 - 2026-10-26 **Godot client skeleton**: `client/` project; `Session` (Gzip, per-profile token, create, enter with the content hash); predicted player with movement events and snapping on corrections; C# subscription director; remote capsules drawn 200 ms back, interpolated then dead-reckoned (ADR 0015); HUD, autopilot, `cargo xtask client` and `capture`; golden vectors from `sim`; 27 xUnit tests; `bot visitor`. Two windows and a bot saw each other with zero corrections; frames in `docs/captures/` (docs/design/client.md).
 - 2026-10-26 **Spike 3: ship and moving deck**: `content/ships.toml` hulls, `sim::ship` (poses, step, draft, cannon flight), ships stepped in `world_tick` and published at 5 Hz, passengers in the ship's frame, helm and cannons with scheduled impacts (ADR 0014); `ship` scenario with zero false corrections, 8 of 8 shots hitting, cheats caught (docs/design/ships.md).
 - 2026-10-26 **Art style test scene**: offline `--style-test flat|gradient` scene with a procedural island on the 2 m grid, Gerstner water with depth colour and shore foam, procedural trees and rocks, and KayKit Adventurers (CC0) walking, running and idling; `--outline`, `--shot follow|wide`; assets in `client/assets/` with the xtask importing before each run (ADR 0016); captures in `docs/captures/` (docs/design/art.md). The decision itself is task 1.
+- 2026-10-26 **Art look decision**: deferred until the game systems are built; simple placeholder geometry until then (user, ADR 0004 amended).

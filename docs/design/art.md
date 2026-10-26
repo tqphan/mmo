@@ -1,6 +1,8 @@
 # Art pipeline and style test
 
-Status: v0.1, 2026-10-26. M0 style test. Code: `client/src/Presentation/`, `client/shaders/water.gdshader`, assets in `client/assets/`. Decisions: ADR 0004 (the look, still open) and ADR 0016 (where assets live).
+Status: v0.1, 2026-10-26. M0 style test. Code: `client/src/Presentation/`, `client/shaders/water.gdshader`, assets in `client/assets/`. Decisions: ADR 0004 (the look, deferred) and ADR 0016 (where assets live).
+
+> **2026-10-26: the look is deferred** (ADR 0004). After seeing this test, the user chose simple placeholder geometry until the game systems are built. The style test stays as a reference for that later decision; nothing below is the game's look yet.
 
 ## 1. How the original worked
 

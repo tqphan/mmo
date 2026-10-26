@@ -13,7 +13,7 @@ Status: v0.3, 2026-10-25. The research is in [RESEARCH.md](RESEARCH.md); referen
 | Who builds it | Claude, across many sessions. The user directs, playtests and approves. | User |
 | Server | SpacetimeDB 2.x with Rust modules | Plan v0.1 |
 | Client | Godot 4.7 .NET (C#) | Plan v0.1 |
-| Art look | Flat low-poly vs hand-painted, decided after the M0 style test | User, 2026-10-25 (ADR 0004) |
+| Art look | Placeholder geometry until the game systems are built; the look (flat or gradient low-poly, or hand-painted) is chosen then | User, 2026-10-25, amended 2026-10-26 (ADR 0004) |
 | Dev machines | Arch Linux laptop and Windows PC; tooling must be cross-platform (`cargo xtask`) | User, 2026-10-25 (ADR 0008) |
 | Commits | Claude commits and pushes to `main` after each finished task | User, 2026-10-25 (ADR 0005) |
 
@@ -513,7 +513,7 @@ pub struct CombatEvent { cell: u64, source: u64, target: u64, skill_id: u32, amo
 
 ## 7. Art and audio pipeline
 
-- **Direction.** Stylized low-poly with flat or gradient shading, a bright and readable palette, chunky silhouettes, and strong color coding by faction and region. This is the default; confirm with Q1. M0 produces a style test scene with screenshots for approval.
+- **Direction.** Stylized low-poly with flat or gradient shading, a bright and readable palette, chunky silhouettes, and strong color coding by faction and region. This is the default. M0 built a style test scene (docs/design/art.md); after seeing it, the user deferred the look until the game systems are built, and the client uses simple placeholder geometry until then (ADR 0004).
 - **Sources, in order of preference:**
   1. **CC0 kits:** Quaternius (characters, animation, nature, buildings), KayKit (characters, props, dungeon kits) and Kenney (environment, UI, audio).
   2. **Procedural generation by Claude:** Godot `@tool` scripts, or Blender's Python API run headless if Blender gets installed. Good fits are modular houses and farms, ship hulls (lofted from profiles), carts, trade packs and crates, crop growth stages, rocks and cliffs, and castle wall segments.
@@ -723,7 +723,7 @@ Relative sizes: M0 medium · M1 large · M2 very large · M3 large · M4 very la
 4. **World scale.** A 16 km stylized map with Terrain3D, water and streaming, within budget at mid-range settings.
 5. **Server-side terrain.** Movement checks and line of sight against the uploaded heightmap and obstacles, with no false positives in a 30-minute session.
 
-**Exit:** every spike passes or has a written mitigation, the art style is approved, and the plan is updated.
+**Exit:** every spike passes or has a written mitigation, and the plan is updated. (The art style is no longer an M0 exit; ADR 0004.)
 
 ### M1: "One Coast" (the core loop)
 - **Content:** one coastal zone of about 3×3 km plus a small island outpost across the water; one race; levels 1–15; three skillsets with about 8 skills each and at least two cross-skillset combos; about 10 NPC types and 10 quests.
@@ -843,6 +843,6 @@ Progress is tracked in [STATUS.md](STATUS.md) and [BACKLOG.md](BACKLOG.md) from 
 ---
 
 ## 14. Open questions
-1. ~~**Look:**~~ Decided after the M0 style test, which is built in flat low-poly (ADR 0004).
+1. ~~**Look:**~~ Deferred until the game systems are built; placeholders until then (ADR 0004, 2026-10-26).
 2. ~~**Setup:**~~ Server toolchain approved; client toolchain pending. Commits and pushes approved (ADR 0005).
 3. **Taste:** is there anything from the final version you'd rather leave out, or anything you especially want early? For example, the depth of gear progression, or the jury system.
