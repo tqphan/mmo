@@ -33,7 +33,7 @@ Every check below takes the reading that is kinder to the player, so the choice 
 - `admin_put_terrain(chunks)`: upsert a batch of chunks. Each must have exactly 1089 samples and an open-world cell key on the map. Caller must be an admin.
 - `admin_clear_terrain()`: delete every chunk. Admin only.
 - **Admins:** the identity that published the database (recorded by `init`), or an account with `gm_level ≥ 3`. Dev builds add `dev_set_gm(level)`, which any caller may use.
-- **File format** (`.mmoh`, `sim::terrain::HeightFile`), little-endian: magic `MMOH`, `u16` version 1, `u16` first cell x, `u16` first cell z, `u16` cells across, `u16` cells down, then `(down·32+1) × (across·32+1)` `u16` samples, rows of increasing z. Regions are whole cells. `loadbot terrain-upload <file>` sends one in batches of 32 chunks. The world exporter (BACKLOG) will write this format.
+- **File format** (`.mmoh`, `sim::terrain::HeightFile`), little-endian: magic `MMOH`, `u16` version 1, `u16` first cell x, `u16` first cell z, `u16` cells across, `u16` cells down, then `(down·32+1) × (across·32+1)` `u16` samples, rows of increasing z. Regions are whole cells. `loadbot terrain-upload <file>` sends one in batches of 32 chunks. The client draws terrain from the same file (docs/design/worldstream.md, ADR 0017). `loadbot world-gen` writes a placeholder for the whole map, and the whole map uploads in about 4 s, adding 172 MB to the server (docs/spikes/world-scale.md).
 
 ### Vertical checks on movement
 Every accepted horizontal move (docs/design/movement.md) is then checked against the ground at its destination, when the terrain there is known. The server keeps an **anchor** in `presence`: the position of the last solid footing and when the character last touched ground.

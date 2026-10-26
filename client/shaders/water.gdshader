@@ -14,8 +14,10 @@ uniform vec4 wave_b = vec4(-0.4, 1.0, 0.10, 13.0);
 uniform vec4 wave_c = vec4(0.7, -0.8, 0.08, 9.0);
 // Off for the flat ring out to the horizon (Water.cs).
 uniform bool waves = true;
-// Waves die down between these distances from the origin (Water.cs sets them from the mesh size).
+// Waves die down between these distances from the centre of the wavy square (Water.cs sets them
+// from the mesh size, and moves the centre when the sea follows the camera).
 uniform vec2 fade = vec2(300.0, 500.0);
+uniform vec2 centre = vec2(0.0);
 // Faceted: one normal per triangle, so the waves read as low-poly panels.
 uniform bool faceted = true;
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
@@ -43,7 +45,7 @@ void vertex() {
 			+ gerstner(wave_b, p, TIME, tangent, binormal)
 			+ gerstner(wave_c, p, TIME, tangent, binormal);
 		// Calm towards the edge of the wavy square, to meet the flat ring without a seam.
-		float calm = 1.0 - smoothstep(fade.x, fade.y, max(abs(p.x), abs(p.z)));
+		float calm = 1.0 - smoothstep(fade.x, fade.y, max(abs(p.x - centre.x), abs(p.z - centre.y)));
 		offset *= calm;
 		VERTEX += offset;
 		NORMAL = normalize(mix(vec3(0.0, 1.0, 0.0), cross(binormal, tangent), calm));
@@ -66,7 +68,8 @@ void fragment() {
 	float shore = 0.7 + 0.25 * sin(world.x * 0.35 + TIME * 1.3) * sin(world.z * 0.31 - TIME);
 	float edge = 1.0 - step(shore, depth);
 	ALBEDO = mix(color, foam.rgb, edge);
-	ALPHA = mix(0.75, 0.95, smoothstep(0.0, 4.0, depth));
+	// Opaque once deep, so whether terrain is drawn under deep water never shows.
+	ALPHA = mix(0.75, 1.0, smoothstep(0.0, 6.0, depth));
 	ALPHA = max(ALPHA, edge);
 	ROUGHNESS = 0.2;
 	SPECULAR = 0.4;

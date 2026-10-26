@@ -3,7 +3,7 @@
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
 //! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
 //! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, `visitor` takes `--secs S --expect N`,
-//! and `terrain-gen` and `terrain-upload` take `--file F`.
+//! `terrain-gen`, `terrain-upload` and `world-gen` take `--file F`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
@@ -14,6 +14,7 @@ mod ship;
 mod swarm;
 mod terrain;
 mod visitor;
+mod world;
 
 use std::time::{Duration, Instant};
 
@@ -87,6 +88,7 @@ fn main() {
         "terrain" => terrain::scenario(&args, &ta),
         "terrain-gen" => terrain::write(&ta.file),
         "terrain-upload" => terrain::upload_file(&args, &ta),
+        "world-gen" => world::write(if ta.file == terrain::TerrainArgs::default().file { world::DEFAULT_FILE } else { &ta.file }),
         "ship" => ship::scenario(&args, &sh),
         "visitor" => visitor::scenario(&args, &va),
         _ => {
@@ -100,6 +102,7 @@ fn main() {
                  terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
                  terrain-gen      write the procedural test terrain to a .mmoh file\n  \
                  terrain-upload   upload a .mmoh height file as a dev admin\n  \
+                 world-gen        write the placeholder 16 km world to target/world.mmoh (or --file), for the world-scale spike\n  \
                  ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
                  visitor          a bot runs circles near spawn and lists who it sees (company for client playtests)"
             );

@@ -46,7 +46,7 @@ Hand-painted, the other option in ADR 0004, can't be shown with the tools we hav
 ## 3. Deviations and not yet done
 - **Assets live in `client/assets/`, not `assets/`** (ADR 0016). The ledger stays at `assets/LEDGER.md`.
 - **The characters are chibi-proportioned**, because that's what KayKit makes. The character style is part of the decision; Quaternius's CC0 characters have more realistic proportions but aren't on a host the xtask can fetch from.
-- **The style test is a dev scene.** The game client still draws capsules on a flat checkerboard. Terrain3D, real terrain and character models come with spike 4, the world exporter and M1.
+- **The style test is a dev scene.** The game client still draws capsules on a flat checkerboard. Real terrain comes with spike 4 (our own tiles, ADR 0017); everything stays placeholder until the art pass (ADR 0004).
 - **No foot-sliding fix.** Animations play at their authored speed, so feet may slide a little at run speed.
 - **No day/night cycle, sky dome art or foliage wind** yet (PLAN §6.3).
 

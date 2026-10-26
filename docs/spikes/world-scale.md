@@ -1,0 +1,66 @@
+# Spike 4: world scale
+
+Status: done, 2026-10-26. PLAN §11, M0 spike 4. Spec: docs/design/worldstream.md. Decisions: ADR 0017 (own terrain instead of Terrain3D), ADR 0004 (placeholder look).
+
+## Question
+
+Can the client show the whole 16 × 16 km world, with terrain, sea and streaming, within budget at mid-range settings? And can the server hold the whole map's terrain?
+
+**Done when:** at 1080p the terrain and sea take at most 4 ms of a 16.7 ms frame on a mid-range GPU (around a GTX 1660 or RX 6600), no frame goes over 33 ms while streaming at sailing speed, and terrain uses less than 300 MB of video memory (docs/design/worldstream.md §2).
+
+## What changed on the way
+
+1. **Terrain3D was dropped** (ADR 0017). Its 1.0.2 source showed that adding or removing a region rebuilds the texture arrays of every loaded region, and removed regions stay in memory until saved (RESEARCH, Terrain3D). It also ships as native code, which the user preferred not to run. The client now draws terrain itself from the server's `.mmoh` file.
+2. **Tiles shrank from 512 m to 256 m.** With 512 m tiles, walking drew 2.8 M triangles, because a whole tile went to full detail once any corner was within 400 m. Swapping in one full-detail tile took up to 11.6 ms on the main thread. 256 m tiles at full detail within 200 m fixed both. That's still about 10 pixels per 2 m quad at 1080p.
+
+## Method
+
+- **Map:** `cargo xtask bot world-gen` writes a placeholder 16 km world laid out as PLAN §9 sketches it (`sidecars/loadbot/src/world.rs`): two continents, a central sea with three islands, the north, and outer ocean, with mountains up to about 400 m. 8001² samples, 128 MB, 40% land; 5 s to generate.
+- **Client:** `cargo xtask client --world-test target/world.mmoh --route R --no-vsync --secs S`, 1920 × 1080, Forward+, 2× MSAA, a shadowed sun (200 m), fog, glow and filmic tonemapping. The first 5 s are left out of the summary.
+- **Hardware:** the Linux laptop's RTX 5070 Ti Laptop GPU (driver 615.78). The Radeon 610M was meant to be the low-end check, but Vulkan doesn't see it: Mesa's `vulkan-radeon` isn't installed.
+- **Server:** the full file uploaded with `loadbot terrain-upload` to a local SpacetimeDB 2.13.0, measuring the host process's resident memory before and after.
+
+## Results
+
+**Client, 256 m tiles** (whole-scene GPU time, so terrain, sea, sky, shadows and post-processing together):
+
+| Route | Frame p50 / p99 / max | GPU p50 / p99 | Peak triangles | Draw calls | Terrain meshes | Video memory |
+|---|---|---|---|---|---|---|
+| `sail`, 4 m above the sea at 11 m/s, 60 s | 1.11 / 1.44 / 11.9 ms | 1.05 / 1.36 ms | 0.18 M | 675 | 3 MB | 283 MB |
+| `walk`, on the ground at 5.4 m/s, 60 s | 1.50 / 1.94 / 12.9 ms | 1.45 / 1.87 ms | 0.87 M | 567 | 18 MB | 294 MB |
+| `cross`, 250 m up at 150 m/s, the whole map, 110 s | 1.56 / 2.06 / 12.0 ms | 1.50 / 1.96 ms | 0.58 M | 879 | 19 MB | 316 MB |
+| `high`, circling from 3 km up, 60 s | 1.38 / 1.79 / 15.2 ms | 1.32 / 1.64 ms | 0.07 M | 983 | 19 MB | 312 MB |
+
+No frame went over 33 ms on any route, and no run logged an error.
+
+**For comparison, 512 m tiles:** `walk` drew 2.80 M triangles at 1.73 / 2.17 ms GPU, and `cross` 2.12 M at 2.06 / 2.64 ms, with up to 11.6 ms spent swapping in one mesh.
+
+**Streaming:**
+- At start, the first view (1,000–1,200 tiles out to 10 km) is built in **0.8–1.3 s** on 4 worker threads.
+- At 150 m/s the queue stays at 0 or 1: tiles are built as fast as they're needed. The 15.6 km jump when `cross` loops back to the west edge re-streams the whole view (about 800 meshes) in **under 1 s**. Teleports will behave the same.
+- Swapping meshes in stays within the 2 ms budget on ordinary frames. The longest single swap, 8.3 ms, came during the teleport re-stream. The other long frames (12–15 ms) are rare and come with no streaming activity; garbage collection is the likely cause, but that isn't confirmed.
+- 1,608 of the 3,969 tiles are wholly under deep water and are never built.
+
+**Memory:**
+- The client's peak resident memory is **854 MB**, against **732 MB** for the style test scene. The world adds about 122 MB, nearly all of it the heightmap. An earlier version read the file into a second buffer first and peaked at 978 MB.
+- Video memory is 283–316 MB in all. The terrain meshes are at most 19 MB of that; the rest is the engine's framebuffers, shadow map and sky.
+
+**Server:** all 62,500 chunks (the whole map, ocean included) uploaded in **3.6 s**. The host process went from 447 to **619 MB**, so +172 MB for the 136 MB of samples.
+
+## Verdict
+
+**Go, with one check left.**
+- Streaming and memory pass clearly: no hitches, sub-second re-streams after a teleport, 19 MB of meshes and 122 MB of heightmap.
+- Frame time passes on this GPU with a lot of room: the whole scene at p99 is at most 2.0 ms, against a 4 ms budget for terrain and sea alone.
+- **Mid-range is an estimate, not a measurement.** This laptop GPU is roughly 2–3 times as fast as a GTX 1660 or RX 6600. On that estimate the whole scene would take about 4–6 ms there, and terrain alone (the difference between walking and sailing, about 0.4 ms here) about 1–1.5 ms. That's within budget on an RX 6600-class card and borderline on a GTX 1660, with sky, shadows and post-processing counted in. A real mid-range measurement is a BACKLOG task.
+
+## Levers if it gets tight
+- **The sea** is the largest single cost: a full-screen transparent pass that reads the depth buffer (`sail` is 1.05 ms with almost no terrain). Use coarser wave subdivision further out, or a cheaper shader past a few hundred metres.
+- **Draw calls** (up to about 1,000) come from many small far tiles. Merge the coarsest levels into 1–2 km meshes, or use a quadtree so far tiles cover more ground each.
+- **Height-aware levels:** count the camera's height above a tile in its distance, so high fliers and gliders draw coarser terrain.
+- **Shadows:** only levels 0 and 1 cast them now. The sun's shadow distance (200 m) can drop at lower settings.
+
+## Follow-ups
+- Measure on real mid-range hardware: the Windows PC with a limited frame budget, or the laptop's Radeon 610M once `vulkan-radeon` is installed (pacman; needs the user's OK).
+- Put the tiles and their collision (`HeightMapShape3D` near the player) into the game client, so players walk on the real terrain the server checks against.
+- From 3 km up, the far edge of the sea ring shows against the sky. Players don't get that high; the sky and sea get a proper horizon in the art pass.

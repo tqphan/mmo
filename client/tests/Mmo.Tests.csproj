@@ -10,6 +10,8 @@
     <Compile Include="../src/Sim/*.cs" Link="Client/Sim/%(Filename)%(Extension)" />
     <Compile Include="../src/Net/SubscriptionDirector.cs" Link="Client/Net/SubscriptionDirector.cs" />
     <Compile Include="../src/World/SnapshotBuffer.cs" Link="Client/World/SnapshotBuffer.cs" />
+    <Compile Include="../src/World/HeightMap.cs" Link="Client/World/HeightMap.cs" />
+    <Compile Include="../src/World/TerrainPlan.cs" Link="Client/World/TerrainPlan.cs" />
     <Compile Include="../src/Gameplay/MoveSender.cs" Link="Client/Gameplay/MoveSender.cs" />
     <Compile Include="../src/Gameplay/Autopilot.cs" Link="Client/Gameplay/Autopilot.cs" />
     <Compile Include="../content/*.cs" Link="Client/Content/%(Filename)%(Extension)" />

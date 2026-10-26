@@ -3,8 +3,9 @@ using Godot;
 namespace Mmo.Presentation
 {
     /// <summary>
-    /// The style test's sea at y = 0, drawn by <c>shaders/water.gdshader</c>: a finely subdivided
-    /// square with waves, inside a flat ring that carries the sea out to the horizon.
+    /// The sea at y = 0, drawn by <c>shaders/water.gdshader</c>: a finely subdivided square with
+    /// waves, inside a flat ring that carries the sea out to the horizon. <see cref="Follow"/>
+    /// keeps it centred under a moving camera.
     /// </summary>
     public static class Water
     {
@@ -42,6 +43,19 @@ namespace Mmo.Presentation
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             });
             return root;
+        }
+
+        /// <summary>
+        /// Centre the sea under <paramref name="at"/>, snapped to its vertex grid so wave vertices
+        /// stay put in the world instead of sliding with the camera.
+        /// </summary>
+        public static void Follow(Node3D water, Vector3 at, float size = 1000.0f, int subdivisions = 250)
+        {
+            float grid = size / subdivisions;
+            var snapped = new Vector3(Mathf.Round(at.X / grid) * grid, 0, Mathf.Round(at.Z / grid) * grid);
+            water.Position = snapped;
+            var near = water.GetNode<MeshInstance3D>("Near");
+            ((ShaderMaterial)((PlaneMesh)near.Mesh).Material).SetShaderParameter("centre", new Vector2(snapped.X, snapped.Z));
         }
 
         /// <summary>A flat square ring between half-widths <paramref name="inner"/> and <paramref name="outer"/>.</summary>

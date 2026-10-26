@@ -20,3 +20,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0014](0014-ships-and-moving-decks.md) | Ships are stepped by the server; passengers move in the ship's frame | Accepted |
 | [0015](0015-remote-entities-interpolate-then-dead-reckon.md) | Other entities are drawn 200 ms back, interpolated, then dead-reckoned | Accepted |
 | [0016](0016-assets-inside-the-godot-project.md) | Third-party and generated assets live in `client/assets/`; the ledger stays in `assets/` | Accepted |
+| [0017](0017-client-terrain-from-the-server-heightmap.md) | The client draws terrain from the server's `.mmoh` heightmap in LOD tiles; no Terrain3D | Accepted |

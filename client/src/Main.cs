@@ -33,6 +33,12 @@ namespace Mmo
                 AddChild(new Presentation.StyleTest(options));
                 return;
             }
+            if (options.WorldTest != null)
+            {
+                GetWindow().Title = $"mmo — world test ({options.Route})";
+                AddChild(new Presentation.WorldTest(options));
+                return;
+            }
             GetWindow().Title = $"mmo — {options.Profile}";
 
             var session = new Session(options);

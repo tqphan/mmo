@@ -137,7 +137,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
 | Client | Godot 4.7.x .NET, C#, with the official `SpacetimeDB.ClientSDK.Godot` | The official SDK is C#. | — |
 | Shared rules | A pure Rust `sim` crate. C# tests check the client's copies of its formulas against generated test vectors. | One source of truth for the few formulas the client predicts: movement speed, ship motion, cannon arcs. | Keeping the copies in sync gets painful. Then build `sim` as a native library and call it from C#. |
 | Art | Stylized low-poly with a bright palette and readable silhouettes. Uses CC0 kits plus procedurally generated props (§7). | Achievable by Claude and free to use. Light on the GPU. | The user picks a hand-painted direction (Q1) |
-| Terrain | Terrain3D with stylized materials | One file per region, editor tools, foliage instancer | — |
+| Terrain | Our own LOD tile meshes, drawn from the server's `.mmoh` heightmap (ADR 0017) | One source for client and server, no native plugin, streaming cost that doesn't grow with what's loaded | Was Terrain3D until spike 4 |
 | Water | A stylized Gerstner-wave shader. Cosmetic buoyancy samples the same function. | Matches the art style, simpler than FFT waves, and gameplay ignores waves anyway | — |
 | World scale | 16×16 km, origin at the center, single precision | Precision problems start 10–40 km from the origin | — |
 | Physics | Jolt (Godot's default), client only | The server uses simple motion math, a heightmap and obstacle outlines. | — |
@@ -265,7 +265,7 @@ mmo/
 │   ├── npc-brain/   pathfinding and AI decisions, sent as reducer calls
 │   └── loadbot/     headless bots for load and scenario tests
 ├── client/          Godot 4.7 .NET project
-│   ├── addons/      Terrain3D, …
+│   ├── addons/      editor plugins, …
 │   ├── assets/      third-party and generated assets, by source
 │   ├── net/         generated bindings (spacetime generate --lang csharp)
 │   ├── content/     generated game data (contentgen)
@@ -487,7 +487,7 @@ pub struct CombatEvent { cell: u64, source: u64, target: u64, skill_id: u32, amo
 | Gameplay | `PlayerController` (CharacterBody3D, prediction, ship-local mode). Tab-targeting, action bars, cast bar, cooldown prediction. Build mode with ghost placement. Vehicle, helm and cannon controls. Glider. Transformations. |
 | Presentation | Characters (shared rig, modular parts, AnimationTree). Visual and sound effects triggered by event tables. Nameplates and damage numbers. |
 | UI | Window framework, HUD, and the inventory, character, skills, crafting, progression, map, mail, market, guild, trial and arena windows |
-| WorldStream | Terrain3D regions, per-cell prop scenes loaded on background threads, foliage instancing, impostors, water, sky and weather |
+| WorldStream | Terrain tiles at six levels of detail (ADR 0017), per-cell prop scenes loaded on background threads, foliage instancing, impostors, water, sky and weather |
 
 ### 6.2 Sync rules
 - **Row callbacks.** A row inserted in a subscribed cell spawns an entity; a deleted row despawns it with a fade. A `transform` update feeds the interpolation buffer. Updates arrive once per 100 ms tick, so the buffer holds at least two ticks. The local player reconciles only when `my_presence.corrections` changes, snapping to the position in that row.
@@ -521,7 +521,7 @@ pub struct CombatEvent { cell: u64, source: u64, target: u64, skill_id: u32, amo
   4. **Commissions**, paid for by donations.
 - **Not allowed:** anything non-commercial or no-derivatives, assets with unclear licenses, or anything from ArcheAge. AI-generated art only with the user's approval and clear terms.
 - **Asset ledger.** `assets/LEDGER.md` records every third-party file: source URL, author, license and date. Claude adds a row whenever it imports something.
-- **Terrain and water.** Terrain3D with a small palette of stylized ground materials. The water shader uses Gerstner waves, shoreline foam, toon highlights and wakes.
+- **Terrain and water.** Terrain meshes from the shared heightmap (ADR 0017) with a small palette of stylized ground materials, after the art pass. The water shader uses Gerstner waves, shoreline foam, toon highlights and wakes.
 - **UI.** Built on a Godot Theme, with Kenney UI as the starting point, then made our own.
 - **Audio.** Kenney and other CC0 sound effects, and CC0 or CC-BY music with credits.
 
@@ -652,7 +652,7 @@ One 16×16 km map, with sea level at 0 and the origin at the center. All names a
 
 - **Travel times (tunable).** An inland pack route takes 5–10 minutes. Crossing the central sea takes about 10 minutes at roughly 10 m/s, and a run to the north about 12–15 minutes: long enough for risk and interception, short enough to repeat.
 - **Climate bands** from north to south feed farming.
-- **Terrain3D** with 1 km regions gives about 256 regions, well within its limits. Open ocean needs only a seabed depth in the server's depth map.
+- **Terrain** is one 8001 × 8001 heightmap at 2 m (128 MB as `u16`), drawn as 3,969 tiles of 256 m (ADR 0017), about 40% of them under deep water and never built. Open ocean needs only a seabed depth in the server's depth map.
 
 ---
 
@@ -720,7 +720,7 @@ Relative sizes: M0 medium · M1 large · M2 very large · M3 large · M4 very la
    - Also measures CPU and memory per player, to size the production server.
 2. **Mass fight.** 150 bots in a 3×3-cell area. Output: a send-rate and level-of-detail policy.
 3. **Ship and moving deck.** A server-driven clipper with two cannons and four players walking and fighting on deck while it turns.
-4. **World scale.** A 16 km stylized map with Terrain3D, water and streaming, within budget at mid-range settings.
+4. **World scale.** A 16 km map with terrain, water and streaming, within budget at mid-range settings (placeholder look, ADR 0004; own terrain, ADR 0017).
 5. **Server-side terrain.** Movement checks and line of sight against the uploaded heightmap and obstacles, with no false positives in a 30-minute session.
 
 **Exit:** every spike passes or has a written mitigation, and the plan is updated. (The art style is no longer an M0 exit; ADR 0004.)

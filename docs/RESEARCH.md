@@ -228,6 +228,7 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 
 ### 4.3 Terrain and world size
 - **Terrain3D** supports worlds up to 65.5×65.5 km, and more with vertex spacing. Each region is saved as a separate file, so people can edit in parallel without merge conflicts. It includes a foliage instancer.
+- **Terrain3D 1.0.2's streaming cost** (read from its source at tag `v1.0.2-stable`, `src/terrain_3d_data.cpp`, 2026-10-26): `add_region` and `remove_region` with `update` call `update_maps(TYPE_MAX, true)`, which rebuilds the height, control and colour texture arrays from every loaded region. `remove_region` only marks a region deleted; it stays in `_regions`, so in memory, until `save_region` erases it. It ships as a native GDExtension. We draw our own terrain instead (ADR 0017).
 - In a standard single-precision build, precision problems start 10–40 km from the origin. Double precision means building Godot **and** Terrain3D from source; Terrain3D calls this experimental. For C#, the .NET assemblies and NuGet packages must also be built with `--precision=double` and served from a local feed.
 
 ### 4.4 Ocean

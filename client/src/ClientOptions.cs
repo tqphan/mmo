@@ -17,6 +17,10 @@ namespace Mmo
     /// <item><c>--style-test flat|gradient</c>: show the offline art style test scene instead of connecting (docs/design/art.md).</item>
     /// <item><c>--outline</c>: in the style test, outline the characters.</item>
     /// <item><c>--shot follow|wide</c>: in the style test, orbit the walking character or the whole island.</item>
+    /// <item><c>--world-test FILE</c>: show the offline world-scale test with this <c>.mmoh</c> map instead of connecting (docs/design/worldstream.md).</item>
+    /// <item><c>--route sail|cross|walk|high</c>: the world test's camera route.</item>
+    /// <item><c>--no-vsync</c>: in the world test, render as fast as possible, to measure frame times.</item>
+    /// <item><c>--secs S</c>: quit the world test after S seconds.</item>
     /// </list>
     /// </summary>
     public sealed class ClientOptions
@@ -32,6 +36,10 @@ namespace Mmo
         public string? StyleTest;
         public bool Outline;
         public string Shot = "follow";
+        public string? WorldTest;
+        public string Route = "sail";
+        public bool NoVsync;
+        public double Secs;
 
         /// <summary>The profile as a legal character name: 3–16 letters, capitalised.</summary>
         public string CharacterName
@@ -64,6 +72,10 @@ namespace Mmo
                     case "--style-test": o.StyleTest = OneOf(Next(), "flat", "gradient"); break;
                     case "--outline": o.Outline = true; break;
                     case "--shot": o.Shot = OneOf(Next(), "follow", "wide"); break;
+                    case "--world-test": o.WorldTest = Next(); break;
+                    case "--route": o.Route = OneOf(Next(), "sail", "cross", "walk", "high"); break;
+                    case "--no-vsync": o.NoVsync = true; break;
+                    case "--secs": o.Secs = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--cam-yaw": o.CamYawDeg = float.Parse(Next(), CultureInfo.InvariantCulture); break;
                     default: throw new ArgumentException($"unknown option {args[i]}");
                 }

@@ -163,7 +163,8 @@ namespace Mmo.Presentation
             }
         }
 
-        private static Godot.Environment Environment()
+        /// <summary>Sky, ambient light, tonemap, fog and glow; the world test reuses it with thinner fog.</summary>
+        internal static Godot.Environment Environment(float fog = 0.0008f)
         {
             var horizon = new Color(0.78f, 0.89f, 0.96f);
             return new Godot.Environment
@@ -188,7 +189,7 @@ namespace Mmo.Presentation
                 TonemapExposure = 0.95f,
                 FogEnabled = true,
                 FogLightColor = horizon,
-                FogDensity = 0.0008f,
+                FogDensity = fog,
                 FogAerialPerspective = 0.2f,
                 FogSkyAffect = 0.0f,
                 GlowEnabled = true,

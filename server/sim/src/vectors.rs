@@ -5,6 +5,7 @@
 
 use crate::cell::{self, CELL_SIZE_M, HYSTERESIS_M, OPEN_WORLD, WORLD_HALF_M};
 use crate::ship;
+use crate::terrain::{self, HeightFile};
 
 const SIM_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../client/tests/vectors/sim.txt");
 
@@ -40,7 +41,9 @@ pub fn generate() -> String {
          # recenter <center> <x> <z> <margin> <key>\n\
          # window <center> <radius> <keys, comma-separated>\n\
          # yaw_to_u16 <radians> <wire>\n\
-         # yaw_from_u16 <wire> <radians>\n",
+         # yaw_from_u16 <wire> <radians>\n\
+         # mmoh <hex bytes of a height file>\n\
+         # mmoh_sample <i> <j> <height>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -114,6 +117,16 @@ pub fn generate() -> String {
     }
     for wire in [0u16, 1, 16384, 32768, 49152, 65535] {
         out.push_str(&format!("yaw_from_u16 {wire} {}\n", f(ship::yaw_from_u16(wire))));
+    }
+
+    // A 2 × 1 cell height file and some of its samples, for the client's .mmoh reader.
+    let file = HeightFile::generate(3, 5, 2, 1, |x, z| (x * 0.37).sin() * 30.0 + z * 0.01);
+    let hex: String = file.to_bytes().iter().map(|b| format!("{b:02x}")).collect();
+    out.push_str(&format!("mmoh {hex}\n"));
+    let (w, h) = file.size();
+    for _ in 0..40 {
+        let (i, j) = ((rng.next() * w as f32) as usize % w, (rng.next() * h as f32) as usize % h);
+        out.push_str(&format!("mmoh_sample {i} {j} {}\n", f(terrain::decode(file.samples[j * w + i]))));
     }
     out
 }

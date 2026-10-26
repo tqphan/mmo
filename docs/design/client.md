@@ -19,12 +19,12 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 - `src/` is split by layer:
   - `Sim/`: ports of `sim` (cells, yaws), checked against golden vectors.
   - `Net/`: `Session` (the connection) and `SubscriptionDirector`.
-  - `World/`: `EntityRegistry`, `RemoteView`, `SnapshotBuffer`, placeholder meshes.
+  - `World/`: `EntityRegistry`, `RemoteView`, `SnapshotBuffer`, placeholder meshes, and `HeightMap` and `TerrainPlan` for terrain (docs/design/worldstream.md).
   - `Gameplay/`: `PlayerController`, `MoveSender`, `FollowCamera`, `Autopilot`.
   - `UI/`: the debug HUD.
-  - `Presentation/`: the art style test scene and the pieces it's built from (docs/design/art.md).
+  - `Presentation/`: the art style test scene and the pieces it's built from (docs/design/art.md), terrain tiles and the world test scene (docs/design/worldstream.md).
 - The scene tree is built in code by `src/Main.cs` from a one-node `main.tscn`. Scenes as files come with real art.
-- Files under `Sim/`, `Net/SubscriptionDirector.cs`, `World/SnapshotBuffer.cs`, `Gameplay/MoveSender.cs` and `Gameplay/Autopilot.cs` don't use Godot, so the xUnit project in `tests/` compiles and tests them directly.
+- Files under `Sim/`, `Net/SubscriptionDirector.cs`, `World/SnapshotBuffer.cs`, `Gameplay/MoveSender.cs`, `Gameplay/Autopilot.cs`, `World/HeightMap.cs` and `World/TerrainPlan.cs` don't use Godot, so the xUnit project in `tests/` compiles and tests them directly.
 
 ### Connecting and entering
 - One `DbConnection` with Gzip (ADR 0011). `FrameTick` runs in `Session._Process`, so every SDK callback runs on the main thread.

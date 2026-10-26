@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (art look deferred).
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (spike 4, world scale).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -28,15 +28,20 @@
   - `--outline` outlines the characters, and `--shot wide` circles the island instead of following the knight.
   - Captures: `docs/captures/2026-10-26-style-*.png`.
   - Assets live in `client/assets/`, listed in `assets/LEDGER.md`. The xtask now runs Godot's import before every client run (about 2 s).
-- **Spikes 1, 2, 3 and 5 done** (docs/spikes/throughput.md, mass-fight.md):
+- **World-scale test, offline** (docs/design/worldstream.md, ADR 0017):
+  - The client draws terrain itself from the server's `.mmoh` heightmap: 256 m tiles at six levels of detail, built on worker threads, deep-water tiles skipped. Terrain3D was dropped (native code, and streaming that slows as more is loaded).
+  - `cargo xtask bot world-gen` writes a placeholder 16 km map (PLAN §9 layout). `cargo xtask client --world-test target/world.mmoh --route sail|walk|cross|high` flies a camera over it and logs frame times, memory and streaming.
+  - The sea follows the camera. Captures: `docs/captures/2026-10-26-world-*.png`.
+- **Spikes 1–5 done** (docs/spikes/throughput.md, mass-fight.md, world-scale.md):
   - 500 players spread out: about 1 core and 0.6 GB on this laptop, 6 KB/s per client.
   - With batched publishing and Gzip, a 150-player fight costs each client about 19 KB/s (reducer p99 3 ms), and 500 all in view about 44 KB/s.
   - The levers for siege-sized crowds are written down for M3.
   - Ships: four bots walked, jumped and swung at each other on a clipper turning at full speed with zero corrections, and the gunner hit the second ship with every shot after its 1.27 s flight time. Extrapolating the 5 Hz ship publishes with the shared step is 0.2 m off one second ahead (mean), against 1.2 m for a straight line. A 10-minute run: 3,782 moves on deck and 280 jumps with no false corrections, 7,103° of turning, 595 swings landed and 106 of 106 shots hit.
+  - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.8–1.3 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. Mid-range is estimated at 4–6 ms for the whole scene, not yet measured.
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected.
 - **Tests:**
-  - 62 `sim` unit tests (one checks the client's golden vectors are current), 14 `contentgen` tests, 55 module tests (in-memory datastore) and 3 loadbot tests, with clippy clean
-  - 27 client xUnit tests: the C# ports match `sim` on 550 generated vectors, plus the director, the move sender, the snapshot buffer and the autopilot. The Godot project compiles with warnings as errors.
+  - 62 `sim` unit tests (one checks the client's golden vectors are current), 14 `contentgen` tests, 55 module tests (in-memory datastore) and 5 loadbot tests, with clippy clean
+  - 44 client xUnit tests: the C# ports match `sim` on 590 generated vectors (including a `.mmoh` file), plus the director, the move sender, the snapshot buffer, the autopilot, the heightmap reader and the terrain tile plan. The Godot project compiles with warnings as errors.
   - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **Client toolchain:** Godot 4.7.2 .NET with `SpacetimeDB.ClientSDK.Godot` 2.13.0 on Linux. The SDK declares GodotSharp 4.6.2, and NuGet resolves it to 4.7.2 without complaint. Movie Maker captures work under Wayland on the laptop's GPU.
@@ -52,9 +57,10 @@
 | Blender | none | none |
 
 ## Next
-1. Spike 4 (world scale) with placeholder terrain, then the world exporter, which give the client real terrain.
+1. Put the terrain tiles and their collision into the game client (top of BACKLOG), so players walk on the terrain the server checks.
 2. **Try the client:** run `cargo xtask server` and `cargo xtask publish`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
 
 ## Blockers and open questions
+- **Mid-range GPU numbers are estimates.** Measuring needs the Windows PC set up, or Mesa's `vulkan-radeon` on the laptop to use its Radeon 610M (pacman; needs your OK).
 - **PLAN Q3:** anything from the final version to leave out or bring forward? Still open.
 - **Crowd measurements need a second machine for the bots.** Spread-out runs fit on the laptop (500 bots used 0.5 cores and 0.4 GB). Crowds are heavier for the bots: 500 in one place took 3 cores even after spike 2. The Windows PC could host the bots once it has the toolchain (the Windows task in BACKLOG). This matters for M3's large battles.
