@@ -108,6 +108,24 @@ namespace Mmo.World
             return a + (b - a) * tz;
         }
 
+        /// <summary>
+        /// The 33 × 33 heights of map cell (<paramref name="cx"/>, <paramref name="cz"/>), rows of
+        /// increasing z with x fastest, edges included: the server's chunk for that cell, as heights.
+        /// Null if the file doesn't cover the cell.
+        /// </summary>
+        public float[]? CellHeights(int cx, int cz)
+        {
+            int dx = cx - CellX, dz = cz - CellZ;
+            if (dx < 0 || dz < 0 || dx >= CellsX || dz >= CellsZ)
+                return null;
+            const int side = QuadsPerCell + 1;
+            var heights = new float[side * side];
+            for (int j = 0; j < side; j++)
+                for (int i = 0; i < side; i++)
+                    heights[j * side + i] = Decode(samples[(dz * QuadsPerCell + j) * Width + dx * QuadsPerCell + i]);
+            return heights;
+        }
+
         /// <summary>The highest sample in [i0, i1] × [j0, j1], clamped to the file.</summary>
         public float Max(int i0, int j0, int i1, int j1)
         {

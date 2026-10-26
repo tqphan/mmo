@@ -1,27 +1,33 @@
 using Godot;
+using Mmo.World;
 
 namespace Mmo.Gameplay
 {
     /// <summary>
     /// A third-person camera behind the player. Q and E, or dragging with the right mouse button,
-    /// turn it; the wheel zooms.
+    /// turn it; the wheel zooms. It stays above the ground.
     /// </summary>
     public partial class FollowCamera : Camera3D
     {
         private const float Pitch = -0.35f;
         private const float TurnSpeed = 2.0f;
         private const float MouseTurn = 0.005f;
+        /// <summary>The least height above the ground at the camera, so it doesn't look out from inside a hill.</summary>
+        private const float Clearance = 0.5f;
 
         private readonly PlayerController player;
+        private readonly HeightMap map;
         private float yaw;
         private float distance = 8.0f;
 
-        public FollowCamera(PlayerController player, float yawDeg)
+        public FollowCamera(PlayerController player, float yawDeg, HeightMap map)
         {
             this.player = player;
+            this.map = map;
             yaw = Mathf.DegToRad(yawDeg);
             Name = "Camera";
             Fov = 60;
+            Far = 20000;
         }
 
         public override void _UnhandledInput(InputEvent e)
@@ -43,7 +49,9 @@ namespace Mmo.Gameplay
             player.CameraYaw = yaw;
             var target = player.GlobalPosition + new Vector3(0, 1.6f, 0);
             var offset = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, Pitch) * new Vector3(0, 0, distance);
-            LookAtFromPosition(target + offset, target, Vector3.Up);
+            var eye = target + offset;
+            eye.Y = Mathf.Max(eye.Y, map.Height(eye.X, eye.Z) + Clearance);
+            LookAtFromPosition(eye, target, Vector3.Up);
         }
     }
 }

@@ -1,6 +1,6 @@
 # World streaming: terrain and sea on the client
 
-Status: v0.1, 2026-10-26. M0 spike 4. Code: `client/src/World/{HeightMap,TerrainPlan}.cs`, `client/src/Presentation/{Terrain,WorldTest}.cs`, `sidecars/loadbot/src/world.rs`. Decisions: ADR 0017 (own terrain), ADR 0004 (placeholder look). Results: docs/spikes/world-scale.md.
+Status: v0.2, 2026-10-26 (in the game client, with collision). Code: `client/src/World/{HeightMap,TerrainPlan,TerrainCollision}.cs`, `client/src/Presentation/{Terrain,WorldTest}.cs`, `sidecars/loadbot/src/world.rs`. Decisions: ADR 0017 (own terrain), ADR 0004 (placeholder look). Results: docs/spikes/world-scale.md.
 
 ## 1. How the original worked
 
@@ -16,7 +16,8 @@ Only the player-facing result matters: no loading screens in the open world, and
 
 ### One heightmap for client and server
 - The client reads the same `.mmoh` file the server checks movement against (docs/design/terrain.md): 2 m samples, `u16`, `raw / 32 − 512` m. The whole 16 km map is 8001 × 8001 samples, 128 MB, and the client keeps all of it in memory (`World/HeightMap.cs`).
-- For the spike the file comes from `cargo xtask bot world-gen` (`target/world.mmoh`), a placeholder map laid out as PLAN §9 sketches it: two 4.4 × 9 km continents, a central sea about 6 km wide with three islands, a 10 × 3 km northern band and ocean round the outside. About 40% is land.
+- For now the file comes from `cargo xtask bot world-gen` (`target/world.mmoh`), a placeholder map laid out as PLAN §9 sketches it: two 4.4 × 9 km continents, a central sea about 6 km wide with three islands, a 10 × 3 km northern band and ocean round the outside. About 40% is land. The trade island sits under spawn (0, 0), which is about 13 m up. Its hills reach 21 m, and it's about 1.1 km across with shallow water all round.
+- `cargo xtask world` uploads it to the local server (writing it first if it's missing, or always with `--gen`), and `cargo xtask client` writes it if it's missing. The game client reads it with `--world` (default `target/world.mmoh`).
 
 ### Tiles and levels of detail
 - The map is cut into **256 m tiles**, 63 × 63 = 3,969 of them, each 128 quads across at full detail. Tiles share their edge samples. (512 m tiles drew 2.8 M triangles when walking and took up to 11.6 ms to swap in; docs/spikes/world-scale.md.)
@@ -31,6 +32,13 @@ Only the player-facing result matters: no loading screens in the open world, and
 - Mesh arrays (positions, normals, colours, indices) are built on up to 4 worker threads, each taking a batch of the 16 nearest waiting tiles. Batches keep streaming speed independent of the frame rate.
 - The main thread turns finished arrays into meshes, up to **2 ms per frame**. A tile keeps its old mesh until the new one is in, so nothing pops out.
 - Normals come from central differences in the heightmap at the tile's own spacing. Colours are placeholders: sand near sea level, grass, rock on steep slopes and high up, sea floor under water.
+
+### Collision
+- Only the local player collides with terrain. Other entities are drawn where the server puts them.
+- `World/TerrainCollision` keeps a `HeightMapShape3D` for each 64 m cell in the 3 × 3 window around the player, 33 × 33 samples each: the server's chunk for that cell (`HeightMap.CellHeights`). The window moves like the Near tier's, once the player is 8 m past the centre cell (`Cell.Recenter`), so there's always at least 56 m of ground ahead.
+- A heightmap shape has a sample every unit, centred on its node. Each shape is scaled by 2 uniformly and its heights halved, since physics engines handle non-uniform scale badly. Godot splits each quad along one diagonal of its own choosing, and the server accepts either (ADR 0013).
+- The engine may not see a new shape until its next step. So after a snap that moved the window (entering, a correction), the player waits two physics frames before moving.
+- Measured: while on the floor, the body's origin stays within 0.01 m of the heightmap's bilinear height.
 
 ### The sea
 - The sea is the existing water shader (`shaders/water.gdshader`): waves near the camera inside a flat ring out to the horizon. It **follows the camera**, snapped to its 4 m grid so wave vertices don't slide, and the waves calm towards the edge of the moving square.
@@ -53,8 +61,7 @@ It logs once a second, and prints a summary on exit: frame time (median, 99th pe
 
 ## 3. Deviations and not yet done
 - **Seen from 3 km up, the far edge of the sea ring shows** against the sky. Players don't get that high.
-- **Spike only.** The game client still walks on its flat placeholder ground. Putting these tiles and their collision into the game is the next step (BACKLOG).
-- **No collision** for the tiles yet. The player will use `HeightMapShape3D`s for the tiles near it.
+- **The world file is generated, not shipped.** Both sides read `target/world.mmoh`, and nothing checks that the server's terrain came from the same file as the client's. Checked-in world files and a check come with BACKLOG "World building v0".
 - **No props, foliage or texturing.** Placeholder look (ADR 0004).
 - **The file is loaded whole.** Fine at 128 MB. Ocean compression or streaming from disk can come later if memory matters.
 - **No editor tooling** for the heightmap yet. The generator stands in for it.
@@ -65,6 +72,8 @@ It logs once a second, and prints a summary on exit: frame time (median, 99th pe
 |---|---|---|
 | xUnit | `.mmoh` parsing matches the Rust format: header, size checks, decoding, bilinear height between samples | `client/tests/HeightMapTests.cs` |
 | xUnit | Level choice by distance with hysteresis; tiles beyond 10 km and in deep water are skipped; nearest tiles come first | `client/tests/TerrainPlanTests.cs` |
-| loadbot unit | The generated world has both continents, the north, the islands, the central sea and the outer ocean; heights fit the format | `sidecars/loadbot/src/world.rs` |
+| xUnit | A cell's collision heights are the server's chunk: 33 × 33, shared edges, null outside the file | `client/tests/HeightMapTests.cs` |
+| live | Clients walk the uploaded world on autopilot for 10 minutes over hills, coast and shallow water with zero corrections (docs/design/client.md, results) | manual |
+| loadbot unit | The generated world has both continents, the north, the islands (the trade island under spawn), the central sea and the outer ocean; heights fit the format | `sidecars/loadbot/src/world.rs` |
 | capture | Each route at 1080p: land on the horizon from the sea, no cracks or holes between levels, the sea meets the coast | `cargo xtask capture world-<route> …`, frames in `docs/captures/` |
 | measurement | Each route with `--no-vsync` on both GPUs; numbers in docs/spikes/world-scale.md | `cargo xtask client --world-test …` |

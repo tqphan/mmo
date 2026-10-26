@@ -4,10 +4,14 @@
 //! move with its heading every 150 ms, about as often as a client running that circle sends turns. Every step it lists the characters in
 //! its Near tier and prints each one the first time it sees it. With `--expect N` it fails unless
 //! it saw at least N other characters; it always fails if it's corrected.
+//!
+//! It runs on the ground of the world file (`--file`, default `target/world.mmoh`) when there is
+//! one, so it isn't corrected where the server has that terrain, and at y = 0 when there isn't.
 
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+use sim::terrain::{FileChunks, HeightFile, ground};
 use spacetimedb_sdk::{DbContext, Table};
 
 use crate::module_bindings::*;
@@ -17,11 +21,13 @@ pub struct VisitorArgs {
     pub secs: u64,
     /// Fail unless at least this many other characters were seen.
     pub expect: usize,
+    /// The world's height file, if not the default.
+    pub file: Option<String>,
 }
 
 impl Default for VisitorArgs {
     fn default() -> Self {
-        Self { secs: 60, expect: 0 }
+        Self { secs: 60, expect: 0, file: None }
     }
 }
 
@@ -31,6 +37,16 @@ const RADIUS: f32 = 4.0;
 const STEP: Duration = Duration::from_millis(150);
 
 pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
+    let path = va.file.as_deref().unwrap_or(crate::world::DEFAULT_FILE);
+    let world = match std::fs::read(path) {
+        Ok(bytes) => Some(HeightFile::from_bytes(&bytes).map_err(|e| format!("{path}: {e}"))?),
+        Err(_) if va.file.is_none() => None,
+        Err(e) => return Err(format!("{path}: {e}")),
+    };
+    println!("V: running on {}", if world.is_some() { path } else { "flat ground (no world file)" });
+    let mut chunks = world.as_ref().map(FileChunks::new);
+    let mut height = |x: f32, z: f32| chunks.as_mut().and_then(|c| ground(c, x, z)).map_or(0.0, |g| g.hi);
+
     let mut bot = Bot::connect(args, "V")?;
     bot.subscribe_self()?;
     let me = bot.arrive()?;
@@ -53,7 +69,7 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
         bot.seq += 1;
         bot.conn
             .reducers
-            .move_event(bot.seq, 0, x, 0.0, z, yaw, (RUN_SPEED * 0.9 * 100.0) as i16, 1)
+            .move_event(bot.seq, 0, x, height(x, z), z, yaw, (RUN_SPEED * 0.9 * 100.0) as i16, 1)
             .map_err(|e| e.to_string())?;
         bot.near.update(&bot.conn, x, z);
 

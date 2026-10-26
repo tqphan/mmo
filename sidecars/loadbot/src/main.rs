@@ -2,7 +2,7 @@
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
 //! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
-//! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, `visitor` takes `--secs S --expect N`,
+//! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, `visitor` takes `--secs S --expect N --file F`,
 //! `terrain-gen`, `terrain-upload` and `world-gen` take `--file F`.
 //! Exits non-zero when a check fails.
 
@@ -61,7 +61,10 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs
                 va.secs = sw.secs;
             }
             "--expect" => va.expect = num("--expect", it.next()),
-            "--file" => ta.file = it.next().expect("--file needs a path"),
+            "--file" => {
+                ta.file = it.next().expect("--file needs a path");
+                va.file = Some(ta.file.clone());
+            }
             "--compression" => {
                 sw.compression = match it.next().as_deref() {
                     Some("none") => spacetimedb_sdk::Compression::None,
@@ -102,9 +105,9 @@ fn main() {
                  terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
                  terrain-gen      write the procedural test terrain to a .mmoh file\n  \
                  terrain-upload   upload a .mmoh height file as a dev admin\n  \
-                 world-gen        write the placeholder 16 km world to target/world.mmoh (or --file), for the world-scale spike\n  \
+                 world-gen        write the placeholder 16 km world to target/world.mmoh (or --file)\n  \
                  ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
-                 visitor          a bot runs circles near spawn and lists who it sees (company for client playtests)"
+                 visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)"
             );
             std::process::exit(2);
         }

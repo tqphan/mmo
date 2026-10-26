@@ -14,13 +14,14 @@ namespace Mmo
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
     /// <item><c>--test-cheat</c>: 3 s after entering, jump 30 m in one frame, to check that the server's correction snaps us back.</item>
+    /// <item><c>--world FILE</c>: the world's <c>.mmoh</c> heightmap (default <c>target/world.mmoh</c>), the same file uploaded to the server.</item>
     /// <item><c>--style-test flat|gradient</c>: show the offline art style test scene instead of connecting (docs/design/art.md).</item>
     /// <item><c>--outline</c>: in the style test, outline the characters.</item>
     /// <item><c>--shot follow|wide</c>: in the style test, orbit the walking character or the whole island.</item>
     /// <item><c>--world-test FILE</c>: show the offline world-scale test with this <c>.mmoh</c> map instead of connecting (docs/design/worldstream.md).</item>
     /// <item><c>--route sail|cross|walk|high</c>: the world test's camera route.</item>
     /// <item><c>--no-vsync</c>: in the world test, render as fast as possible, to measure frame times.</item>
-    /// <item><c>--secs S</c>: quit the world test after S seconds.</item>
+    /// <item><c>--secs S</c>: quit after S seconds.</item>
     /// </list>
     /// </summary>
     public sealed class ClientOptions
@@ -33,6 +34,7 @@ namespace Mmo
         public float CamYawDeg;
         public bool Trace;
         public bool TestCheat;
+        public string World = "target/world.mmoh";
         public string? StyleTest;
         public bool Outline;
         public string Shot = "follow";
@@ -69,6 +71,7 @@ namespace Mmo
                     case "--walk": o.Walk = true; break;
                     case "--trace": o.Trace = true; break;
                     case "--test-cheat": o.TestCheat = true; break;
+                    case "--world": o.World = Next(); break;
                     case "--style-test": o.StyleTest = OneOf(Next(), "flat", "gradient"); break;
                     case "--outline": o.Outline = true; break;
                     case "--shot": o.Shot = OneOf(Next(), "follow", "wide"); break;
@@ -82,6 +85,12 @@ namespace Mmo
             }
             return o;
         }
+
+        /// <summary>A path from the command line: relative paths are from the repo root, where cargo xtask runs.</summary>
+        public static string RepoPath(string path) =>
+            System.IO.Path.IsPathRooted(path)
+                ? path
+                : System.IO.Path.GetFullPath(System.IO.Path.Combine(Godot.ProjectSettings.GlobalizePath("res://"), "..", path));
 
         private static string OneOf(string value, params string[] allowed) =>
             Array.IndexOf(allowed, value) >= 0 ? value : throw new ArgumentException($"{value} is not one of {string.Join(", ", allowed)}");

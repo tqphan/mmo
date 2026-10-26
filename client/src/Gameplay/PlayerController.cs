@@ -1,6 +1,7 @@
 using Godot;
 using Mmo.Content;
 using Mmo.Net;
+using Mmo.World;
 using SpacetimeDB.Types;
 
 namespace Mmo.Gameplay
@@ -8,7 +9,8 @@ namespace Mmo.Gameplay
     /// <summary>
     /// The local player: predicted on this client and reported to the server as movement events
     /// (PLAN §4.2). It snaps to the server's position on entering and on each correction. The body's
-    /// origin is at its feet, where the server measures positions.
+    /// origin is at its feet, where the server measures positions. It walks on the same heightmap
+    /// the server checks against, kept under it by <see cref="TerrainCollision"/>.
     /// </summary>
     public partial class PlayerController : CharacterBody3D
     {
@@ -20,15 +22,21 @@ namespace Mmo.Gameplay
 
         private readonly Session session;
         private readonly ClientOptions options;
+        private readonly TerrainCollision ground;
         private readonly MoveSender sender = new();
         private Node3D body = null!;
         private float heading;
         private double enteredAt = double.NaN;
+        /// <summary>Physics frames to wait after a snap built new ground, so the engine has it before we fall.</summary>
+        private int settle;
+        /// <summary>The furthest the body stood from the heightmap's bilinear height, to check the collision lines up.</summary>
+        private float worstGap;
 
-        public PlayerController(Session session, ClientOptions options)
+        public PlayerController(Session session, ClientOptions options, TerrainCollision ground)
         {
             this.session = session;
             this.options = options;
+            this.ground = ground;
             Name = "Player";
         }
 
@@ -54,12 +62,14 @@ namespace Mmo.Gameplay
         }
 
         public override void _ExitTree() =>
-            session.Log($"quitting: {sender.Sent} moves sent, {session.Me?.Corrections ?? 0} corrections");
+            session.Log($"quitting: {sender.Sent} moves sent, {session.Me?.Corrections ?? 0} corrections, standing at most {worstGap:F2} m off the heightmap");
 
         private void Snap(Presence p)
         {
             GlobalPosition = new Vector3(p.X, p.Y, p.Z);
             Velocity = Vector3.Zero;
+            if (ground.Follow(p.X, p.Z))
+                settle = 2;
             heading = Sim.Yaw.FromU16(p.Yaw);
             body.Rotation = new Vector3(0, heading, 0);
             sender.Reset(p.LastSeq, State(0, true), Clock.Now);
@@ -74,6 +84,14 @@ namespace Mmo.Gameplay
 
         public override void _PhysicsProcess(double delta)
         {
+            // The window only moves once we're 8 m into a cell it already covers, so the ground under
+            // us is always there.
+            ground.Follow(GlobalPosition.X, GlobalPosition.Z);
+            if (settle > 0)
+            {
+                settle--;
+                return;
+            }
             float dt = (float)delta;
             var wish = Wish();
             float maxSpeed = (options.Walk ? MoveMode.Walk : MoveMode.Run).Data().MaxSpeedMps;
@@ -101,6 +119,9 @@ namespace Mmo.Gameplay
                 GlobalPosition += new Vector3(0, 0, -30);
                 session.Log($"test cheat: jumped to ({GlobalPosition.X:F1}, {GlobalPosition.Z:F1})");
             }
+
+            if (IsOnFloor())
+                worstGap = Mathf.Max(worstGap, Mathf.Abs(GlobalPosition.Y - ground.Map.Height(GlobalPosition.X, GlobalPosition.Z)));
 
             float speed = new Vector2(Velocity.X, Velocity.Z).Length();
             if (speed > MoveSender.StillMps)

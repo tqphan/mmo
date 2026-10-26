@@ -85,6 +85,30 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void CellHeightsAreTheServersChunks()
+        {
+            // Two cells across, (3, 5) and (4, 5).
+            var map = FromVectors();
+            var west = map.CellHeights(3, 5)!;
+            var east = map.CellHeights(4, 5)!;
+            Assert.Equal(33 * 33, east.Length);
+            for (int j = 0; j < 33; j++)
+            {
+                for (int i = 0; i < 33; i++)
+                {
+                    Assert.Equal(map.Sample(i, j), west[j * 33 + i]);
+                    Assert.Equal(map.Sample(32 + i, j), east[j * 33 + i]);
+                }
+                // Neighbours repeat their shared edge.
+                Assert.Equal(west[j * 33 + 32], east[j * 33]);
+            }
+            Assert.Null(map.CellHeights(2, 5));
+            Assert.Null(map.CellHeights(5, 5));
+            Assert.Null(map.CellHeights(3, 4));
+            Assert.Null(map.CellHeights(3, 6));
+        }
+
+        [Fact]
         public void RefusesBadFiles()
         {
             var good = File1x1((_, _) => 0);

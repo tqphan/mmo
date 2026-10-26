@@ -42,10 +42,7 @@ namespace Mmo.Presentation
             GetWindow().Size = new Vector2I(1920, 1080);
             if (options.NoVsync)
                 DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-            // Relative paths are from the repo root, where cargo xtask runs.
-            string path = System.IO.Path.IsPathRooted(options.WorldTest)
-                ? options.WorldTest!
-                : System.IO.Path.GetFullPath(System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), "..", options.WorldTest!));
+            string path = ClientOptions.RepoPath(options.WorldTest!);
             if (!System.IO.File.Exists(path))
             {
                 GD.PushError($"world: no map at {path}; write one with `cargo xtask bot world-gen`");

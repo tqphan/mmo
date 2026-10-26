@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (spike 4, world scale).
+**Milestone:** M0, Foundations and risk spikes. **Updated:** 2026-10-26 (client walks on real terrain).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -23,6 +23,9 @@
   - Other entities are capsules with nameplates (ships are hull-sized boxes), drawn 200 ms back: interpolated, then dead-reckoned along their heading.
   - There is a debug HUD, `--autopilot` routes, `cargo xtask client`, and `cargo xtask capture` for Movie Maker frames.
   - Two windows and `bot visitor` all saw each other with zero corrections. Remote runners were drawn with no reversals. A test cheat was corrected and snapped back.
+  - **The client walks on the server's terrain** (docs/design/worldstream.md). It loads the world's `.mmoh` (`--world`, default `target/world.mmoh`) and draws it with the spike's tiles and sea. The player stands on `HeightMapShape3D`s for the 3 × 3 cells around it, holding the server's own samples, and the camera stays above the ground. The flat placeholder ground is gone.
+  - Spawn (0, 0) is now on the placeholder world's trade island, about 13 m up. `cargo xtask world` uploads the world, and `bot visitor` runs on its ground.
+  - Two autopilot clients walked hills, coast and shallow water for 10 minutes each with `bot visitor` for company: 1,186 and 1,185 moves, zero corrections, and the body never more than 0.06 m off the heightmap. Captures: `docs/captures/2026-10-26-terrain-*.png`.
 - **Art: deferred.** The user chose simple placeholder geometry until the game systems are built (ADR 0004, 2026-10-26). The style test scene stays as a reference (docs/design/art.md, ADR 0016):
   - `cargo xtask client --style-test flat` (or `gradient`) runs offline. It shows a procedural island, Gerstner water with turquoise shallows and a foam line, procedural low-poly trees and rocks, and three KayKit Adventurers characters (CC0) walking, running and idling.
   - `--outline` outlines the characters, and `--shot wide` circles the island instead of following the knight.
@@ -40,8 +43,8 @@
   - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.5–0.7 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. On the Radeon 610M integrated GPU, far below mid-range, it holds 36–60 fps at 1080p with no frame over 33 ms, which puts mid-range inside the 4 ms budget (docs/spikes/world-scale.md).
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected.
 - **Tests:**
-  - 62 `sim` unit tests (one checks the client's golden vectors are current), 14 `contentgen` tests, 55 module tests (in-memory datastore) and 5 loadbot tests, with clippy clean
-  - 44 client xUnit tests: the C# ports match `sim` on 590 generated vectors (including a `.mmoh` file), plus the director, the move sender, the snapshot buffer, the autopilot, the heightmap reader and the terrain tile plan. The Godot project compiles with warnings as errors.
+  - 63 `sim` unit tests (one checks the client's golden vectors are current), 14 `contentgen` tests, 55 module tests (in-memory datastore) and 5 loadbot tests, with clippy clean
+  - 45 client xUnit tests: the C# ports match `sim` on 590 generated vectors (including a `.mmoh` file), plus the director, the move sender, the snapshot buffer, the autopilot, the heightmap reader (with per-cell collision heights) and the terrain tile plan. The Godot project compiles with warnings as errors.
   - the `see-each-other`, `tick`, `cross-cells`, `terrain` and `ship` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **Client toolchain:** Godot 4.7.2 .NET with `SpacetimeDB.ClientSDK.Godot` 2.13.0 on Linux. The SDK declares GodotSharp 4.6.2, and NuGet resolves it to 4.7.2 without complaint. Movie Maker captures work under Wayland on the laptop's GPU.
@@ -57,8 +60,8 @@
 | Blender | none | none |
 
 ## Next
-1. Put the terrain tiles and their collision into the game client (top of BACKLOG), so players walk on the terrain the server checks.
-2. **Try the client:** run `cargo xtask server` and `cargo xtask publish`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
+1. World building v0 (top of BACKLOG): the world's files in the repo, and a check that client and server use the same terrain.
+2. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company.
 
 ## Blockers and open questions
 - **PLAN Q3:** anything from the final version to leave out or bring forward? Still open.

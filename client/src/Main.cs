@@ -9,7 +9,7 @@ namespace Mmo
 {
     /// <summary>
     /// The composition root: reads the command line (<see cref="ClientOptions"/>), then builds the
-    /// session, a flat placeholder ground, the entity registry, the player, the camera and the HUD.
+    /// session, the world's terrain and sea, the entity registry, the player, the camera and the HUD.
     /// </summary>
     public partial class Main : Node3D
     {
@@ -41,24 +41,69 @@ namespace Mmo
             }
             GetWindow().Title = $"mmo — {options.Profile}";
 
+            string path = ClientOptions.RepoPath(options.World);
+            if (!System.IO.File.Exists(path))
+            {
+                GD.PushError($"no world at {path}; write one with `cargo xtask bot world-gen`");
+                GetTree().Quit(2);
+                return;
+            }
+            var map = HeightMap.Load(path);
+            GD.Print($"world: {path}, {map.Width} × {map.Depth} samples");
+
             var session = new Session(options);
             AddChild(session);
-            AddChild(Ground());
+            var terrain = new Presentation.Terrain(map);
+            AddChild(terrain);
+            var water = Presentation.Water.Create(faceted: false, new Presentation.Palette(), horizon: 80000.0f);
+            AddChild(water);
             AddChild(new DirectionalLight3D
             {
                 Name = "Sun",
-                RotationDegrees = new Vector3(-50, -30, 0),
+                RotationDegrees = new Vector3(-42, -35, 0),
+                LightColor = new Color(1.0f, 0.95f, 0.86f),
+                LightEnergy = 1.15f,
                 ShadowEnabled = true,
+                DirectionalShadowMaxDistance = 200,
             });
-            AddChild(new WorldEnvironment { Environment = Sky() });
+            AddChild(new WorldEnvironment { Environment = Presentation.StyleTest.Environment(fog: 0.00012f) });
             var entities = new EntityRegistry(session, options.Trace);
             AddChild(entities);
-            var player = new PlayerController(session, options);
+            var ground = new TerrainCollision(map);
+            AddChild(ground);
+            var player = new PlayerController(session, options, ground);
             AddChild(player);
-            AddChild(new FollowCamera(player, options.CamYawDeg));
+            var camera = new FollowCamera(player, options.CamYawDeg, map);
+            AddChild(camera);
             AddChild(new Hud(session, player, entities));
+            // Last, so it sees where the camera went this frame.
+            AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
                 AddChild(new RealTime());
+            if (options.Secs > 0)
+                GetTree().CreateTimer(options.Secs).Timeout += () => GetTree().Quit();
+        }
+
+        /// <summary>Keeps the terrain's levels of detail and the sea centred on the camera.</summary>
+        private partial class Scenery : Node
+        {
+            private readonly Camera3D camera;
+            private readonly Presentation.Terrain terrain;
+            private readonly Node3D water;
+
+            public Scenery(Camera3D camera, Presentation.Terrain terrain, Node3D water)
+            {
+                this.camera = camera;
+                this.terrain = terrain;
+                this.water = water;
+                Name = "Scenery";
+            }
+
+            public override void _Process(double delta)
+            {
+                terrain.Focus = camera.GlobalPosition;
+                Presentation.Water.Follow(water, camera.GlobalPosition);
+            }
         }
 
         /// <summary>
@@ -101,45 +146,5 @@ namespace Mmo
             Bind("turn_right", Key.E, Key.Right);
             Bind("jump", Key.Space);
         }
-
-        /// <summary>A flat 2 km checkerboard at y = 0 until there's terrain (BACKLOG: world exporter, spike 4).</summary>
-        private static Node3D Ground()
-        {
-            const float size = 2000.0f;
-            var checker = Image.CreateEmpty(2, 2, false, Image.Format.Rgb8);
-            var light = new Color(0.55f, 0.62f, 0.45f);
-            var dark = new Color(0.47f, 0.54f, 0.38f);
-            checker.SetPixel(0, 0, light);
-            checker.SetPixel(1, 1, light);
-            checker.SetPixel(1, 0, dark);
-            checker.SetPixel(0, 1, dark);
-            var material = new StandardMaterial3D
-            {
-                AlbedoTexture = ImageTexture.CreateFromImage(checker),
-                TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
-                // One checker square per 4 m.
-                Uv1Scale = new Vector3(size / 8.0f, size / 8.0f, 1),
-                Roughness = 1.0f,
-            };
-            var ground = new StaticBody3D { Name = "Ground" };
-            ground.AddChild(new CollisionShape3D
-            {
-                Shape = new BoxShape3D { Size = new Vector3(size, 1, size) },
-                Position = new Vector3(0, -0.5f, 0),
-            });
-            ground.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(size, size), Material = material } });
-            return ground;
-        }
-
-        private static Godot.Environment Sky() => new()
-        {
-            BackgroundMode = Godot.Environment.BGMode.Sky,
-            Sky = new Sky { SkyMaterial = new ProceduralSkyMaterial() },
-            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
-            TonemapMode = Godot.Environment.ToneMapper.Filmic,
-            FogEnabled = true,
-            FogDensity = 0.002f,
-            FogSkyAffect = 0.0f,
-        };
     }
 }

@@ -203,21 +203,50 @@ impl HeightFile {
 
     /// One `(cell key, CHUNK_LEN samples)` per cell, the shared edges repeated.
     pub fn chunks(&self) -> Vec<(u64, Vec<u16>)> {
-        let (w, _) = self.size();
         let mut out = Vec::new();
         for cz in 0..self.cells_z as usize {
             for cx in 0..self.cells_x as usize {
-                let samples = (0..CHUNK_SIDE)
-                    .flat_map(|r| {
-                        let start = (cz * QUADS_PER_CHUNK + r) * w + cx * QUADS_PER_CHUNK;
-                        self.samples[start..start + CHUNK_SIDE].iter().copied()
-                    })
-                    .collect();
                 let key = pack(OPEN_WORLD, self.cell_z + cz as u16, self.cell_x + cx as u16);
-                out.push((key, samples));
+                out.push((key, self.chunk_at(cx, cz)));
             }
         }
         out
+    }
+
+    /// The samples of the file's cell `(cx, cz)`, counted from its first cell.
+    fn chunk_at(&self, cx: usize, cz: usize) -> Vec<u16> {
+        let (w, _) = self.size();
+        (0..CHUNK_SIDE)
+            .flat_map(|r| {
+                let start = (cz * QUADS_PER_CHUNK + r) * w + cx * QUADS_PER_CHUNK;
+                self.samples[start..start + CHUNK_SIDE].iter().copied()
+            })
+            .collect()
+    }
+}
+
+/// A height file read as chunks, each cut out the first time it's asked for. For tools that need
+/// the ground in a few places on a big map without splitting all of it.
+pub struct FileChunks<'a> {
+    file: &'a HeightFile,
+    cut: std::collections::HashMap<u64, Vec<u16>>,
+}
+
+impl<'a> FileChunks<'a> {
+    pub fn new(file: &'a HeightFile) -> Self {
+        Self { file, cut: Default::default() }
+    }
+}
+
+impl Chunks for FileChunks<'_> {
+    fn chunk(&mut self, cell: u64) -> Option<&[u16]> {
+        let (instance, cz, cx) = unpack(cell);
+        let f = self.file;
+        let (dx, dz) = (cx.checked_sub(f.cell_x)?, cz.checked_sub(f.cell_z)?);
+        if instance != OPEN_WORLD || dx >= f.cells_x || dz >= f.cells_z {
+            return None;
+        }
+        Some(self.cut.entry(cell).or_insert_with(|| f.chunk_at(dx as usize, dz as usize)))
     }
 }
 
@@ -362,6 +391,21 @@ mod tests {
         off_map[6..8].copy_from_slice(&CELLS_PER_SIDE.to_le_bytes());
         assert!(HeightFile::from_bytes(&off_map).is_err());
         assert!(HeightFile::from_bytes(b"MMO").is_err());
+    }
+
+    #[test]
+    fn file_chunks_cut_the_same_chunks_on_demand() {
+        let f = HeightFile::generate(5, 7, 3, 2, |x, z| x * 0.1 - z * 0.05);
+        let mut lazy = FileChunks::new(&f);
+        for (key, samples) in f.chunks() {
+            assert_eq!(lazy.chunk(key), Some(samples.as_slice()));
+        }
+        assert_eq!(lazy.chunk(pack(OPEN_WORLD, 7, 4)), None, "west of the file");
+        assert_eq!(lazy.chunk(pack(OPEN_WORLD, 9, 5)), None, "south of the file");
+        assert_eq!(lazy.chunk(pack(1, 7, 5)), None, "another instance");
+        let (x0, z0) = f.origin();
+        let g = ground(&mut lazy, x0 + 100.0, z0 + 50.0).unwrap();
+        assert!((g.hi - ((x0 + 100.0) * 0.1 - (z0 + 50.0) * 0.05)).abs() < 0.05);
     }
 
     #[test]

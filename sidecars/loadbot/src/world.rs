@@ -1,7 +1,7 @@
 //! A placeholder for the whole 16 km map, laid out as PLAN §9 sketches it, for the world-scale
 //! spike (docs/spikes/world-scale.md): two continents either side of a central sea with three
 //! islands, a band of land along the north edge, and ocean round the outside. Written as one
-//! `.mmoh` height file that the client turns into Terrain3D regions and the server can upload.
+//! `.mmoh` height file that the client draws and walks on, and the server checks moves against.
 //! The real world comes from the editor through the world exporter.
 
 use sim::cell::{CELLS_PER_SIDE, WORLD_HALF_M};
@@ -28,8 +28,9 @@ const LANDS: [Land; 6] = [
     Land { x: 5200.0, z: 1200.0, hx: 2200.0, hz: 4500.0, r: 1200.0, peaks: 320.0 },
     // The north, 10 × 3 km along the top edge.
     Land { x: 0.0, z: -5900.0, hx: 5000.0, hz: 1400.0, r: 900.0, peaks: 420.0 },
-    // Central sea islands: trade, battleground, sanctum.
-    Land { x: 0.0, z: 600.0, hx: 650.0, hz: 550.0, r: 450.0, peaks: 60.0 },
+    // Central sea islands: trade, battleground, sanctum. Spawn (0, 0) is on the trade island, about
+    // 13 m up, until the world has real spawn points.
+    Land { x: 0.0, z: -100.0, hx: 650.0, hz: 550.0, r: 450.0, peaks: 60.0 },
     Land { x: -900.0, z: 4300.0, hx: 500.0, hz: 400.0, r: 350.0, peaks: 40.0 },
     Land { x: 1100.0, z: -2300.0, hx: 380.0, hz: 380.0, r: 300.0, peaks: 90.0 },
 ];
@@ -151,7 +152,7 @@ mod tests {
         assert!(world_height(-5200.0, 1200.0) > 20.0, "west continent");
         assert!(world_height(5200.0, 1200.0) > 20.0, "east continent");
         assert!(world_height(0.0, -6000.0) > 20.0, "the north");
-        assert!(world_height(0.0, 600.0) > 5.0, "trade island");
+        assert!(world_height(0.0, 0.0) > 5.0, "trade island, under spawn");
         assert!(world_height(-2000.0, 3000.0) < -10.0, "central sea");
         assert!(world_height(0.0, 7900.0) < -10.0, "outer ocean");
         assert!(world_height(-7950.0, 0.0) < -2.0, "west edge");

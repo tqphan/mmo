@@ -5,6 +5,8 @@ use std::process::{Command, ExitCode};
 
 const DB: &str = "mmo-world";
 const WASM: &str = "target/wasm32-unknown-unknown/release/world.wasm";
+/// The world's heightmap, written by `bot world-gen`; the client draws it and the server checks against it.
+const WORLD: &str = "target/world.mmoh";
 
 const HELP: &str = "\
 cargo xtask <task> [options]
@@ -18,12 +20,15 @@ cargo xtask <task> [options]
   publish [--prod] [--clear]
                        build and publish to the local server; --clear wipes the database
   generate             regenerate client bindings (Rust for loadbot, C# for the Godot client)
+  world [--gen]        upload the world's heightmap (target/world.mmoh) to the local server, writing
+                       it first if it's missing or with --gen
   bot <scenario> [args]
                        run a loadbot scenario against the local server; `bot help` lists them
                        (`bot swarm --bots N --combat F --area M --secs S` is the throughput spike)
   check                test, then publish --clear and run every bot scenario (needs `server`)
   client [args]        build and run the Godot client; args go to it (`--profile NAME`,
-                       `--autopilot circle:X,Z,R`, …; docs/design/client.md)
+                       `--autopilot circle:X,Z,R`, …; docs/design/client.md). Writes the world
+                       first if it's missing
   capture <name> <frames> [args]
                        run the client in Movie Maker mode at 30 fps for <frames> frames, writing
                        PNGs to target/captures/<name>/; args go to the client
@@ -44,6 +49,7 @@ fn main() -> ExitCode {
         Some("server") => server(&root),
         Some("publish") => publish(flag("--prod"), flag("--clear")),
         Some("generate") => generate(),
+        Some("world") => world(flag("--gen")),
         Some("bot") => match args.get(1) {
             Some(s) => bot(s, &args[2..]),
             None => Err(format!("scenarios: {}", SCENARIOS.join(", "))),
@@ -162,13 +168,28 @@ fn client_import() -> Task {
     run(godot().args(["--headless", "--path", "client", "--import"]))
 }
 
+/// Write the placeholder world with loadbot (a release build: about 5 s rather than minutes).
+fn world_gen(force: bool) -> Task {
+    if !force && Path::new(WORLD).is_file() {
+        return Ok(());
+    }
+    run(cargo().args(["run", "--quiet", "--release", "-p", "loadbot", "--", "world-gen", "--file", WORLD]))
+}
+
+fn world(regenerate: bool) -> Task {
+    world_gen(regenerate)?;
+    bot("terrain-upload", &["--file".into(), WORLD.into()])
+}
+
 fn client(extra: &[String]) -> Task {
+    world_gen(false)?;
     client_build()?;
     client_import()?;
     run(with_dotnet(&mut godot()).args(["--path", "client", "--"]).args(extra))
 }
 
 fn capture(name: &str, frames: u32, extra: &[String]) -> Task {
+    world_gen(false)?;
     client_build()?;
     client_import()?;
     let dir = std::env::current_dir().unwrap().join("target").join("captures").join(name);
