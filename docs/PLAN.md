@@ -683,7 +683,7 @@ One 16×16 km map, with sea level at 0 and the origin at the center. All names a
 - **Scenarios:** a local server plus scripted Rust bots that play a loop and check the database at each step. For example: plant, fast-forward the test clock, harvest, craft a pack, carry it, sell it.
 - **Client:** xUnit for pure C# logic, in-engine tests with GoDotTest or GdUnit4, and simulated input with GodotTestDriver.
 - **Visuals:** scripted camera paths rendered in Movie Maker mode, giving PNG frames that Claude inspects. Before-and-after captures for every visual change.
-- **Performance:** frame-time logs from scripted flythroughs, and server tick timings from a metrics table.
+- **Performance:** frame-time logs from scripted flythroughs, and server tick timings from the host's Prometheus metrics (ADR 0010).
 - **People:** a user playtest at the end of every milestone, with friends if possible.
 
 ### 10.5 Definition of done

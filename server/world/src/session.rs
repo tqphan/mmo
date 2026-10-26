@@ -108,6 +108,9 @@ pub(crate) fn my_presence(ctx: &ViewContext) -> Option<Presence> {
 
 #[spacetimedb::reducer(client_connected)]
 pub fn on_connect(ctx: &ReducerContext) {
+    // SpacetimeDB 2.13 has no lifecycle reducer for republishing, so a database created before
+    // the tick existed starts it here (ADR 0010).
+    crate::tick::start(ctx);
     if ctx.db.account().identity().find(ctx.sender()).is_none() {
         ctx.db.account().insert(Account { identity: ctx.sender(), created_at: now(ctx), gm_level: 0 });
     }

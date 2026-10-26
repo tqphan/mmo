@@ -19,7 +19,7 @@ cargo xtask <task> [options]
   check                test, then publish --clear and run every bot scenario (needs `server`)
 ";
 
-const SCENARIOS: &[&str] = &["see-each-other"];
+const SCENARIOS: &[&str] = &["see-each-other", "tick"];
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

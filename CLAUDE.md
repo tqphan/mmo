@@ -49,13 +49,14 @@ Run these from the repo root. They work on Linux and Windows (ADR 0008).
 - `cargo xtask server`: local SpacetimeDB on 127.0.0.1:3000, in the foreground (data in `target/stdb-data`)
 - `cargo xtask publish [--prod] [--clear]`: build the module to wasm and publish it as `mmo-world` on the local server
 - `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.
-- `cargo xtask bot <scenario>`: run a loadbot scenario against the local server
+- `cargo xtask bot <scenario>`: run a loadbot scenario against the local server (`cargo xtask bot metrics` prints server timings)
 - `cargo xtask check`: test, then publish with `--clear` and run every scenario (needs `server` running)
 - Not yet: run the client, capture frames (needs Godot; BACKLOG 1).
 
 Gotchas:
 - `spacetime call` connects and disconnects around each call, and disconnecting despawns the character. Use loadbot for anything that needs a session.
 - Never run a blanket `cargo update` (ADR 0009).
+- SpacetimeDB 2.13 accepts `#[reducer(update)]` but never runs it on publish; it becomes an ordinary reducer that clients can call. Reducers also have no clock, so timings come from the host's `/v1/metrics` (ADR 0010).
 
 ## Environment (checked 2026-10-25)
 Development happens on two machines, so keep everything cross-platform (ADR 0008). Details are in `docs/STATUS.md`.

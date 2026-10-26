@@ -5,6 +5,7 @@
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
+mod metrics;
 
 use std::time::{Duration, Instant};
 
@@ -38,8 +39,15 @@ fn main() {
     let args = parse_args();
     let result = match args.scenario.as_str() {
         "see-each-other" => see_each_other(&args),
+        "tick" => tick(&args),
+        "metrics" => metrics::read(&args.uri, &args.db).map(|r| print!("{r}")),
         _ => {
-            eprintln!("scenarios:\n  see-each-other   two bots enter, see each other move, get corrected, leave");
+            eprintln!(
+                "scenarios:\n  \
+                 see-each-other   two bots enter, see each other move, get corrected, leave\n  \
+                 tick             the world tick runs at 10 Hz and its timings can be read\n  \
+                 metrics          print the server's tick timings and reducer counts"
+            );
             std::process::exit(2);
         }
     };
@@ -185,4 +193,40 @@ fn see_each_other(args: &Args) -> Check {
     println!("A left and B saw it go");
     b.conn.disconnect().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// The world tick runs at about 10 Hz with a sane `dt`, and its timings can be read from the host.
+fn tick(args: &Args) -> Check {
+    // Connecting starts the tick on a database published before it existed.
+    let bot = Bot::connect(args, "T")?;
+    let applied = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = applied.clone();
+    bot.conn
+        .subscription_builder()
+        .on_applied(move |_| flag.store(true, std::sync::atomic::Ordering::SeqCst))
+        .on_error(|_, e| eprintln!("subscription error: {e}"))
+        .subscribe(["SELECT * FROM dev_tick"]);
+    wait_for("subscription", || applied.load(std::sync::atomic::Ordering::SeqCst))?;
+    let ticks = || bot.conn.db.dev_tick().iter().next().map(|s| (s.ticks, s.last_dt));
+    wait_for("the first tick", || ticks().is_some())?;
+
+    let (start, _) = ticks().unwrap();
+    let begun = Instant::now();
+    std::thread::sleep(Duration::from_secs(3));
+    let (end, last_dt) = ticks().unwrap();
+    let hz = (end - start) as f64 / begun.elapsed().as_secs_f64();
+    println!("tick rate {hz:.1} Hz, last dt {last_dt:.3} s");
+    if !(8.0..=12.0).contains(&hz) {
+        return Err(format!("tick rate {hz:.1} Hz, expected about 10"));
+    }
+    if !(0.05..=sim::tick::MAX_DT).contains(&last_dt) {
+        return Err(format!("last dt {last_dt} s, expected about 0.1"));
+    }
+
+    let report = metrics::read(&args.uri, &args.db)?;
+    print!("{report}");
+    if report.tick.count < 1.0 {
+        return Err("the host reports no world_tick timings".into());
+    }
+    bot.conn.disconnect().map_err(|e| e.to_string())
 }

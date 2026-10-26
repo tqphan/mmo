@@ -3,3 +3,4 @@
 
 pub mod cell;
 pub mod movement;
+pub mod tick;

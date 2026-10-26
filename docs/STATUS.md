@@ -9,9 +9,11 @@
   - movement events checked against speed limits, with corrections and a suspicion log
   - 64 m cell keys and Near-tier window queries
   - the dev test clock
+  - the 10 Hz `world_tick` with a measured, capped `dt` (it steps nothing yet)
+  - server timings read from the host's Prometheus endpoint by `cargo xtask bot metrics` (ADR 0010). An idle tick costs about 90 µs of CPU.
 - **Tests:**
-  - 13 `sim` unit tests and 17 module tests (in-memory datastore), with clippy clean
-  - the `see-each-other` bot scenario, which passes against a live server
+  - 16 `sim` unit tests, 24 module tests (in-memory datastore) and 2 loadbot tests, with clippy clean
+  - the `see-each-other` and `tick` bot scenarios, which pass against a live server
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **No client yet.** Godot and .NET aren't installed on the Linux machine (BACKLOG 1). C# bindings are generated into `client/net` but nothing uses them.
 
@@ -24,8 +26,8 @@
 | .NET / Godot / Blender | none | .NET 7 and 10 / none / none |
 
 ## Next
-1. BACKLOG 1 needs the user's OK. Until then, carry on with server-side tasks 2–7.
-2. BACKLOG 2: world tick and metrics, then 3: the throughput spike.
+1. BACKLOG 1 needs the user's OK. Until then, carry on with server-side tasks 2–6.
+2. BACKLOG 2: the throughput spike (`loadbot swarm`), using `loadbot metrics` for the server-side numbers.
 
 ## Blockers and open questions
 - **Client toolchain on Linux:** not approved yet (user chose server-only for now).

@@ -13,6 +13,7 @@ pub mod character_public_type;
 pub mod create_character_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_clock_type;
+pub mod dev_tick_table;
 pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
@@ -22,8 +23,10 @@ pub mod my_characters_table;
 pub mod my_presence_table;
 pub mod presence_type;
 pub mod suspicion_type;
+pub mod tick_state_type;
 pub mod transform_table;
 pub mod transform_type;
+pub mod world_tick_timer_type;
 
 pub use account_type::Account;
 pub use character_private_type::CharacterPrivate;
@@ -32,6 +35,7 @@ pub use character_public_type::CharacterPublic;
 pub use create_character_reducer::create_character;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_clock_type::DevClock;
+pub use dev_tick_table::*;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
@@ -41,8 +45,10 @@ pub use my_characters_table::*;
 pub use my_presence_table::*;
 pub use presence_type::Presence;
 pub use suspicion_type::Suspicion;
+pub use tick_state_type::TickState;
 pub use transform_table::*;
 pub use transform_type::Transform;
+pub use world_tick_timer_type::WorldTickTimer;
 
 #[derive(Clone, PartialEq, Debug)]
 
@@ -134,6 +140,7 @@ impl __sdk::Reducer for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     character_public: __sdk::TableUpdate<CharacterPublic>,
+    dev_tick: __sdk::TableUpdate<TickState>,
     entity: __sdk::TableUpdate<Entity>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_presence: __sdk::TableUpdate<Presence>,
@@ -149,6 +156,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "character_public" => db_update
                     .character_public
                     .append(character_public_table::parse_table_update(table_update)?),
+                "dev_tick" => db_update
+                    .dev_tick
+                    .append(dev_tick_table::parse_table_update(table_update)?),
                 "entity" => db_update
                     .entity
                     .append(entity_table::parse_table_update(table_update)?),
@@ -196,6 +206,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.transform = cache
             .apply_diff_to_table::<Transform>("transform", &self.transform)
             .with_updates_by_pk(|row| &row.entity_id);
+        diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
@@ -208,6 +219,9 @@ impl __sdk::DbUpdate for DbUpdate {
             match &table_rows.table[..] {
                 "character_public" => db_update
                     .character_public
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "dev_tick" => db_update
+                    .dev_tick
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "entity" => db_update
                     .entity
@@ -237,6 +251,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "character_public" => db_update
                     .character_public
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "dev_tick" => db_update
+                    .dev_tick
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -265,6 +282,7 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     character_public: __sdk::TableAppliedDiff<'r, CharacterPublic>,
+    dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
@@ -287,6 +305,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.character_public,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<TickState>("dev_tick", &self.dev_tick, event);
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
             "my_characters",
@@ -956,6 +975,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         character_public_table::register_table(client_cache);
+        dev_tick_table::register_table(client_cache);
         entity_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
@@ -963,6 +983,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "character_public",
+        "dev_tick",
         "entity",
         "my_characters",
         "my_presence",

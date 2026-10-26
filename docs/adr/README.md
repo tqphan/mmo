@@ -13,3 +13,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0007](0007-godot-dotnet-client.md) | Godot 4.7.x .NET client in C# | Accepted |
 | [0008](0008-two-dev-machines-xtask.md) | Develop on Linux and Windows; dev tasks via `cargo xtask`; workspace at the repo root | Accepted |
 | [0009](0009-lockfile-seeded-from-spacetimedb.md) | Seed `Cargo.lock` from SpacetimeDB's own lockfile | Accepted |
+| [0010](0010-server-metrics-from-the-host.md) | Server timings come from the host's Prometheus metrics, not a module table | Accepted |

@@ -2,12 +2,14 @@
 
 mod movement;
 mod session;
+mod tick;
 mod time;
 
 #[cfg(test)]
 mod tests;
 
 #[spacetimedb::reducer(init)]
-pub fn init(_ctx: &spacetimedb::ReducerContext) {
+pub fn init(ctx: &spacetimedb::ReducerContext) {
+    tick::start(ctx);
     log::info!("world module initialised");
 }

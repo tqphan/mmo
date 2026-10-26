@@ -277,3 +277,92 @@ fn dev_clock_moves_game_time_forward_only() {
     assert_eq!(after.to_micros_since_unix_epoch() - before.to_micros_since_unix_epoch(), 3_600_000_000);
     assert!(call(&t, 1, |ctx| dev_advance_clock(ctx, -1)).is_err());
 }
+
+fn tick(t: &TestContext) -> crate::tick::TickState {
+    use crate::tick::{tick_state, world_tick, world_tick_timer};
+    t.with_reducer_tx(TestAuth::internal(), |ctx| {
+        let timer = ctx.db.world_tick_timer().iter().next().expect("tick timer");
+        world_tick(ctx, timer)
+    })
+    .unwrap();
+    read(t, |ctx| ctx.db.tick_state().id().find(0).unwrap())
+}
+
+fn started() -> TestContext {
+    let t = world();
+    read(&t, crate::init);
+    t
+}
+
+#[test]
+fn init_starts_one_10hz_tick() {
+    use crate::tick::world_tick_timer;
+    let t = started();
+    arrive(&t, 1, "Mira"); // connecting must not start a second one
+    let timers: Vec<_> = read(&t, |ctx| ctx.db.world_tick_timer().iter().map(|r| r.scheduled_at).collect());
+    assert_eq!(timers.len(), 1);
+    assert_eq!(timers[0], spacetimedb::ScheduleAt::Interval(TimeDuration::from_micros(sim::tick::TICK_MICROS)));
+}
+
+#[test]
+fn connecting_starts_the_tick_on_an_older_database() {
+    use crate::tick::world_tick_timer;
+    let t = world(); // no init: as if published before the tick existed
+    arrive(&t, 1, "Mira");
+    assert_eq!(read(&t, |ctx| ctx.db.world_tick_timer().count()), 1);
+}
+
+#[test]
+fn the_tick_steps_by_measured_time() {
+    let t = started();
+    let first = tick(&t);
+    assert_eq!((first.ticks, first.last_dt), (1, 0.0));
+    advance_ms(&t, 100);
+    assert_eq!(tick(&t).last_dt, 0.1);
+    advance_ms(&t, 137); // a late tick steps further
+    let s = tick(&t);
+    assert_eq!((s.ticks, s.last_dt), (3, 0.137));
+    assert_eq!(s.last_at, Timestamp::from_micros_since_unix_epoch(T0 + 237_000));
+}
+
+#[test]
+fn a_stalled_tick_steps_at_most_max_dt() {
+    let t = started();
+    tick(&t);
+    advance_ms(&t, 5_000);
+    assert_eq!(tick(&t).last_dt, sim::tick::MAX_DT);
+}
+
+#[test]
+fn clients_cannot_call_the_tick() {
+    use crate::tick::{tick_state, world_tick, world_tick_timer};
+    let t = started();
+    let r = call(&t, 1, |ctx| {
+        let timer = ctx.db.world_tick_timer().iter().next().unwrap();
+        world_tick(ctx, timer)
+    });
+    assert!(r.is_err());
+    assert_eq!(read(&t, |ctx| ctx.db.tick_state().count()), 0);
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn a_dev_clock_jump_does_not_jump_the_tick() {
+    use crate::time::dev_advance_clock;
+    let t = started();
+    tick(&t);
+    call(&t, 1, |ctx| dev_advance_clock(ctx, 86_400_000_000)).unwrap();
+    advance_ms(&t, 100);
+    assert_eq!(tick(&t).last_dt, sim::tick::MAX_DT);
+    advance_ms(&t, 100);
+    assert_eq!(tick(&t).last_dt, 0.1);
+}
+
+#[cfg(feature = "dev")]
+#[test]
+fn dev_view_shows_the_tick_state() {
+    let t = started();
+    tick(&t);
+    let s = crate::tick::dev_tick(&t.view_context(auth(1))).unwrap();
+    assert_eq!(s.ticks, 1);
+}

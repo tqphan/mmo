@@ -28,6 +28,7 @@ namespace SpacetimeDB.Types
         public RemoteTables(DbConnection conn)
         {
             AddTable(CharacterPublic = new(conn));
+            AddTable(DevTick = new(conn));
             AddTable(Entity = new(conn));
             AddTable(MyCharacters = new(conn));
             AddTable(MyPresence = new(conn));
@@ -515,6 +516,7 @@ namespace SpacetimeDB.Types
         internal static string[] AllTablesSqlQueries() => new string[]
         {
             new QueryBuilder().From.CharacterPublic().ToSql(),
+            new QueryBuilder().From.DevTick().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
@@ -526,6 +528,7 @@ namespace SpacetimeDB.Types
     public sealed class From
     {
         public global::SpacetimeDB.Table<CharacterPublic, CharacterPublicCols, CharacterPublicIxCols> CharacterPublic() => new("character_public", new CharacterPublicCols("character_public"), new CharacterPublicIxCols("character_public"));
+        public global::SpacetimeDB.Table<TickState, DevTickCols, DevTickIxCols> DevTick() => new("dev_tick", new DevTickCols("dev_tick"), new DevTickIxCols("dev_tick"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
