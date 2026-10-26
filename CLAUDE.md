@@ -24,7 +24,7 @@ This is a hobby MMO that recreates the **systems** of ArcheAge's final Western v
 2. **Build** the smallest end-to-end slice: server, client and tests.
 3. **Verify** with tests and bot scenarios. For visual changes, capture frames in Movie Maker mode and look at them.
 4. **Update docs.** Update `docs/STATUS.md` and `docs/BACKLOG.md`, and record any decisions as ADRs.
-5. **Commit.** Git isn't initialized yet; ask the user before the first commit.
+5. **Commit.** The repository is https://github.com/tqphan/mmo (public, branch `main`). Ask before committing or pushing unless the user has given standing approval, and record any such approval here.
 6. **Report** to the user: what changed, how to try it, and what needs their decision.
 
 ## Definition of done

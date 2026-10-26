@@ -660,7 +660,7 @@ One 16×16 km map, with sea level at 0 and the origin at the center. All names a
 - **`docs/design/<system>.md`**: the spec for each system.
 - **`docs/world/`**: the world bible.
 - **`docs/playtests/`**: notes from each playtest.
-- **Git:** a commit per finished task, with a clear message (once approved, Q2). Optionally push to a private remote as off-site backup.
+- **Git:** hosted at https://github.com/tqphan/mmo. One commit per finished task, with a clear message, once that's approved (Q2).
 
 ### 10.3 Session loop
 1. Read `CLAUDE.md`, `docs/STATUS.md` and the top of `docs/BACKLOG.md`.
@@ -831,7 +831,7 @@ L is likelihood and I is impact: H = high, M = medium, L = low.
 
 ### What needs your OK
 1. **The toolchain changes** above.
-2. **Git:** `git init`, a commit per finished task, and optionally a private GitHub repository as off-site backup.
+2. **Git:** set up on 2026-10-25 at https://github.com/tqphan/mmo (public). Still open: whether Claude may commit after each finished task without asking first.
 
 ### Then Claude starts M0
 1. Scaffold the repository (§4.8). Write the status file, the backlog (M0 tasks), and decision records 0001–0007 for the decisions so far.
@@ -844,5 +844,5 @@ L is likelihood and I is impact: H = high, M = medium, L = low.
 
 ## 14. Open questions
 1. **Look:** low-poly with flat or gradient shading (recommended; free CC0 kits fit it), or hand-painted textures (needs much more custom art)?
-2. **Setup:** OK to make the toolchain changes and initialize git? Do you want a private GitHub remote?
+2. **Setup:** OK to make the toolchain changes? And may Claude commit after each finished task without asking each time?
 3. **Taste:** is there anything from the final version you'd rather leave out, or anything you especially want early? For example, the depth of gear progression, or the jury system.
