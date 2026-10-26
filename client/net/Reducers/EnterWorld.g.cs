@@ -12,12 +12,12 @@ namespace SpacetimeDB.Types
 {
     public sealed partial class RemoteReducers : RemoteBase
     {
-        public delegate void EnterWorldHandler(ReducerEventContext ctx, ulong charId);
+        public delegate void EnterWorldHandler(ReducerEventContext ctx, ulong charId, ulong contentHash);
         public event EnterWorldHandler? OnEnterWorld;
 
-        public void EnterWorld(ulong charId)
+        public void EnterWorld(ulong charId, ulong contentHash)
         {
-            conn.InternalCallReducer(new Reducer.EnterWorld(charId));
+            conn.InternalCallReducer(new Reducer.EnterWorld(charId, contentHash));
         }
 
         public bool InvokeEnterWorld(ReducerEventContext ctx, Reducer.EnterWorld args)
@@ -37,7 +37,8 @@ namespace SpacetimeDB.Types
             }
             OnEnterWorld(
                 ctx,
-                args.CharId
+                args.CharId,
+                args.ContentHash
             );
             return true;
         }
@@ -51,10 +52,16 @@ namespace SpacetimeDB.Types
         {
             [DataMember(Name = "char_id")]
             public ulong CharId;
+            [DataMember(Name = "content_hash")]
+            public ulong ContentHash;
 
-            public EnterWorld(ulong CharId)
+            public EnterWorld(
+                ulong CharId,
+                ulong ContentHash
+            )
             {
                 this.CharId = CharId;
+                this.ContentHash = ContentHash;
             }
 
             public EnterWorld()

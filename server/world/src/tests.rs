@@ -5,6 +5,7 @@ use spacetimedb::{ConnectionId, Identity, ReducerContext, Table, TimeDuration, T
 
 use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
+use sim::content::CONTENT_HASH;
 
 const T0: i64 = 1_800_000_000_000_000; // an arbitrary start time, in µs
 
@@ -41,7 +42,7 @@ fn arrive(t: &TestContext, player: u128, name: &str) -> Presence {
     .unwrap();
     call(t, player, |ctx| create_character(ctx, name.into())).unwrap();
     let char_id = read(t, |ctx| ctx.db.character_private().owner().filter(identity(player)).last().unwrap().char_id);
-    call(t, player, |ctx| enter_world(ctx, char_id)).unwrap();
+    call(t, player, |ctx| enter_world(ctx, char_id, CONTENT_HASH)).unwrap();
     read(t, |ctx| ctx.db.presence().identity().find(identity(player)).unwrap())
 }
 
@@ -138,14 +139,30 @@ fn cannot_enter_with_someone_elses_character() {
         Ok(())
     })
     .unwrap();
-    assert!(call(&t, 2, |ctx| enter_world(ctx, p.char_id)).is_err());
+    assert!(call(&t, 2, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).is_err());
+}
+
+#[test]
+fn a_client_with_other_content_is_refused() {
+    let t = world();
+    let p = arrive(&t, 1, "Mira");
+    call(&t, 1, |ctx| {
+        leave_world(ctx);
+        Ok(())
+    })
+    .unwrap();
+    let err = call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH ^ 1)).unwrap_err();
+    assert!(err.contains("does not match"), "{err}");
+    assert_eq!(read(&t, |ctx| ctx.db.presence().count()), 0);
+    assert_eq!(read(&t, |ctx| ctx.db.entity().count()), 0);
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
 }
 
 #[test]
 fn re_entering_replaces_the_old_entity() {
     let t = world();
     let p = arrive(&t, 1, "Mira");
-    call(&t, 1, |ctx| enter_world(ctx, p.char_id)).unwrap();
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
     assert_eq!(read(&t, |ctx| ctx.db.entity().count()), 1);
     assert_eq!(read(&t, |ctx| ctx.db.transform().count()), 1);
     assert_ne!(presence_of(&t, 1).entity_id, p.entity_id);
@@ -249,7 +266,7 @@ fn leaving_saves_position_and_despawns() {
     assert_eq!((c.x, c.z), (2.0, -1.0));
 
     // Coming back puts the character where it left.
-    call(&t, 1, |ctx| enter_world(ctx, p.char_id)).unwrap();
+    call(&t, 1, |ctx| enter_world(ctx, p.char_id, CONTENT_HASH)).unwrap();
     let tr = transform_of(&t, presence_of(&t, 1).entity_id);
     assert_eq!((tr.x, tr.z), (2.0, -1.0));
 }

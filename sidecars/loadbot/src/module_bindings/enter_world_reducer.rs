@@ -8,12 +8,14 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct EnterWorldArgs {
     pub char_id: u64,
+    pub content_hash: u64,
 }
 
 impl From<EnterWorldArgs> for super::Reducer {
     fn from(args: EnterWorldArgs) -> Self {
         Self::EnterWorld {
             char_id: args.char_id,
+            content_hash: args.content_hash,
         }
     }
 }
@@ -33,8 +35,8 @@ pub trait enter_world {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`enter_world:enter_world_then`] to run a callback after the reducer completes.
-    fn enter_world(&self, char_id: u64) -> __sdk::Result<()> {
-        self.enter_world_then(char_id, |_, _| {})
+    fn enter_world(&self, char_id: u64, content_hash: u64) -> __sdk::Result<()> {
+        self.enter_world_then(char_id, content_hash, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `enter_world` to run as soon as possible,
@@ -46,6 +48,7 @@ pub trait enter_world {
     fn enter_world_then(
         &self,
         char_id: u64,
+        content_hash: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -57,12 +60,18 @@ impl enter_world for super::RemoteReducers {
     fn enter_world_then(
         &self,
         char_id: u64,
+        content_hash: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(EnterWorldArgs { char_id }, callback)
+        self.imp.invoke_reducer_with_callback(
+            EnterWorldArgs {
+                char_id,
+                content_hash,
+            },
+            callback,
+        )
     }
 }

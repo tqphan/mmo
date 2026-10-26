@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["server/world", "server/sim", "sidecars/loadbot", "xtask"]
+members = ["server/world", "server/sim", "server/contentgen", "sidecars/loadbot", "xtask"]
 
 [workspace.package]
 edition = "2024"

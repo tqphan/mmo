@@ -1,0 +1,10 @@
+[package]
+name = "contentgen"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Pinned to versions already in Cargo.lock (ADR 0009).
+serde = { version = "=1.0.228", features = ["derive"] }
+toml = "=0.9.8"

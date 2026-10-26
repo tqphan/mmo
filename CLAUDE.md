@@ -45,7 +45,8 @@ This is a hobby MMO that recreates the **systems** of ArcheAge's final Western v
 
 ## Commands
 Run these from the repo root. They work on Linux and Windows (ADR 0008).
-- `cargo xtask test`: unit and module tests, then clippy with warnings as errors (with and without `dev`)
+- `cargo xtask content`: regenerate the content outputs from `content/` (Rust `sim::content`, C# `client/content`). Run after editing `content/`, and commit the outputs too.
+- `cargo xtask test`: content staleness check, unit and module tests, a build of the generated C#, then clippy with warnings as errors (with and without `dev`)
 - `cargo xtask server`: local SpacetimeDB on 127.0.0.1:3000, in the foreground (data in `target/stdb-data`)
 - `cargo xtask publish [--prod] [--clear]`: build the module to wasm and publish it as `mmo-world` on the local server
 - `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.

@@ -267,6 +267,7 @@ mmo/
 ├── client/          Godot 4.7 .NET project
 │   ├── addons/      Terrain3D, …
 │   ├── net/         generated bindings (spacetime generate --lang csharp)
+│   ├── content/     generated game data (contentgen)
 │   └── src/         Net · World · Gameplay · Presentation · UI
 ├── tools/           world exporter plugin, procedural asset generators, GM web panel
 └── ops/             deploy scripts, backup jobs, configuration

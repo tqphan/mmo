@@ -12,13 +12,14 @@
   - the dev test clock
   - the 10 Hz `world_tick` with a measured, capped `dt` (it steps nothing yet)
   - server timings read from the host's Prometheus endpoint by `cargo xtask bot metrics` (ADR 0010). An idle tick costs about 90 µs of CPU.
+  - game data from `content/` through `contentgen` (docs/design/content.md, ADR 0012): the movement-mode table, generated into Rust (`sim::content`) and C# (`client/content`), with a `CONTENT_HASH` that `enter_world` checks
   - dev-only `dev_teleport`, and `dev_swing` with a `combat_event` event table, as a stand-in for combat in load tests
 - **Spikes 1 and 2 done** (docs/spikes/throughput.md, mass-fight.md):
   - 500 players spread out: about 1 core and 0.6 GB on this laptop, 6 KB/s per client.
   - With batched publishing and Gzip, a 150-player fight costs each client about 19 KB/s (reducer p99 3 ms), and 500 all in view about 44 KB/s.
   - The levers for siege-sized crowds are written down for M3.
 - **Tests:**
-  - 20 `sim` unit tests, 27 module tests (in-memory datastore) and 3 loadbot tests, with clippy clean
+  - 20 `sim` unit tests, 9 `contentgen` tests, 28 module tests (in-memory datastore) and 3 loadbot tests, with clippy clean; the generated C# compiles with warnings as errors
   - the `see-each-other`, `tick` and `cross-cells` bot scenarios, which pass against a live server, plus `swarm` for load
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **No client yet, but the toolchain works on Linux.** A throwaway Godot 4.7.2 C# project using `SpacetimeDB.ClientSDK.Godot` 2.13.0 and our generated bindings built cleanly, connected to the local server and read `dev_tick` (headless). The SDK declares GodotSharp 4.6.2; NuGet resolves it to 4.7.2 without complaint.
@@ -34,8 +35,8 @@
 | Blender | none | none |
 
 ## Next
-1. `contentgen` v0 (top of BACKLOG).
-2. The Godot client skeleton is unblocked. Its net layer follows ADR 0011 (Gzip, snap from `my_presence`, buffer two ticks) and ports the subscription director.
+1. Spike 5, server-side terrain (top of BACKLOG).
+2. The Godot client skeleton is unblocked. Its net layer follows ADR 0011 (Gzip, snap from `my_presence`, buffer two ticks), ports the subscription director, and sends `GameContent.Hash` on entering.
 
 ## Blockers and open questions
 - **Art look:** decided after the style test (ADR 0004).

@@ -129,7 +129,7 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
     conn.reducers.create_character(name_for(conn.identity())).map_err(|e| e.to_string())?;
     wait_until("character", || conn.db.my_characters().count() > 0).await?;
     let char_id = conn.db.my_characters().iter().next().unwrap().char_id;
-    conn.reducers.enter_world(char_id).map_err(|e| e.to_string())?;
+    conn.reducers.enter_world(char_id, sim::content::CONTENT_HASH).map_err(|e| e.to_string())?;
     wait_until("presence", || conn.db.my_presence().count() > 0).await?;
     let me = conn.db.my_presence().iter().next().unwrap().entity_id;
 

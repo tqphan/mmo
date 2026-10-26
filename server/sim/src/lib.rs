@@ -2,5 +2,6 @@
 //! No SpacetimeDB dependency, so everything here is plain unit-testable Rust.
 
 pub mod cell;
+pub mod content;
 pub mod movement;
 pub mod tick;

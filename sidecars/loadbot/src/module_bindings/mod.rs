@@ -83,6 +83,7 @@ pub enum Reducer {
     },
     EnterWorld {
         char_id: u64,
+        content_hash: u64,
     },
     LeaveWorld,
     MoveEvent {
@@ -137,11 +138,13 @@ impl __sdk::Reducer for Reducer {
                     z: z.clone(),
                 })
             }
-            Reducer::EnterWorld { char_id } => {
-                __sats::bsatn::to_vec(&enter_world_reducer::EnterWorldArgs {
-                    char_id: char_id.clone(),
-                })
-            }
+            Reducer::EnterWorld {
+                char_id,
+                content_hash,
+            } => __sats::bsatn::to_vec(&enter_world_reducer::EnterWorldArgs {
+                char_id: char_id.clone(),
+                content_hash: content_hash.clone(),
+            }),
             Reducer::LeaveWorld => __sats::bsatn::to_vec(&leave_world_reducer::LeaveWorldArgs {}),
             Reducer::MoveEvent {
                 seq,

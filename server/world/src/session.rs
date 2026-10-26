@@ -176,8 +176,16 @@ pub fn create_character(ctx: &ReducerContext, name: String) -> Result<(), String
     Ok(())
 }
 
+/// `content_hash` is the client's `CONTENT_HASH`. A client built from other content would
+/// predict with other rules, so it is refused (docs/design/content.md).
 #[spacetimedb::reducer]
-pub fn enter_world(ctx: &ReducerContext, char_id: u64) -> Result<(), String> {
+pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64) -> Result<(), String> {
+    if content_hash != sim::content::CONTENT_HASH {
+        return Err(format!(
+            "client content {content_hash:016x} does not match the server's {:016x}; update the client",
+            sim::content::CONTENT_HASH
+        ));
+    }
     let c = ctx
         .db
         .character_private()

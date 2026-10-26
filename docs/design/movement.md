@@ -11,7 +11,7 @@ Status: v0.2, 2026-10-25. M0 slice; v0.2 publishes moves once per tick (ADR 0011
 | A donkey mount moves at about 5 m/s, which players describe as slow | C | [Magic Game World: the donkey](https://www.magicgameworld.com/?p=42608) |
 | Base on-foot run speed | **Unknown** | Not found in a first search; added to RESEARCH §2A.3 |
 
-Our speed numbers are placeholders until the research is done. They live in `sim::movement` so tuning them is a one-line change.
+Our speed numbers are placeholders until the research is done. They live in `content/movement.toml` (docs/design/content.md), so tuning them is a one-line change plus `cargo xtask content`.
 
 ## 2. Our rules
 
@@ -21,7 +21,7 @@ Our speed numbers are placeholders until the research is done. They live in `sim
 - A character has a public part (`character_public`: id, name) and a private part (`character_private`: owner, saved position), which the owner reads through the `my_characters` view.
 
 ### Entering and leaving
-- `enter_world(char_id)`: the caller must own the character. Inserts an `entity` (cold) and a `transform` (hot) at the saved position, plus a private `presence` row (identity ↔ character ↔ entity, movement bookkeeping), which the owner reads through `my_presence`. Entering again first removes the old presence, so one identity has at most one entity in the world.
+- `enter_world(char_id, content_hash)`: the client's content hash must match the server's (docs/design/content.md), and the caller must own the character. Inserts an `entity` (cold) and a `transform` (hot) at the saved position, plus a private `presence` row (identity ↔ character ↔ entity, movement bookkeeping), which the owner reads through `my_presence`. Entering again first removes the old presence, so one identity has at most one entity in the world.
 - `leave_world`, or disconnecting, saves the position and deletes the entity, transform and presence.
 - New characters start at `SPAWN` (the origin) until the world has spawn points.
 
@@ -36,7 +36,7 @@ Our speed numbers are placeholders until the research is done. They live in `sim
 - `seq` must be greater than the last accepted one; stale or duplicate events are dropped silently (`Ok`).
 - Check (horizontal only): distance from the server's position ≤ `max_speed(mode) × (1 + 15%) × min(dt, 2 s) + 0.5 m`, where `dt` is measured since the last accepted event, using `now(ctx)`.
   - The 2 s cap means a client can't stay quiet and then jump.
-  - Placeholder limits: walk 2.0 m/s, run 5.4 m/s, swim 3.5 m/s (confidence C).
+  - Placeholder limits from `content/movement.toml`: walk 2.0 m/s, run 5.4 m/s, swim 3.5 m/s (confidence C).
 - **The authoritative position lives in the private `presence` row** (x, y, z, yaw, speed, mode). Moves are checked against it and update it at once.
 - **Others see moves once per tick** (ADR 0011). An accepted move also adds the entity to the private `moved` set. `world_tick` copies every moved position into the public `transform` (and `entity.cell`) in one transaction every 100 ms, so observers lag by 0–100 ms. Game rules that need a character's position read `presence`.
 - **Rejected move:** the position stays where it was with speed 0, a row goes into the private `suspicion` log, and `presence.corrections` goes up by one. The client watches `my_presence.corrections` and snaps to the position in that row when the count changes. `seq` and the time still advance, so the next legal step counts from the server position.

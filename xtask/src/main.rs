@@ -9,7 +9,9 @@ const WASM: &str = "target/wasm32-unknown-unknown/release/world.wasm";
 const HELP: &str = "\
 cargo xtask <task> [options]
 
-  test                 unit and module tests, then clippy with warnings as errors
+  content              regenerate the content outputs (Rust statics, C# data, hash) from content/
+  test                 content check, unit and module tests, C# content build, then clippy with
+                       warnings as errors
   build [--prod]       build the world module to wasm (dev build has the test clock)
   server               run a local SpacetimeDB server in the foreground (data in target/stdb-data)
   publish [--prod] [--clear]
@@ -30,6 +32,7 @@ fn main() -> ExitCode {
     std::env::set_current_dir(&root).unwrap();
 
     let result = match args.first().map(String::as_str) {
+        Some("content") => contentgen("write"),
         Some("test") => test(),
         Some("build") => build(flag("--prod")),
         Some("server") => server(&root),
@@ -102,8 +105,34 @@ fn with_dotnet(cmd: &mut Command) -> &mut Command {
     cmd.env("DOTNET_CLI_TELEMETRY_OPTOUT", "1").env("DOTNET_NOLOGO", "1")
 }
 
+fn contentgen(mode: &str) -> Task {
+    run(cargo().args(["run", "--quiet", "-p", "contentgen", "--", mode]))
+}
+
+/// Compile the generated C# on its own, warnings as errors, until the Godot project builds it.
+fn csharp_content() -> Task {
+    let dir = Path::new("target").join("content-cs");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let csproj = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../client/content/*.cs" />
+  </ItemGroup>
+</Project>
+"#;
+    std::fs::write(dir.join("content-cs.csproj"), csproj).map_err(|e| e.to_string())?;
+    run(with_dotnet(&mut Command::new("dotnet")).args(["build", "--nologo", "-v", "quiet"]).arg(&dir))
+}
+
 fn test() -> Task {
+    contentgen("check")?;
     run(cargo().args(["test", "--workspace", "--features", "world/dev"]))?;
+    csharp_content()?;
     for features in [&["--features", "world/dev"][..], &[]] {
         run(cargo().args(["clippy", "--workspace", "--all-targets"]).args(features).args(["--", "-D", "warnings"]))?;
     }

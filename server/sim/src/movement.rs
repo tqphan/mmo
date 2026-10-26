@@ -4,33 +4,8 @@
 //! last accepted event is possible at the mode's speed limit. Vertical and obstacle checks need the
 //! heightmap and come later (M0 spike 5).
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum MoveMode {
-    Walk = 0,
-    Run = 1,
-    Swim = 2,
-}
-
-impl MoveMode {
-    pub fn from_u8(v: u8) -> Option<Self> {
-        match v {
-            0 => Some(Self::Walk),
-            1 => Some(Self::Run),
-            2 => Some(Self::Swim),
-            _ => None,
-        }
-    }
-
-    /// Horizontal speed limit in m/s. Placeholder numbers, confidence C (see the spec).
-    pub fn max_speed_mps(self) -> f32 {
-        match self {
-            Self::Walk => 2.0,
-            Self::Run => 5.4,
-            Self::Swim => 3.5,
-        }
-    }
-}
+/// The modes and their speed limits come from `content/movement.toml`.
+pub use crate::content::MoveMode;
 
 /// Fractional allowance on top of the speed limit, for clock jitter between client and server.
 pub const SPEED_TOLERANCE: f32 = 0.15;
@@ -63,7 +38,7 @@ pub fn check_move(from: [f32; 3], to: [f32; 3], dt_s: f32, mode: MoveMode) -> Ve
     }
     let (dx, dz) = (to[0] - from[0], to[2] - from[2]);
     let moved_m = (dx * dx + dz * dz).sqrt();
-    let allowed_m = allowed_distance(mode.max_speed_mps(), dt_s);
+    let allowed_m = allowed_distance(mode.data().max_speed_mps, dt_s);
     if moved_m <= allowed_m {
         Verdict::Ok
     } else {

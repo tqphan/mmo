@@ -1,0 +1,18 @@
+# Movement modes (docs/design/movement.md). `wire` is the value sent in `move_event.mode`; the
+# values must run 0, 1, 2, … with no gaps. Speeds are placeholders, confidence C, until the
+# research backlog item on on-foot speeds is done.
+
+[[mode]]
+id = "walk"
+wire = 0
+max_speed_mps = 2.0
+
+[[mode]]
+id = "run"
+wire = 1
+max_speed_mps = 5.4
+
+[[mode]]
+id = "swim"
+wire = 2
+max_speed_mps = 3.5

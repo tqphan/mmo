@@ -156,7 +156,7 @@ impl Bot {
         self.conn.reducers.create_character(name.clone()).map_err(|e| e.to_string())?;
         wait_for("character", || self.conn.db.my_characters().count() > 0)?;
         let char_id = self.conn.db.my_characters().iter().next().unwrap().char_id;
-        self.conn.reducers.enter_world(char_id).map_err(|e| e.to_string())?;
+        self.conn.reducers.enter_world(char_id, sim::content::CONTENT_HASH).map_err(|e| e.to_string())?;
         wait_for("presence", || self.presence().is_some())?;
         println!("{}: entered as {name} (char {char_id})", self.label);
         Ok(self.presence().unwrap())
