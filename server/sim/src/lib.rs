@@ -7,3 +7,5 @@ pub mod movement;
 pub mod ship;
 pub mod terrain;
 pub mod tick;
+#[cfg(test)]
+mod vectors;

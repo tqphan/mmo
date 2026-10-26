@@ -1,0 +1,17 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Mmo</RootNamespace>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Pinned with the server (ADR 0006); the package declares GodotSharp 4.6.2 and NuGet takes 4.7.2. -->
+    <PackageReference Include="SpacetimeDB.ClientSDK.Godot" Version="2.13.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The xUnit project compiles the Godot-free parts of src/ itself. -->
+    <Compile Remove="tests/**" />
+  </ItemGroup>
+</Project>

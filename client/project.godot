@@ -1,0 +1,27 @@
+; Godot project for the mmo client (docs/PLAN.md §6). Scenes are built in code from src/Main.cs
+; for now; see docs/design/client.md.
+
+config_version=5
+
+[application]
+
+config/name="mmo"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[dotnet]
+
+project/assembly_name="Mmo"
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2

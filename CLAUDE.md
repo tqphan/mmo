@@ -45,24 +45,26 @@ This is a hobby MMO that recreates the **systems** of ArcheAge's final Western v
 
 ## Commands
 Run these from the repo root. They work on Linux and Windows (ADR 0008).
-- `cargo xtask content`: regenerate the content outputs from `content/` (Rust `sim::content`, C# `client/content`). Run after editing `content/`, and commit the outputs too.
-- `cargo xtask test`: content staleness check, unit and module tests, a build of the generated C#, then clippy with warnings as errors (with and without `dev`)
+- `cargo xtask content`: regenerate the content outputs from `content/` (Rust `sim::content`, C# `client/content`) and the client's test vectors from `sim` (`client/tests/vectors`). Run after editing `content/` or the `sim` code the client ports, and commit the outputs too.
+- `cargo xtask test`: content and vector staleness checks, unit and module tests, the Godot client's C# build and xUnit tests, then clippy with warnings as errors (with and without `dev`)
 - `cargo xtask server`: local SpacetimeDB on 127.0.0.1:3000, in the foreground (data in `target/stdb-data`)
 - `cargo xtask publish [--prod] [--clear]`: build the module to wasm and publish it as `mmo-world` on the local server
 - `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.
-- `cargo xtask bot <scenario> [args]`: run a loadbot scenario against the local server (`bot metrics` prints server timings; `bot swarm --bots N --area M` is the throughput test, docs/spikes/throughput.md; `bot terrain --bots N --secs S` walks bots over uploaded test terrain in the map's south-west corner and clears it afterwards, docs/design/terrain.md; `bot terrain-gen` and `bot terrain-upload --file F` write and upload `.mmoh` height files; `bot ship --secs S` sails a clipper with bots walking its deck and firing its cannon, docs/design/ships.md)
+- `cargo xtask bot <scenario> [args]`: run a loadbot scenario against the local server (`bot metrics` prints server timings; `bot swarm --bots N --area M` is the throughput test, docs/spikes/throughput.md; `bot terrain --bots N --secs S` walks bots over uploaded test terrain in the map's south-west corner and clears it afterwards, docs/design/terrain.md; `bot terrain-gen` and `bot terrain-upload --file F` write and upload `.mmoh` height files; `bot ship --secs S` sails a clipper with bots walking its deck and firing its cannon, docs/design/ships.md; `bot visitor --secs S [--expect N]` runs circles near spawn as company for client tests)
 - `cargo xtask check`: test, then publish with `--clear` and run every scenario (needs `server` running)
-- Not yet: run the client, capture frames (the Godot client skeleton in BACKLOG).
+- `cargo xtask client [args]`: build and run the Godot client; args such as `--profile NAME` and `--autopilot circle:X,Z,R` go to it (docs/design/client.md)
+- `cargo xtask capture <name> <frames> [args]`: the client in Movie Maker mode at 30 fps, PNGs in `target/captures/<name>/`. Look at them with Read; keep the ones worth keeping in `docs/captures/`.
 
 Gotchas:
 - `spacetime call` connects and disconnects around each call, and disconnecting despawns the character. Use loadbot for anything that needs a session.
 - Never run a blanket `cargo update` (ADR 0009).
+- View rows (`my_presence`, `my_characters`) have no primary key, so the C# SDK never fires `OnUpdate` for them. A change arrives as an insert and then a delete (docs/design/client.md).
 - SpacetimeDB 2.13 accepts `#[reducer(update)]` but never runs it on publish; it becomes an ordinary reducer that clients can call. Reducers also have no clock, so timings come from the host's `/v1/metrics` (ADR 0010).
 
 ## Environment (checked 2026-10-25)
 Development happens on two machines, so keep everything cross-platform (ADR 0008). Details are in `docs/STATUS.md`.
 - **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 and Godot 4.7.2 .NET in `~/.local/bin` (not on PATH; the xtask finds them). .NET SDKs from pacman. No Blender.
-- **Windows PC:** Rust 1.90 (needs the wasm32 target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI 1.10 (needs upgrading to 2.13.0). No Godot or Blender.
+- **Windows PC:** Rust 1.90 (needs the wasm32 target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI 1.10 (needs upgrading to 2.13.0). No Godot or Blender. The xtask looks for Godot in `$GODOT`, on PATH, or in `%LOCALAPPDATA%\Godot\godot.exe`.
 
 ## Standing approvals
 - 2026-10-25: Claude may commit **and push** to `main` after each finished task without asking (ADR 0005).

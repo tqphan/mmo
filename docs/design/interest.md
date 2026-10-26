@@ -1,6 +1,6 @@
 # Interest management: cells, tiers and the subscription director
 
-Status: v0.1, 2026-10-25. M0 slice. Code: `server/sim/src/cell.rs`, `sidecars/loadbot/src/director.rs`. The C# mirror comes with the Godot client skeleton (BACKLOG).
+Status: v0.1, 2026-10-25. M0 slice. Code: `server/sim/src/cell.rs`, `sidecars/loadbot/src/director.rs`, and the C# mirror in `client/src/Net/SubscriptionDirector.cs` (docs/design/client.md).
 
 ## 1. How the original worked
 
@@ -36,4 +36,5 @@ Self, Near, Static, Far and Global, as in PLAN §4.3. Only Self and Near exist s
   - the one out of reach never appears
   
   At the end it checks that the window moved exactly 5 times, that the cells behind were dropped and the first bot left the cache, that nothing outside the window is cached, and that there were no corrections.
+- **The client's C# director** (`client/tests/SubscriptionDirectorTests.cs`) runs the same rules against a fake server. Its `recenter` and `window_cells` match `sim` on the generated vectors in `client/tests/vectors/sim.txt`.
 - **`swarm`** uses the director. With 500 bots spread over 2 km, mean bandwidth per client went from 6.0 to 4.9 KB/s and server CPU from 0.86 to 0.71 cores, compared with resubscribing the whole window on every cell change (3028 window moves in the run).

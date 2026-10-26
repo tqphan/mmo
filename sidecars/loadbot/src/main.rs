@@ -2,7 +2,8 @@
 //!
 //! `cargo run -p loadbot -- [--uri URI] [--db NAME] <scenario>`; scenarios are listed by `help`.
 //! `swarm` also takes `--bots N --combat SHARE --area METRES --secs S [--compression none|gzip|brotli]`;
-//! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, and `terrain-gen` and `terrain-upload` take `--file F`.
+//! `terrain` takes `--bots N --secs S --file F`, `ship` takes `--secs S`, `visitor` takes `--secs S --expect N`,
+//! and `terrain-gen` and `terrain-upload` take `--file F`.
 //! Exits non-zero when a check fails.
 
 #[allow(clippy::all, unused)]
@@ -12,6 +13,7 @@ mod metrics;
 mod ship;
 mod swarm;
 mod terrain;
+mod visitor;
 
 use std::time::{Duration, Instant};
 
@@ -31,11 +33,12 @@ struct Args {
     scenario: String,
 }
 
-fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs) {
+fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs, visitor::VisitorArgs) {
     let mut a = Args { uri: "http://127.0.0.1:3000".into(), db: "mmo-world".into(), scenario: "help".into() };
     let mut sw = swarm::SwarmArgs::default();
     let mut ta = terrain::TerrainArgs::default();
     let mut sh = ship::ShipArgs::default();
+    let mut va = visitor::VisitorArgs::default();
     let mut it = std::env::args().skip(1);
     fn num<T: std::str::FromStr>(flag: &str, v: Option<String>) -> T {
         v.and_then(|v| v.parse().ok()).unwrap_or_else(|| panic!("{flag} needs a number"))
@@ -54,7 +57,9 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs
                 sw.secs = num("--secs", it.next());
                 ta.secs = sw.secs;
                 sh.secs = sw.secs;
+                va.secs = sw.secs;
             }
+            "--expect" => va.expect = num("--expect", it.next()),
             "--file" => ta.file = it.next().expect("--file needs a path"),
             "--compression" => {
                 sw.compression = match it.next().as_deref() {
@@ -67,11 +72,11 @@ fn parse_args() -> (Args, swarm::SwarmArgs, terrain::TerrainArgs, ship::ShipArgs
             s => a.scenario = s.into(),
         }
     }
-    (a, sw, ta, sh)
+    (a, sw, ta, sh, va)
 }
 
 fn main() {
-    let (args, sw, ta, sh) = parse_args();
+    let (args, sw, ta, sh, va) = parse_args();
     let scenario = args.scenario.clone();
     let result = match scenario.as_str() {
         "see-each-other" => see_each_other(&args),
@@ -83,6 +88,7 @@ fn main() {
         "terrain-gen" => terrain::write(&ta.file),
         "terrain-upload" => terrain::upload_file(&args, &ta),
         "ship" => ship::scenario(&args, &sh),
+        "visitor" => visitor::scenario(&args, &va),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -94,7 +100,8 @@ fn main() {
                  terrain          walkers roam uploaded test terrain with no false corrections; cheats are caught\n  \
                  terrain-gen      write the procedural test terrain to a .mmoh file\n  \
                  terrain-upload   upload a .mmoh height file as a dev admin\n  \
-                 ship             bots walk the deck of a turning ship, fire its cannon and try to cheat"
+                 ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
+                 visitor          a bot runs circles near spawn and lists who it sees (company for client playtests)"
             );
             std::process::exit(2);
         }

@@ -1,0 +1,21 @@
+# 0015: Other entities are drawn 200 ms back, interpolated, then dead-reckoned
+
+- **Status:** Accepted, 2026-10-26
+- **Context:**
+  - Other players' positions reach a client through `transform`, published once per 100 ms tick (ADR 0011). But a row changes only when its player sends a move: on start, stop, turn and jump, and every 0.5 s while running straight.
+  - A pure interpolation buffer would have to sit more than 0.5 s in the past to always have a row on each side of the time it draws.
+  - Pure extrapolation overshoots every stop.
+  - The rows carry no send time, only position, yaw and speed.
+- **Decision:**
+  - Each row is stamped with its local receive time. The client draws 200 ms (two ticks) in the past.
+  - Between two rows it interpolates. Past the newest row it carries on along that row's yaw at its speed, for at most 0.8 s.
+  - A jump of more than 8 m beyond what the rows' speeds explain counts as a teleport and snaps.
+  - The drawn pose eases towards that answer at a rate of 15/s.
+  - Clients send their direction of travel as the yaw, so the dead reckoning goes the right way.
+  - The code is `client/src/World/SnapshotBuffer.cs` and `RemoteView` (docs/design/client.md).
+- **Consequences:**
+  - Stops and turns, which are sent as events, look right after 200 ms.
+  - Between straight-line heartbeats the drawn position is a prediction. When a row comes in late, the switch to interpolation can step back a little; in tests that was at most 0.35 m before easing. In a live trace, a client running circles was drawn with no reversals.
+  - Anything that sends moves must send a heading that matches its motion; a wrong heading looks like jitter. The loadbot `visitor` scenario does this, and `--trace` plus a short script measures it.
+  - Ships need the shared `sim::ship::step` instead of a straight line (ADR 0014). That comes with M1 ships.
+  - If heartbeats ever slow down, or crowds need a longer buffer, stamping rows with the server tick would remove the receive-time jitter. That would cost a column in `transform`.

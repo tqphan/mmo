@@ -1,2 +1,8 @@
 /target/
 *.log
+# Godot and .NET build output
+/client/.godot/
+bin/
+obj/
+# Godot's script ids for generated code; it recreates them (client/src keeps its own)
+*.g.cs.uid

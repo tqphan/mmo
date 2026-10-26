@@ -18,3 +18,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0012](0012-content-generated-and-committed.md) | Content is generated into committed files; clients send a content hash | Accepted |
 | [0013](0013-server-terrain-lenient-checks.md) | Server terrain: 2 m `u16` chunks per cell; checks take the kinder of both triangulations | Accepted |
 | [0014](0014-ships-and-moving-decks.md) | Ships are stepped by the server; passengers move in the ship's frame | Accepted |
+| [0015](0015-remote-entities-interpolate-then-dead-reckon.md) | Other entities are drawn 200 ms back, interpolated, then dead-reckoned | Accepted |

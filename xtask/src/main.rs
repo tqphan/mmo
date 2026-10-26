@@ -9,9 +9,10 @@ const WASM: &str = "target/wasm32-unknown-unknown/release/world.wasm";
 const HELP: &str = "\
 cargo xtask <task> [options]
 
-  content              regenerate the content outputs (Rust statics, C# data, hash) from content/
-  test                 content check, unit and module tests, C# content build, then clippy with
-                       warnings as errors
+  content              regenerate the content outputs (Rust statics, C# data, hash) from content/,
+                       and the client's test vectors from sim
+  test                 content check, unit and module tests, the Godot client's C# build and
+                       xUnit tests, then clippy with warnings as errors
   build [--prod]       build the world module to wasm (dev build has the test clock)
   server               run a local SpacetimeDB server in the foreground (data in target/stdb-data)
   publish [--prod] [--clear]
@@ -21,6 +22,11 @@ cargo xtask <task> [options]
                        run a loadbot scenario against the local server; `bot help` lists them
                        (`bot swarm --bots N --combat F --area M --secs S` is the throughput spike)
   check                test, then publish --clear and run every bot scenario (needs `server`)
+  client [args]        build and run the Godot client; args go to it (`--profile NAME`,
+                       `--autopilot circle:X,Z,R`, …; docs/design/client.md)
+  capture <name> <frames> [args]
+                       run the client in Movie Maker mode at 30 fps for <frames> frames, writing
+                       PNGs to target/captures/<name>/; args go to the client
 ";
 
 const SCENARIOS: &[&str] = &["see-each-other", "tick", "cross-cells", "terrain", "ship"];
@@ -32,7 +38,7 @@ fn main() -> ExitCode {
     std::env::set_current_dir(&root).unwrap();
 
     let result = match args.first().map(String::as_str) {
-        Some("content") => contentgen("write"),
+        Some("content") => contentgen("write").and_then(|()| vectors()),
         Some("test") => test(),
         Some("build") => build(flag("--prod")),
         Some("server") => server(&root),
@@ -43,6 +49,11 @@ fn main() -> ExitCode {
             None => Err(format!("scenarios: {}", SCENARIOS.join(", "))),
         },
         Some("check") => check(),
+        Some("client") => client(&args[1..]),
+        Some("capture") => match (args.get(1), args.get(2).and_then(|f| f.parse::<u32>().ok())) {
+            (Some(name), Some(frames)) => capture(name, frames, &args[3..]),
+            _ => Err("usage: capture <name> <frames> [client args]".into()),
+        },
         _ => {
             print!("{HELP}");
             return ExitCode::from(2);
@@ -109,30 +120,76 @@ fn contentgen(mode: &str) -> Task {
     run(cargo().args(["run", "--quiet", "-p", "contentgen", "--", mode]))
 }
 
-/// Compile the generated C# on its own, warnings as errors, until the Godot project builds it.
-fn csharp_content() -> Task {
-    let dir = Path::new("target").join("content-cs");
+/// Rewrite the client's golden test vectors from `sim` (`client/tests/vectors`).
+fn vectors() -> Task {
+    run(cargo().args(["test", "--quiet", "-p", "sim", "--lib", "vectors"]).env("MMO_WRITE_VECTORS", "1"))
+}
+
+/// Godot 4.7 .NET: `$GODOT`, then `godot` on PATH, then `~/.local/bin/godot` (Linux) or
+/// `%LOCALAPPDATA%\Godot\godot.exe` (Windows).
+fn godot() -> Command {
+    if let Ok(p) = std::env::var("GODOT") {
+        return Command::new(p);
+    }
+    let exe = if cfg!(windows) { "godot.exe" } else { "godot" };
+    let on_path = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).any(|d| d.join(exe).is_file()))
+        .unwrap_or(false);
+    if on_path {
+        return Command::new(exe);
+    }
+    let default: Option<PathBuf> = if cfg!(windows) {
+        std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Godot").join(exe))
+    } else {
+        std::env::var_os("HOME").map(|d| PathBuf::from(d).join(".local/bin").join(exe))
+    };
+    Command::new(default.filter(|p| p.is_file()).unwrap_or_else(|| exe.into()))
+}
+
+/// Build the Godot project's C# (bindings, content and client), warnings as errors.
+fn client_build() -> Task {
+    run(with_dotnet(&mut Command::new("dotnet")).args(["build", "--nologo", "-v", "quiet", "client/Mmo.csproj"]))
+}
+
+/// The client's xUnit tests: the Godot-free code, and the golden vectors from `sim`.
+fn client_test() -> Task {
+    run(with_dotnet(&mut Command::new("dotnet")).args(["test", "--nologo", "-v", "quiet", "client/tests/Mmo.Tests.csproj"]))
+}
+
+/// Godot imports a project's assets the first time it opens it; do that headless before a run.
+fn client_import() -> Task {
+    if Path::new("client/.godot/imported").is_dir() {
+        return Ok(());
+    }
+    run(godot().args(["--headless", "--path", "client", "--import"]))
+}
+
+fn client(extra: &[String]) -> Task {
+    client_build()?;
+    client_import()?;
+    run(with_dotnet(&mut godot()).args(["--path", "client", "--"]).args(extra))
+}
+
+fn capture(name: &str, frames: u32, extra: &[String]) -> Task {
+    client_build()?;
+    client_import()?;
+    let dir = std::env::current_dir().unwrap().join("target").join("captures").join(name);
+    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let csproj = r#"<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="../../client/content/*.cs" />
-  </ItemGroup>
-</Project>
-"#;
-    std::fs::write(dir.join("content-cs.csproj"), csproj).map_err(|e| e.to_string())?;
-    run(with_dotnet(&mut Command::new("dotnet")).args(["build", "--nologo", "-v", "quiet"]).arg(&dir))
+    run(with_dotnet(&mut godot())
+        .args(["--path", "client", "--fixed-fps", "30", "--quit-after", &frames.to_string(), "--write-movie"])
+        .arg(dir.join("frame.png"))
+        .arg("--")
+        .args(extra))?;
+    eprintln!("frames in {}", dir.display());
+    Ok(())
 }
 
 fn test() -> Task {
     contentgen("check")?;
     run(cargo().args(["test", "--workspace", "--features", "world/dev"]))?;
-    csharp_content()?;
+    client_build()?;
+    client_test()?;
     for features in [&["--features", "world/dev"][..], &[]] {
         run(cargo().args(["clippy", "--workspace", "--all-targets"]).args(features).args(["--", "-D", "warnings"]))?;
     }
