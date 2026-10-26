@@ -6,17 +6,21 @@
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
+mod director;
 mod metrics;
 mod swarm;
 
 use std::time::{Duration, Instant};
 
+use director::Director;
 use module_bindings::*;
 use spacetimedb_sdk::{DbContext, Identity, Table};
 
 const RUN_SPEED: f32 = 5.4;
 const HEARTBEAT: Duration = Duration::from_millis(500);
 const WAIT: Duration = Duration::from_secs(5);
+/// The Near tier's tables (PLAN §4.3), 5×5 cells.
+const NEAR_TABLES: &[&str] = &["entity", "transform"];
 
 struct Args {
     uri: String,
@@ -59,6 +63,7 @@ fn main() {
     let result = match scenario.as_str() {
         "see-each-other" => see_each_other(&args),
         "tick" => tick(&args),
+        "cross-cells" => cross_cells(&args),
         "metrics" => metrics::read(&args.uri, &args.db).map(|r| print!("{r}")),
         "swarm" => swarm::swarm(args, sw),
         _ => {
@@ -66,6 +71,7 @@ fn main() {
                 "scenarios:\n  \
                  see-each-other   two bots enter, see each other move, get corrected, leave\n  \
                  tick             the world tick runs at 10 Hz and its timings can be read\n  \
+                 cross-cells      a bot walks 300 m through cell borders and never loses sight of anyone\n  \
                  metrics          print the server's tick timings and reducer counts\n  \
                  swarm            the throughput spike: many bots moving and fighting, measured"
             );
@@ -100,6 +106,7 @@ struct Bot {
     label: &'static str,
     conn: DbConnection,
     seq: u32,
+    near: Director,
 }
 
 impl Bot {
@@ -112,32 +119,35 @@ impl Bot {
             .map_err(|e| format!("{label}: connect failed: {e}"))?;
         conn.run_threaded();
         wait_for("identity", || conn.try_identity().is_some())?;
-        Ok(Self { label, conn, seq: 0 })
+        Ok(Self { label, conn, seq: 0, near: Director::new(NEAR_TABLES, 2) })
     }
 
     fn identity(&self) -> Identity {
         self.conn.identity()
     }
 
-    /// Subscribe to our private views plus the Near tier around `cell` (PLAN §4.3).
-    fn subscribe_near(&self, cell: u64) -> Check {
-        let mut queries = vec![
-            "SELECT * FROM my_characters".to_string(),
-            "SELECT * FROM my_presence".to_string(),
-            "SELECT * FROM character_public".to_string(),
-        ];
-        for c in sim::cell::window_cells(cell, 2) {
-            queries.push(format!("SELECT * FROM entity WHERE cell = {c}"));
-            queries.push(format!("SELECT * FROM transform WHERE cell = {c}"));
-        }
+    /// Subscribe to our private views and everyone's names.
+    fn subscribe_self(&self) -> Check {
         let applied = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let flag = applied.clone();
         self.conn
             .subscription_builder()
             .on_applied(move |_| flag.store(true, std::sync::atomic::Ordering::SeqCst))
             .on_error(|_, e| eprintln!("subscription error: {e}"))
-            .subscribe(queries);
+            .subscribe(["SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public"]);
         wait_for("subscription", || applied.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    /// Start the Near tier around `(x, z)`; `step` keeps it following us from then on.
+    fn watch_near(&self, x: f32, z: f32) -> Check {
+        self.near.update(&self.conn, x, z);
+        wait_for("Near tier", || self.near.ready())
+    }
+
+    /// Move anywhere at once with the dev-only GM teleport.
+    fn teleport(&self, x: f32, z: f32) -> Check {
+        self.conn.reducers.dev_teleport(x, z).map_err(|e| e.to_string())?;
+        wait_for("teleport", || self.presence().is_some_and(|p| p.x == x && p.z == z))
     }
 
     /// Create a character named after our identity and enter the world with it.
@@ -161,7 +171,11 @@ impl Bot {
         self.conn
             .reducers
             .move_event(self.seq, x, 0.0, z, 0, (RUN_SPEED * 100.0) as i16, 1)
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        if self.near.center().is_some() {
+            self.near.update(&self.conn, x, z);
+        }
+        Ok(())
     }
 
     fn sees(&self, entity_id: u64) -> Option<Transform> {
@@ -177,11 +191,12 @@ fn name_for(id: Identity) -> String {
 }
 
 fn see_each_other(args: &Args) -> Check {
-    let spawn = sim::cell::cell_of(sim::cell::OPEN_WORLD, 0.0, 0.0);
     let mut a = Bot::connect(args, "A")?;
     let b = Bot::connect(args, "B")?;
-    a.subscribe_near(spawn)?;
-    b.subscribe_near(spawn)?;
+    for bot in [&a, &b] {
+        bot.subscribe_self()?;
+        bot.watch_near(0.0, 0.0)?;
+    }
     let pa = a.arrive()?;
     let pb = b.arrive()?;
 
@@ -251,4 +266,107 @@ fn tick(args: &Args) -> Check {
         return Err("the host reports no world_tick timings".into());
     }
     bot.conn.disconnect().map_err(|e| e.to_string())
+}
+
+/// One bot walks 290 m east through five cell borders, zigzagging across a row border all the way,
+/// then paces back and forth over the last column border. Bots standing along the route must stay
+/// in view the whole time, one standing out of reach must never appear, and the window must move
+/// exactly once per border crossed (docs/design/interest.md).
+fn cross_cells(args: &Args) -> Check {
+    const START: (f32, f32) = (-150.0, 0.0);
+    const END_X: f32 = 140.0;
+    /// The window reaches at least 2 cells less the margin past the player: 120 m. The rest is
+    /// slack for subscription latency.
+    const MUST_SEE_M: f32 = 110.0;
+    // Bots along the route, then one beyond the window's reach in z.
+    let spots: [(&'static str, f32, f32); 6] = [
+        ("W1", -150.0, 40.0),
+        ("W2", -60.0, -40.0),
+        ("W3", 20.0, 60.0),
+        ("W4", 100.0, -50.0),
+        ("W5", 150.0, 30.0),
+        ("FAR", 0.0, 250.0),
+    ];
+    let mut standing = Vec::new();
+    for (label, x, z) in spots {
+        let bot = Bot::connect(args, label)?;
+        bot.subscribe_self()?;
+        let p = bot.arrive()?;
+        bot.teleport(x, z)?;
+        standing.push((bot, p.entity_id, x, z));
+    }
+    let far = standing.last().unwrap().1;
+
+    let mut w = Bot::connect(args, "walker")?;
+    w.subscribe_self()?;
+    w.arrive()?;
+    w.teleport(START.0, START.1)?;
+    w.watch_near(START.0, START.1)?;
+
+    // Zigzag ±4 m across z = 0 every 32 m, so the row border is crossed again and again inside the
+    // margin; then pace over x = 128 to 6 m past it and back, twice.
+    let mut route: Vec<(f32, f32)> = (1..=9).map(|i| (START.0 + 32.0 * i as f32, if i % 2 == 1 { 4.0 } else { -4.0 })).collect();
+    route.push((END_X, 0.0));
+    for _ in 0..2 {
+        route.extend([(122.0, 0.0), (134.0, 0.0)]);
+    }
+
+    let stride = RUN_SPEED * HEARTBEAT.as_secs_f32() * 0.95;
+    let (mut x, mut z) = START;
+    let mut checks = 0u32;
+    for (tx, tz) in route {
+        loop {
+            let (dx, dz) = (tx - x, tz - z);
+            let d = (dx * dx + dz * dz).sqrt();
+            if d < 1e-3 {
+                break;
+            }
+            // Look the whole time between heartbeats, not just at them.
+            for _ in 0..10 {
+                std::thread::sleep(HEARTBEAT / 10);
+                for (bot, id, sx, sz) in &standing {
+                    let seen = w.sees(*id).is_some();
+                    let near = (sx - x).abs().max((sz - z).abs()) <= MUST_SEE_M;
+                    if *id == far && seen {
+                        return Err(format!("saw {} from ({x:.1}, {z:.1}), out of reach", bot.label));
+                    }
+                    if *id != far && near && !seen {
+                        return Err(format!(
+                            "lost sight of {} from ({x:.1}, {z:.1}), window on {:?}",
+                            bot.label,
+                            w.near.center().map(sim::cell::unpack)
+                        ));
+                    }
+                    checks += 1;
+                }
+            }
+            let k = (stride / d).min(1.0);
+            (x, z) = (x + dx * k, z + dz * k);
+            w.step(x, z)?;
+        }
+    }
+    println!("walked to ({x:.1}, {z:.1}) with {checks} sightline checks and no gap");
+
+    // Borders at x = -128, -64, 0, 64 and 128; none of the z = 0 or pacing crossings count.
+    let recenters = w.near.recenters();
+    if recenters != 5 {
+        return Err(format!("the window moved {recenters} times, expected 5"));
+    }
+    wait_for("the old cells to be dropped", || w.near.settled())?;
+    let w1 = standing[0].1;
+    wait_for("W1 to drop out of view", || w.sees(w1).is_none())?;
+    let window = sim::cell::window_cells(w.near.center().unwrap(), 2);
+    if let Some(t) = w.conn.db.transform().iter().find(|t| !window.contains(&t.cell)) {
+        return Err(format!("still holding entity {} outside the window", t.entity_id));
+    }
+    let corrections = w.presence().map_or(0, |p| p.corrections);
+    if corrections != 0 {
+        return Err(format!("{corrections} corrections on an honest walk"));
+    }
+    println!("the window moved {recenters} times, once per border; W1 dropped out behind");
+
+    for bot in std::iter::once(&w).chain(standing.iter().map(|s| &s.0)) {
+        bot.conn.disconnect().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

@@ -202,7 +202,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
   | Global | Zone war states, world events, clock, weather | Whole world | Rarely |
 
   The Far tier is what puts a sail on the horizon.
-- **Switching cells.** Subscribe to the new cells before dropping the old ones, with hysteresis so a player on a cell border doesn't keep resubscribing.
+- **Switching cells.** A subscription director per tier holds one subscription per cell, subscribes to new cells before dropping old ones, and moves the window only once the player is 8 m past its centre cell, so a player on a border doesn't keep resubscribing (docs/design/interest.md).
 - **Hot and cold tables are separate.** Write rows only when something changed, using small types.
 - **Movement reaches other players in batches** (ADR 0011). `move_event` updates the private `presence` row; `world_tick` copies every moved position into `transform` in one transaction. Each observer gets one message per tick instead of one per move. Clients ask for Gzip compression. Measured in M0 spike 2 (docs/spikes/mass-fight.md): a 150-player crowd costs each client about 19 KB/s, and 500 all in view about 44 KB/s.
 - **Next lever for siege-sized crowds:** publish the outer ring of the Near tier at 2 Hz from a second table, so clients subscribe to the inner 3×3 cells at full rate and the outer 16 at a lower one. Build it when M3's large battles need it.

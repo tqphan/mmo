@@ -1,8 +1,8 @@
 //! `loadbot swarm`: many bots at once, for the throughput spike (docs/spikes/throughput.md).
 //!
 //! Every bot has its own connection, and all of them run as tasks on one tokio runtime. Each
-//! teleports to a random spot in a square, then runs about with heartbeats, keeping a Near-tier
-//! subscription around its cell. A share of them are "in combat": they move twice as often and
+//! teleports to a random spot in a square, then runs about with heartbeats, its Near tier kept
+//! around it by a `Director`. A share of them are "in combat": they move twice as often and
 //! swing at the nearest bot in reach once a second, using the dev-only stand-in for combat.
 
 use std::collections::HashMap;
@@ -10,9 +10,10 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::SeqCst};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use spacetimedb_sdk::{Compression, DbContext, EventTable as _, SubscriptionHandle as _, Table};
+use spacetimedb_sdk::{Compression, DbContext, EventTable as _, Table};
 
 use crate::module_bindings::*;
+use crate::director::Director;
 use crate::{Args, Check, RUN_SPEED, metrics, name_for};
 
 pub struct SwarmArgs {
@@ -82,20 +83,8 @@ async fn wait_until(what: &str, mut cond: impl FnMut() -> bool) -> Check {
     Err(format!("timed out waiting for {what}"))
 }
 
-/// Our private views, names, and the Near tier around `cell` including combat events there.
-fn near_queries(cell: u64) -> Vec<String> {
-    let mut q = vec![
-        "SELECT * FROM my_characters".to_string(),
-        "SELECT * FROM my_presence".to_string(),
-        "SELECT * FROM character_public".to_string(),
-    ];
-    for c in sim::cell::window_cells(cell, 2) {
-        for table in ["entity", "transform", "combat_event"] {
-            q.push(format!("SELECT * FROM {table} WHERE cell = {c}"));
-        }
-    }
-    q
-}
+/// The Near tier's tables, including combat events (PLAN §4.3).
+const NEAR_TABLES: &[&str] = &["entity", "transform", "combat_event"];
 
 /// Records the call-to-completion time of a reducer called now, if we're measuring.
 fn timer(shared: &Arc<Shared>) -> impl FnOnce(bool) + Send + 'static {
@@ -133,11 +122,9 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
     // Arrive, with only our own rows subscribed for now.
     let applied = Arc::new(AtomicBool::new(false));
     let flag = applied.clone();
-    let mut sub = Some(
-        conn.subscription_builder()
-            .on_applied(move |_| flag.store(true, SeqCst))
-            .subscribe(["SELECT * FROM my_characters", "SELECT * FROM my_presence"]),
-    );
+    conn.subscription_builder()
+        .on_applied(move |_| flag.store(true, SeqCst))
+        .subscribe(["SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public"]);
     wait_until("own subscription", || applied.load(SeqCst)).await?;
     conn.reducers.create_character(name_for(conn.identity())).map_err(|e| e.to_string())?;
     wait_until("character", || conn.db.my_characters().count() > 0).await?;
@@ -155,27 +142,9 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
         .map_err(|e| e.to_string())?;
     wait_until("teleport", || teleported.load(SeqCst)).await?;
 
-    // The Near tier around us; moved along whenever we change cell.
-    let mut sub_cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
-    let resubscribe = |cell: u64, old: Option<SubscriptionHandle>| {
-        let done = Arc::new(AtomicBool::new(false));
-        let flag = done.clone();
-        let handle = conn
-            .subscription_builder()
-            .on_applied(move |_| {
-                // Subscribe to the new window before dropping the old one (PLAN §4.3).
-                if let Some(old) = old {
-                    let _ = old.unsubscribe();
-                }
-                flag.store(true, SeqCst);
-            })
-            .on_error(|_, e| eprintln!("subscription error: {e}"))
-            .subscribe(near_queries(cell));
-        (handle, done)
-    };
-    let (handle, done) = resubscribe(sub_cell, sub.take());
-    sub = Some(handle);
-    wait_until("Near tier", || done.load(SeqCst)).await?;
+    let near = Director::new(NEAR_TABLES, 2);
+    near.update(&conn, x, z);
+    wait_until("Near tier", || near.ready()).await?;
     {
         let shared = shared.clone();
         conn.db.combat_event().on_insert(move |_, _| {
@@ -218,11 +187,7 @@ async fn run_bot(i: usize, args: Arc<Args>, sw: Arc<SwarmArgs>, shared: Arc<Shar
             .move_event_then(seq, x, 0.0, z, yaw, (RUN_SPEED * 100.0) as i16, 1, move |_, r| done(matches!(r, Ok(Ok(())))))
             .map_err(|e| e.to_string())?;
 
-        let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
-        if cell != sub_cell {
-            let (handle, _) = resubscribe(cell, sub.take());
-            sub = Some(handle);
-            sub_cell = cell;
+        if near.update(&conn, x, z) {
             shared.resubscribes.fetch_add(1, SeqCst);
         }
 
@@ -381,7 +346,7 @@ pub fn swarm(args: Args, sw: SwarmArgs) -> Check {
     }
     println!("loadbot CPU {}, RSS {}", cpu(&a.us, &b.us), mb(&b.us));
     println!(
-        "swings {}, combat events seen {}, resubscribes {}, reducer errors {}, corrections {corrections}",
+        "swings {}, combat events seen {}, window moves {}, reducer errors {}, corrections {corrections}",
         shared.swings.load(SeqCst),
         shared.combat_events_seen.load(SeqCst),
         shared.resubscribes.load(SeqCst),

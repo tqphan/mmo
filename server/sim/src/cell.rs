@@ -8,6 +8,10 @@ pub const WORLD_SIZE_M: f32 = 16_000.0;
 pub const WORLD_HALF_M: f32 = WORLD_SIZE_M / 2.0;
 pub const CELLS_PER_SIDE: u16 = 250;
 
+/// How far past the edge of its centre cell a player may go before a subscription window follows.
+/// Walking along a border then costs nothing (PLAN §4.3, docs/design/interest.md).
+pub const HYSTERESIS_M: f32 = 8.0;
+
 /// The open world. Dungeons, arenas, the prison and so on get their own instance ids.
 pub const OPEN_WORLD: u32 = 0;
 
@@ -54,6 +58,18 @@ pub fn window_rows(center: u64, radius: u16) -> Vec<(u64, u64)> {
 /// change, but checks range queries against every change (docs/spikes/throughput.md).
 pub fn window_cells(center: u64, radius: u16) -> Vec<u64> {
     window_rows(center, radius).into_iter().flat_map(|(lo, hi)| lo..=hi).collect()
+}
+
+/// Where a window now centred on `center` should be centred for a player at `(x, z)`: the same
+/// cell until the player is more than `margin_m` outside it, then the cell the player is in.
+/// Non-finite positions leave the window where it is.
+pub fn recenter(center: u64, x: f32, z: f32, margin_m: f32) -> u64 {
+    let (instance, cy, cx) = unpack(center);
+    let near = |coord: f32, i: u16| {
+        let lo = i as f32 * CELL_SIZE_M - WORLD_HALF_M;
+        (lo - margin_m..lo + CELL_SIZE_M + margin_m).contains(&coord)
+    };
+    if !x.is_finite() || !z.is_finite() || near(x, cx) && near(z, cy) { center } else { cell_of(instance, x, z) }
 }
 
 #[cfg(test)]
@@ -111,5 +127,40 @@ mod tests {
         assert_eq!(cells[24], pack(0, 102, 102));
         assert!(cells.contains(&pack(0, 100, 100)));
         assert_eq!(window_cells(pack(0, 0, 0), 2).len(), 9);
+    }
+
+    #[test]
+    fn recenter_waits_for_the_margin() {
+        let c = cell_of(OPEN_WORLD, 32.0, 32.0); // the cell spanning [0, 64) on both axes
+        assert_eq!(recenter(c, 70.0, 32.0, HYSTERESIS_M), c);
+        assert_eq!(recenter(c, -7.9, 71.9, HYSTERESIS_M), c);
+        assert_eq!(recenter(c, 72.1, 32.0, HYSTERESIS_M), c + 1);
+        assert_eq!(recenter(c, -8.1, 32.0, HYSTERESIS_M), c - 1);
+        assert_eq!(unpack(recenter(c, 80.0, 80.0, HYSTERESIS_M)), (0, 126, 126));
+    }
+
+    #[test]
+    fn recenter_does_not_flap_on_a_border() {
+        // Zigzagging ±6 m across x = 64 for a while never moves the window.
+        let c = cell_of(OPEN_WORLD, 32.0, 32.0);
+        for i in 0..100 {
+            let x = 64.0 + if i % 2 == 0 { 6.0 } else { -6.0 };
+            assert_eq!(recenter(c, x, 32.0, HYSTERESIS_M), c);
+        }
+        // Once past the margin it moves, and coming back over the border doesn't move it back.
+        let next = recenter(c, 73.0, 32.0, HYSTERESIS_M);
+        assert_eq!(next, c + 1);
+        assert_eq!(recenter(next, 58.0, 32.0, HYSTERESIS_M), next);
+    }
+
+    #[test]
+    fn recenter_keeps_the_instance_and_ignores_bad_input() {
+        let c = cell_of(9, 0.0, 0.0);
+        assert_eq!(unpack(recenter(c, 200.0, 0.0, HYSTERESIS_M)).0, 9);
+        assert_eq!(recenter(c, f32::NAN, 0.0, HYSTERESIS_M), c);
+        assert_eq!(recenter(c, 0.0, f32::INFINITY, HYSTERESIS_M), c);
+        // Off the map the window stays on the edge cell.
+        let edge = cell_of(0, WORLD_HALF_M - 1.0, 0.0);
+        assert_eq!(recenter(edge, 1.0e6, 0.0, HYSTERESIS_M), edge);
     }
 }
