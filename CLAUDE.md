@@ -51,7 +51,7 @@ Run these from the repo root. They work on Linux and Windows (ADR 0008).
 - `cargo xtask generate`: regenerate bindings (Rust → `sidecars/loadbot/src/module_bindings`, C# → `client/net`). Run after any schema or reducer change.
 - `cargo xtask bot <scenario>`: run a loadbot scenario against the local server (`cargo xtask bot metrics` prints server timings)
 - `cargo xtask check`: test, then publish with `--clear` and run every scenario (needs `server` running)
-- Not yet: run the client, capture frames (needs Godot; BACKLOG 1).
+- Not yet: run the client, capture frames (BACKLOG 6, the client skeleton).
 
 Gotchas:
 - `spacetime call` connects and disconnects around each call, and disconnecting despawns the character. Use loadbot for anything that needs a session.
@@ -60,9 +60,10 @@ Gotchas:
 
 ## Environment (checked 2026-10-25)
 Development happens on two machines, so keep everything cross-platform (ADR 0008). Details are in `docs/STATUS.md`.
-- **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 in `~/.local/bin` (not on PATH; the xtask finds it). No .NET, Godot or Blender.
+- **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 and Godot 4.7.2 .NET in `~/.local/bin` (not on PATH; the xtask finds them). .NET SDKs from pacman. No Blender.
 - **Windows PC:** Rust 1.90 (needs the wasm32 target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI 1.10 (needs upgrading to 2.13.0). No Godot or Blender.
 
 ## Standing approvals
 - 2026-10-25: Claude may commit **and push** to `main` after each finished task without asking (ADR 0005).
-- 2026-10-25: installing the Rust wasm target and the SpacetimeDB CLI on the Linux machine. Client tooling (.NET, Godot) is **not** approved yet.
+- 2026-10-25: installing the Rust wasm target and the SpacetimeDB CLI on the Linux machine.
+- 2026-10-25: installing the client toolchain on the Linux machine: Godot 4.7.x .NET (into `~/.local`) and the .NET 8 and 10 SDKs (pacman; needs the user's sudo password).

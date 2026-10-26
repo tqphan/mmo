@@ -84,6 +84,22 @@ fn spacetime() -> Command {
     Command::new(default.filter(|p| p.is_file()).unwrap_or_else(|| exe.into()))
 }
 
+/// Put a per-user .NET install (`$DOTNET_ROOT`, else `~/.dotnet`) on `cmd`'s PATH, so tools that
+/// run `dotnet` themselves find it. A system-wide install is already on PATH.
+fn with_dotnet(cmd: &mut Command) -> &mut Command {
+    let exe = if cfg!(windows) { "dotnet.exe" } else { "dotnet" };
+    let root = std::env::var_os("DOTNET_ROOT")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".dotnet")))
+        .filter(|d| d.join(exe).is_file());
+    if let Some(root) = root {
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let paths = std::iter::once(root.clone()).chain(std::env::split_paths(&path));
+        cmd.env("DOTNET_ROOT", &root).env("PATH", std::env::join_paths(paths).unwrap());
+    }
+    cmd.env("DOTNET_CLI_TELEMETRY_OPTOUT", "1").env("DOTNET_NOLOGO", "1")
+}
+
 fn test() -> Task {
     run(cargo().args(["test", "--workspace", "--features", "world/dev"]))?;
     for features in [&["--features", "world/dev"][..], &[]] {
@@ -120,7 +136,9 @@ fn generate() -> Task {
     build(false)?;
     run(spacetime().args(["generate", "--lang", "rust", "--out-dir", "sidecars/loadbot/src/module_bindings"])
         .args(["--bin-path", WASM, "--yes"]))?;
-    run(spacetime().args(["generate", "--lang", "csharp", "--out-dir", "client/net"]).args(["--bin-path", WASM, "--yes"]))
+    run(with_dotnet(&mut spacetime())
+        .args(["generate", "--lang", "csharp", "--out-dir", "client/net"])
+        .args(["--bin-path", WASM, "--yes"]))
 }
 
 fn bot(scenario: &str) -> Task {
