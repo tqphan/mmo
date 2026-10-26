@@ -19,3 +19,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0013](0013-server-terrain-lenient-checks.md) | Server terrain: 2 m `u16` chunks per cell; checks take the kinder of both triangulations | Accepted |
 | [0014](0014-ships-and-moving-decks.md) | Ships are stepped by the server; passengers move in the ship's frame | Accepted |
 | [0015](0015-remote-entities-interpolate-then-dead-reckon.md) | Other entities are drawn 200 ms back, interpolated, then dead-reckoned | Accepted |
+| [0016](0016-assets-inside-the-godot-project.md) | Third-party and generated assets live in `client/assets/`; the ledger stays in `assets/` | Accepted |

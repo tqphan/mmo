@@ -254,7 +254,7 @@ mmo/
 │   ├── world/       world bible: our names, races, factions, lore, map
 │   └── playtests/   notes from each playtest
 ├── content/         game data source of truth (items, skills, recipes, NPCs, quests, routes)
-├── assets/          third-party and generated assets + LEDGER.md (source, author, license)
+├── assets/          LEDGER.md (source, author, license); the files are in client/assets/ (ADR 0016)
 ├── Cargo.toml       Cargo workspace for server/, sidecars/ and xtask/ (ADR 0008)
 ├── xtask/           dev tasks: `cargo xtask help`
 ├── server/
@@ -266,6 +266,7 @@ mmo/
 │   └── loadbot/     headless bots for load and scenario tests
 ├── client/          Godot 4.7 .NET project
 │   ├── addons/      Terrain3D, …
+│   ├── assets/      third-party and generated assets, by source
 │   ├── net/         generated bindings (spacetime generate --lang csharp)
 │   ├── content/     generated game data (contentgen)
 │   └── src/         Net · World · Gameplay · Presentation · UI

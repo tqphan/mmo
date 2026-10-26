@@ -27,6 +27,12 @@ namespace Mmo
                 return;
             }
             AddInputActions();
+            if (options.StyleTest != null)
+            {
+                GetWindow().Title = $"mmo — style test ({options.StyleTest})";
+                AddChild(new Presentation.StyleTest(options));
+                return;
+            }
             GetWindow().Title = $"mmo — {options.Profile}";
 
             var session = new Session(options);

@@ -156,11 +156,9 @@ fn client_test() -> Task {
     run(with_dotnet(&mut Command::new("dotnet")).args(["test", "--nologo", "-v", "quiet", "client/tests/Mmo.Tests.csproj"]))
 }
 
-/// Godot imports a project's assets the first time it opens it; do that headless before a run.
+/// Import new and changed assets headless before a run; a run doesn't import them itself. About 2 s
+/// when nothing changed.
 fn client_import() -> Task {
-    if Path::new("client/.godot/imported").is_dir() {
-        return Ok(());
-    }
     run(godot().args(["--headless", "--path", "client", "--import"]))
 }
 

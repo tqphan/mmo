@@ -14,6 +14,9 @@ namespace Mmo
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
     /// <item><c>--test-cheat</c>: 3 s after entering, jump 30 m in one frame, to check that the server's correction snaps us back.</item>
+    /// <item><c>--style-test flat|gradient</c>: show the offline art style test scene instead of connecting (docs/design/art.md).</item>
+    /// <item><c>--outline</c>: in the style test, outline the characters.</item>
+    /// <item><c>--shot follow|wide</c>: in the style test, orbit the walking character or the whole island.</item>
     /// </list>
     /// </summary>
     public sealed class ClientOptions
@@ -26,6 +29,9 @@ namespace Mmo
         public float CamYawDeg;
         public bool Trace;
         public bool TestCheat;
+        public string? StyleTest;
+        public bool Outline;
+        public string Shot = "follow";
 
         /// <summary>The profile as a legal character name: 3–16 letters, capitalised.</summary>
         public string CharacterName
@@ -55,11 +61,17 @@ namespace Mmo
                     case "--walk": o.Walk = true; break;
                     case "--trace": o.Trace = true; break;
                     case "--test-cheat": o.TestCheat = true; break;
+                    case "--style-test": o.StyleTest = OneOf(Next(), "flat", "gradient"); break;
+                    case "--outline": o.Outline = true; break;
+                    case "--shot": o.Shot = OneOf(Next(), "follow", "wide"); break;
                     case "--cam-yaw": o.CamYawDeg = float.Parse(Next(), CultureInfo.InvariantCulture); break;
                     default: throw new ArgumentException($"unknown option {args[i]}");
                 }
             }
             return o;
         }
+
+        private static string OneOf(string value, params string[] allowed) =>
+            Array.IndexOf(allowed, value) >= 0 ? value : throw new ArgumentException($"{value} is not one of {string.Join(", ", allowed)}");
     }
 }

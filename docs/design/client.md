@@ -22,6 +22,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
   - `World/`: `EntityRegistry`, `RemoteView`, `SnapshotBuffer`, placeholder meshes.
   - `Gameplay/`: `PlayerController`, `MoveSender`, `FollowCamera`, `Autopilot`.
   - `UI/`: the debug HUD.
+  - `Presentation/`: the art style test scene and the pieces it's built from (docs/design/art.md).
 - The scene tree is built in code by `src/Main.cs` from a one-node `main.tscn`. Scenes as files come with real art.
 - Files under `Sim/`, `Net/SubscriptionDirector.cs`, `World/SnapshotBuffer.cs`, `Gameplay/MoveSender.cs` and `Gameplay/Autopilot.cs` don't use Godot, so the xUnit project in `tests/` compiles and tests them directly.
 
@@ -53,6 +54,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--cam-yaw DEG` | Starting camera yaw, 0 looking north (-z) |
 | `--trace` | Log where each other entity is drawn every frame, to measure smoothness |
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
+| `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |
 
 Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump.
 

@@ -8,7 +8,7 @@ namespace Mmo
         public static double Now => Time.GetTicksUsec() / 1_000_000.0;
     }
 
-    /// <summary>Placeholder meshes until the art style test (BACKLOG).</summary>
+    /// <summary>Placeholder meshes until the look is chosen (ADR 0004) and characters get models.</summary>
     public static class Views
     {
         /// <summary>A capsule standing on its origin, with a nose pointing along its facing (-z).</summary>

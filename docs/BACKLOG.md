@@ -4,9 +4,8 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 
 ## M0: Foundations and risk spikes
 
-1. **Art style test scene**
-   Stylized terrain, water, and a CC0 character walking (ADR 0004).
-   *Done when:* the user has reviewed captures and decided flat low-poly vs hand-painted.
+1. **[needs OK] Choose the art look.** The style test scene is built (docs/design/art.md); captures are in `docs/captures/2026-10-26-style-*.png`.
+   *Done when:* the user has picked flat or gradient low-poly (or hand-painted), outlines or not, and whether KayKit's chibi proportions suit the characters. Record it in ADR 0004.
 
 2. **Spike 4: world scale**: a 16 km Terrain3D map with water and streaming, within budget at mid-range settings.
 3. **World exporter v0**: Godot plugin → heightmap as a `.mmoh` file (docs/design/terrain.md) and a land-use raster → uploaded as an admin. Production uploads need the publisher's identity (the owner), since `dev_set_gm` is dev-only.
@@ -36,3 +35,4 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 - 2026-10-25 **Spike 5: server-side terrain**: private `terrain_chunk` (2 m `u16` heightmap, 33 × 33 per cell), admin upload from `.mmoh` files, vertical checks anchored to the last footing and line of sight in `sim`, both taking the kinder triangulation (ADR 0013); `terrain` scenario, 30 minutes with 16 bots and zero false corrections (docs/design/terrain.md).
 - 2026-10-26 **Godot client skeleton**: `client/` project; `Session` (Gzip, per-profile token, create, enter with the content hash); predicted player with movement events and snapping on corrections; C# subscription director; remote capsules drawn 200 ms back, interpolated then dead-reckoned (ADR 0015); HUD, autopilot, `cargo xtask client` and `capture`; golden vectors from `sim`; 27 xUnit tests; `bot visitor`. Two windows and a bot saw each other with zero corrections; frames in `docs/captures/` (docs/design/client.md).
 - 2026-10-26 **Spike 3: ship and moving deck**: `content/ships.toml` hulls, `sim::ship` (poses, step, draft, cannon flight), ships stepped in `world_tick` and published at 5 Hz, passengers in the ship's frame, helm and cannons with scheduled impacts (ADR 0014); `ship` scenario with zero false corrections, 8 of 8 shots hitting, cheats caught (docs/design/ships.md).
+- 2026-10-26 **Art style test scene**: offline `--style-test flat|gradient` scene with a procedural island on the 2 m grid, Gerstner water with depth colour and shore foam, procedural trees and rocks, and KayKit Adventurers (CC0) walking, running and idling; `--outline`, `--shot follow|wide`; assets in `client/assets/` with the xtask importing before each run (ADR 0016); captures in `docs/captures/` (docs/design/art.md). The decision itself is task 1.
