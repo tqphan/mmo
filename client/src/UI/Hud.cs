@@ -7,7 +7,7 @@ using Mmo.World;
 
 namespace Mmo.UI
 {
-    /// <summary>A debug readout: connection, position, labor, land use, cell window, entities in view, corrections, and the ship we're on or next to.</summary>
+    /// <summary>A debug readout: connection, position, labor, land use, cell windows, entities in view, corrections, the ship we're on or next to, and resource nodes in reach.</summary>
     public partial class Hud : CanvasLayer
     {
         private readonly Session session;
@@ -15,10 +15,12 @@ namespace Mmo.UI
         private readonly EntityRegistry entities;
         private readonly LandRaster? land;
         private readonly ShipControls controls;
+        private readonly Gathering gathering;
         private readonly Label label = new();
 
-        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls)
+        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls, Gathering gathering)
         {
+            this.gathering = gathering;
             this.controls = controls;
             this.session = session;
             this.player = player;
@@ -57,9 +59,13 @@ namespace Mmo.UI
                 var (_, cy, cx) = Sim.Cell.Unpack(c);
                 text += $"\nnear window ({cx}, {cy})  cells {near.HeldCount}/{near.WantedCount}{(near.Ready ? "" : " loading")}  moved {near.Recenters}x";
             }
+            if (session.Static is { } st && st.Center is not null)
+                text += $"\nstatic cells {st.HeldCount}/{st.WantedCount}{(st.Ready ? "" : " loading")}";
             text += $"\nin view {entities.Count}  {Engine.GetFramesPerSecond():F0} fps";
             if (controls.Prompt.Length > 0)
                 text += "\n" + controls.Prompt;
+            if (gathering.Prompt.Length > 0)
+                text += "\n" + gathering.Prompt;
             label.Text = text;
         }
 

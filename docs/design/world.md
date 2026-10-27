@@ -19,6 +19,7 @@ Only what players see matters: where building is allowed, which climate a farm i
 ### The world's files are the source
 - The world lives in the repo under `world/`, as files our own tool writes: `tools/worldtool` (`cargo run -p worldtool`). For now its generator writes them (the placeholder map from docs/design/worldstream.md). Editor tooling will later edit the same files, and from then on the files, not the generator, are the source of truth. Regenerating would overwrite hand edits.
 - `world/world.toml` is the manifest: the format version, the region size, and the **terrain hash** of the heights (below). `worldtool` writes it, and nobody edits it by hand.
+- `world/nodes.tsv`: resource node placements, one per line (docs/design/gathering.md). `worldtool gen` writes it after the regions, and `worldtool nodes` rewrites it alone from the regions there. It isn't part of the terrain hash, since clients take nodes from the server.
 - `world/regions/x{RX}z{RZ}.mmor`: **625 regions** of 10 × 10 cells (640 m), 25 along each side. Small regions keep an edit's diff small. The whole placeholder world is about 9 MB, against 128 MB raw.
 
 ### Region file (`.mmor`, version 1, little-endian)
@@ -61,7 +62,7 @@ At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 
 ### Uploading
 - `cargo xtask world` uploads `world/` to the local server through `loadbot world-upload`, with the **publisher's identity**: the xtask reads the SpacetimeDB CLI's token (`spacetime login show --token`) and passes it to loadbot in `MMO_ADMIN_TOKEN`. The publisher is always an admin (`owner`, docs/design/terrain.md), so this also works on `--prod` builds, which have no `dev_set_gm`. Without the variable, loadbot falls back to a fresh identity and `dev_set_gm` (dev builds only).
-- After uploading, `world-upload` checks that the server's `terrain_info` hash equals the manifest's.
+- After uploading, `world-upload` checks that the server's `terrain_info` hash equals the manifest's. Then it replaces every resource node with `world/nodes.tsv` (`admin_clear_nodes`, then `admin_put_nodes` in batches of 1,000) and checks the count. That resets every node to ready.
 - `cargo xtask world --gen` regenerates `world/` first. The result should be committed.
 - Land use isn't uploaded yet: nothing on the server reads it until housing and farming (M2). It comes with them, as a private table keyed by cell like `terrain_chunk`, with its own hash.
 

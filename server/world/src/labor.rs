@@ -39,9 +39,14 @@ pub fn open(ctx: &ReducerContext, who: Identity) {
     }
 }
 
+/// What `who`'s pool holds as of now, without writing it.
+pub fn available(ctx: &ReducerContext, who: Identity) -> Result<i32, String> {
+    let row = ctx.db.labor().identity().find(who).ok_or("no labor pool")?;
+    Ok(row.pool().current(&LABOR, now(ctx).to_micros_since_unix_epoch()))
+}
+
 /// Take `cost` off `who`'s pool as of now, for work done in the same transaction. Returns what's
 /// left; on `Err` nothing changes.
-#[cfg_attr(not(feature = "dev"), allow(dead_code))] // only dev reducers spend until gathering (M1 task 3)
 pub fn spend(ctx: &ReducerContext, who: Identity, cost: i32) -> Result<i32, String> {
     let row = ctx.db.labor().identity().find(who).ok_or("no labor pool")?;
     let t = now(ctx).to_micros_since_unix_epoch();

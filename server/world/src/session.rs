@@ -305,6 +305,7 @@ fn despawn(ctx: &ReducerContext, who: Identity) {
     let Some(p) = ctx.db.presence().identity().find(who) else { return };
     let [x, y, z] = crate::ship::world_position(ctx, &p);
     crate::ship::let_go(ctx, p.parent, p.entity_id);
+    crate::gathering::cancel(ctx, p.char_id);
     if let Some(c) = ctx.db.character_private().char_id().find(p.char_id) {
         ctx.db.character_private().char_id().update(CharacterPrivate { x, y, z, ..c });
     }

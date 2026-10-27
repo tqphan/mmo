@@ -7,8 +7,12 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod account_type;
+pub mod admin_clear_nodes_reducer;
 pub mod admin_clear_terrain_reducer;
+pub mod admin_put_nodes_reducer;
 pub mod admin_put_terrain_reducer;
+pub mod admin_remove_nodes_reducer;
+pub mod cancel_gather_reducer;
 pub mod cannon_shot_type;
 pub mod character_private_type;
 pub mod character_public_table;
@@ -33,6 +37,8 @@ pub mod entity_type;
 pub mod fire_reducer;
 pub mod game_clock_table;
 pub mod game_clock_type;
+pub mod gather_job_type;
+pub mod gather_reducer;
 pub mod helm_reducer;
 pub mod item_type;
 pub mod labor_type;
@@ -45,8 +51,11 @@ pub mod my_characters_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
 pub mod my_presence_table;
+pub mod node_placement_type;
 pub mod owner_type;
 pub mod presence_type;
+pub mod resource_node_table;
+pub mod resource_node_type;
 pub mod ship_motion_type;
 pub mod split_item_reducer;
 pub mod suspicion_type;
@@ -62,8 +71,12 @@ pub mod vehicle_type;
 pub mod world_tick_timer_type;
 
 pub use account_type::Account;
+pub use admin_clear_nodes_reducer::admin_clear_nodes;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
+pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_terrain_reducer::admin_put_terrain;
+pub use admin_remove_nodes_reducer::admin_remove_nodes;
+pub use cancel_gather_reducer::cancel_gather;
 pub use cannon_shot_type::CannonShot;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
@@ -88,6 +101,8 @@ pub use entity_type::Entity;
 pub use fire_reducer::fire;
 pub use game_clock_table::*;
 pub use game_clock_type::GameClock;
+pub use gather_job_type::GatherJob;
+pub use gather_reducer::gather;
 pub use helm_reducer::helm;
 pub use item_type::Item;
 pub use labor_type::Labor;
@@ -100,8 +115,11 @@ pub use my_characters_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
 pub use my_presence_table::*;
+pub use node_placement_type::NodePlacement;
 pub use owner_type::Owner;
 pub use presence_type::Presence;
+pub use resource_node_table::*;
+pub use resource_node_type::ResourceNode;
 pub use ship_motion_type::ShipMotion;
 pub use split_item_reducer::split_item;
 pub use suspicion_type::Suspicion;
@@ -124,10 +142,18 @@ pub use world_tick_timer_type::WorldTickTimer;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
+    AdminClearNodes,
     AdminClearTerrain,
+    AdminPutNodes {
+        nodes: Vec<NodePlacement>,
+    },
     AdminPutTerrain {
         chunks: Vec<TerrainChunk>,
     },
+    AdminRemoveNodes {
+        ids: Vec<u64>,
+    },
+    CancelGather,
     CreateCharacter {
         name: String,
     },
@@ -177,6 +203,9 @@ pub enum Reducer {
         yaw: f32,
         pitch: f32,
     },
+    Gather {
+        node_id: u64,
+    },
     Helm {
         throttle: i8,
         rudder: i8,
@@ -212,8 +241,12 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
+            Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
+            Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
+            Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
+            Reducer::CancelGather => "cancel_gather",
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
@@ -227,6 +260,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevTeleport { .. } => "dev_teleport",
             Reducer::EnterWorld { .. } => "enter_world",
             Reducer::Fire { .. } => "fire",
+            Reducer::Gather { .. } => "gather",
             Reducer::Helm { .. } => "helm",
             Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
@@ -240,13 +274,29 @@ impl __sdk::Reducer for Reducer {
     #[allow(clippy::clone_on_copy)]
     fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
+            Reducer::AdminClearNodes => {
+                __sats::bsatn::to_vec(&admin_clear_nodes_reducer::AdminClearNodesArgs {})
+            }
             Reducer::AdminClearTerrain => {
                 __sats::bsatn::to_vec(&admin_clear_terrain_reducer::AdminClearTerrainArgs {})
+            }
+            Reducer::AdminPutNodes { nodes } => {
+                __sats::bsatn::to_vec(&admin_put_nodes_reducer::AdminPutNodesArgs {
+                    nodes: nodes.clone(),
+                })
             }
             Reducer::AdminPutTerrain { chunks } => {
                 __sats::bsatn::to_vec(&admin_put_terrain_reducer::AdminPutTerrainArgs {
                     chunks: chunks.clone(),
                 })
+            }
+            Reducer::AdminRemoveNodes { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_nodes_reducer::AdminRemoveNodesArgs {
+                    ids: ids.clone(),
+                })
+            }
+            Reducer::CancelGather => {
+                __sats::bsatn::to_vec(&cancel_gather_reducer::CancelGatherArgs {})
             }
             Reducer::CreateCharacter { name } => {
                 __sats::bsatn::to_vec(&create_character_reducer::CreateCharacterArgs {
@@ -323,6 +373,9 @@ impl __sdk::Reducer for Reducer {
                 yaw: yaw.clone(),
                 pitch: pitch.clone(),
             }),
+            Reducer::Gather { node_id } => __sats::bsatn::to_vec(&gather_reducer::GatherArgs {
+                node_id: node_id.clone(),
+            }),
             Reducer::Helm { throttle, rudder } => __sats::bsatn::to_vec(&helm_reducer::HelmArgs {
                 throttle: throttle.clone(),
                 rudder: rudder.clone(),
@@ -382,6 +435,7 @@ pub struct DbUpdate {
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_presence: __sdk::TableUpdate<Presence>,
+    resource_node: __sdk::TableUpdate<ResourceNode>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
     transform: __sdk::TableUpdate<Transform>,
     vehicle: __sdk::TableUpdate<Vehicle>,
@@ -420,6 +474,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
+                "resource_node" => db_update
+                    .resource_node
+                    .append(resource_node_table::parse_table_update(table_update)?),
                 "terrain_info" => db_update
                     .terrain_info
                     .append(terrain_info_table::parse_table_update(table_update)?),
@@ -464,6 +521,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.game_clock = cache
             .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
+            .with_updates_by_pk(|row| &row.id);
+        diff.resource_node = cache
+            .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
             .with_updates_by_pk(|row| &row.id);
         diff.terrain_info = cache
             .apply_diff_to_table::<TerrainInfo>("terrain_info", &self.terrain_info)
@@ -514,6 +574,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "resource_node" => db_update
+                    .resource_node
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -563,6 +626,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "resource_node" => db_update
+                    .resource_node
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -596,6 +662,7 @@ pub struct AppliedDiff<'r> {
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
+    resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
     vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
@@ -633,6 +700,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
+        callbacks.invoke_table_row_callbacks::<ResourceNode>(
+            "resource_node",
+            &self.resource_node,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
             "terrain_info",
             &self.terrain_info,
@@ -1309,6 +1381,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
+        resource_node_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
         transform_table::register_table(client_cache);
         vehicle_table::register_table(client_cache);
@@ -1323,6 +1396,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_inventory",
         "my_labor",
         "my_presence",
+        "resource_node",
         "terrain_info",
         "transform",
         "vehicle",

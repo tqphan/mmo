@@ -18,7 +18,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use sim::terrain::{Diagonal, HeightFile, quad};
-use spacetimedb_sdk::DbContext;
+use spacetimedb_sdk::{DbContext, Table};
 
 use crate::module_bindings::*;
 use crate::swarm::Rng;
@@ -172,7 +172,8 @@ pub fn upload_file(args: &Args, ta: &TerrainArgs) -> Check {
 }
 
 /// `loadbot world-upload [--world DIR]`: replace the server's terrain with the world's, then check
-/// that the server's terrain hash is the manifest's.
+/// that the server's terrain hash is the manifest's; then replace its resource nodes with the
+/// world's (docs/design/gathering.md) and check they all arrived.
 pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     let started = Instant::now();
     let world = worldtool::World::load(std::path::Path::new(&ta.world))?;
@@ -186,7 +187,41 @@ pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     wait_for("the server's terrain hash", || got().hash == want)
         .map_err(|_| format!("the server's terrain hash is {:016x} over {} chunks, expected {want:016x}", got().hash, got().chunks))?;
     println!("the server's terrain hash matches: {want:016x} over {} chunks", got().chunks);
+    upload_nodes(&admin, &worldtool::nodes::load(std::path::Path::new(&ta.world))?)?;
     admin.conn.disconnect().map_err(|e| e.to_string())
+}
+
+/// Nodes per `admin_put_nodes` call.
+const NODE_BATCH: usize = 1000;
+
+/// Replace every resource node on the server with `nodes`, and check the count.
+fn upload_nodes(admin: &Bot, nodes: &[worldtool::nodes::Placement]) -> Check {
+    let started = Instant::now();
+    outcome(|tx| admin.conn.reducers.admin_clear_nodes_then(move |_, r| drop(tx.send(flatten(r)))))?;
+    let rows: Vec<NodePlacement> = nodes
+        .iter()
+        .map(|n| NodePlacement { kind: n.kind.wire, x: n.x, y: n.y, z: n.z, yaw: sim::ship::yaw_to_u16(f32::from(n.yaw_deg).to_radians()) })
+        .collect();
+    for batch in rows.chunks(NODE_BATCH) {
+        let batch = batch.to_vec();
+        outcome(|tx| admin.conn.reducers.admin_put_nodes_then(batch, move |_, r| drop(tx.send(flatten(r)))))?;
+    }
+    let (tx, rx) = mpsc::channel();
+    admin
+        .conn
+        .subscription_builder()
+        .on_applied(move |_| {
+            let _ = tx.send(());
+        })
+        .on_error(|_, e| eprintln!("subscription error: {e}"))
+        .subscribe(["SELECT * FROM resource_node"]);
+    rx.recv_timeout(WAIT).map_err(|_| "no reply to the node subscription".to_string())?;
+    let got = admin.conn.db.resource_node().count() as usize;
+    if got != nodes.len() {
+        return Err(format!("the server has {got} resource nodes, expected {}", nodes.len()));
+    }
+    println!("uploaded {got} resource nodes in {:.1} s", started.elapsed().as_secs_f32());
+    Ok(())
 }
 
 /// What the walkers did, added up.

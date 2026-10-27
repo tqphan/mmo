@@ -51,7 +51,9 @@ pub fn generate() -> String {
          # ship_sail <hull> <throttle> <rudder> <10 Hz steps from rest at the origin> <x> <z> <yaw> <speed>\n\
          # cannon_flight <x> <y> <z> <yaw> <pitch> <speed> <secs> <landing x> <landing z>, or none\n\
          # labor <points> <at> <now> <settled points> <settled at> <next regen at, or none>, with the content rules\n\
-         # labor_spend <points> <at> <now> <cost> <points> <at>, or short <have>\n",
+         # labor_spend <points> <at> <now> <cost> <points> <at>, or short <have>\n\
+         # gather_reach <node x> <y> <z> <at x> <y> <z> <in reach: 1 or 0>\n\
+         # gather_progress <node wire> <done at> <now> <progress>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -144,7 +146,29 @@ pub fn generate() -> String {
     out.push_str(&format!("terrain_hash {total}\n"));
     ships(&mut out, &mut rng);
     labor(&mut out, &mut rng);
+    gather(&mut out, &mut rng);
     out
+}
+
+/// `sim::gather`'s reach and progress, for the client's port.
+fn gather(out: &mut String, rng: &mut Lcg) {
+    use crate::gather::{GATHER_REACH_M, NODES, done_at, in_reach, progress};
+    for k in 0..80 {
+        let node = [rng.range(-8000.0, 8000.0), rng.range(-5.0, 200.0), rng.range(-8000.0, 8000.0)];
+        // Half near the edge of reach, where rounding would show.
+        let spread = if k % 2 == 0 { GATHER_REACH_M * 1.05 } else { GATHER_REACH_M * 3.0 };
+        let at = [node[0] + rng.range(-spread, spread), node[1] + rng.range(-spread, spread), node[2] + rng.range(-spread, spread)];
+        let hit = u8::from(in_reach(node, at));
+        out.push_str(&format!("gather_reach {} {} {} {} {} {} {hit}\n", f(node[0]), f(node[1]), f(node[2]), f(at[0]), f(at[1]), f(at[2])));
+    }
+    let t0: i64 = 1_800_000_000_000_000;
+    for (k, n) in NODES.iter().enumerate() {
+        let done = done_at(n, t0 + k as i64);
+        for _ in 0..8 {
+            let now = done + ((rng.next() - 0.7) * 1.6 * n.gather_s * 1e6) as i64;
+            out.push_str(&format!("gather_progress {} {done} {now} {}\n", n.wire, f(progress(n, done, now))));
+        }
+    }
 }
 
 /// `sim::labor` with the content rules, for the client's port.

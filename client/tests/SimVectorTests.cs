@@ -200,6 +200,33 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void GatherReach()
+        {
+            int n = 0, hits = 0;
+            foreach (var v in Lines("gather_reach"))
+            {
+                bool want = v[7] == "1";
+                Assert.Equal(want, Gather.InReach(new System.Numerics.Vector3(F(v[1]), F(v[2]), F(v[3])), new System.Numerics.Vector3(F(v[4]), F(v[5]), F(v[6]))));
+                hits += want ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 80 && hits >= 10 && hits < n, $"{n} vectors, {hits} in reach");
+        }
+
+        [Fact]
+        public void GatherProgress()
+        {
+            int n = 0;
+            foreach (var v in Lines("gather_progress"))
+            {
+                var kind = GameContent.Node(byte.Parse(v[1]))!;
+                Assert.Equal(F(v[4]), Gather.Progress(kind, long.Parse(v[2]), long.Parse(v[3])));
+                n++;
+            }
+            Assert.True(n >= 50, $"{n} vectors");
+        }
+
+        [Fact]
         public void YawFacingRoundTrips()
         {
             for (float yaw = -3.1f; yaw < 3.1f; yaw += 0.1f)

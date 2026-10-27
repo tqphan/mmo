@@ -75,6 +75,9 @@ namespace Mmo.Gameplay
         /// <summary>The helm and cannons; set by <see cref="Main"/>.</summary>
         public ShipControls? Controls { get; set; }
 
+        /// <summary>Gathering from resource nodes; set by <see cref="Main"/>. F on land gathers before it climbs.</summary>
+        public Gathering? Gathering { get; set; }
+
         /// <summary>Why the last climb didn't happen, for the HUD.</summary>
         public string? ClimbNote { get; private set; }
 
@@ -147,6 +150,8 @@ namespace Mmo.Gameplay
             swimming = Parent == 0 && Swimming.Swims(swimming, ground.Map.Height(GlobalPosition.X, GlobalPosition.Z), GlobalPosition.Y);
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
+            if (interact && Parent == 0 && Gathering?.Interact() == true)
+                interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;
             var wish = Controls?.Manning is not null ? Vector2.Zero : Wish(order, ship);
@@ -201,6 +206,7 @@ namespace Mmo.Gameplay
                 session.SendMove(m);
             // Every frame, not only when we move: a ship carries us across cells while we stand still.
             session.Near?.Update(GlobalPosition.X, GlobalPosition.Z);
+            session.Static?.Update(GlobalPosition.X, GlobalPosition.Z);
             Controls?.Step(now, order, interactAboard);
         }
 
@@ -234,6 +240,23 @@ namespace Mmo.Gameplay
                 landings++;
                 session.Log($"left ship {was} at ({GlobalPosition.X:F1}, {GlobalPosition.Y:F1}, {GlobalPosition.Z:F1}), moving {Velocity.Length():F1} m/s of our own");
             }
+        }
+
+        /// <summary>
+        /// Dev builds: move to (x, z) on the ground at once with the GM teleport, which the server
+        /// applies before any move we send after it, and carry on from there.
+        /// </summary>
+        public void DevTeleport(float x, float z)
+        {
+            session.Conn?.Reducers.DevTeleport(x, z);
+            Parent = 0;
+            swimming = false;
+            GlobalPosition = new Vector3(x, ground.Map.Height(x, z), z);
+            Velocity = Vector3.Zero;
+            if (ground.Follow(x, z))
+                settle = 2;
+            sender.Reset(0, State(0, true), Clock.Now);
+            session.Log($"dev teleport to ({x:F1}, {z:F1})");
         }
 
         /// <summary>Climb aboard the ship alongside, if the server would allow the jump to its deck now.</summary>

@@ -51,6 +51,7 @@ The fidelity target is **the final Western version, as it stood at shutdown in J
 
   Each has ten ranks, and higher ranks lower labor cost and crafting time. Only a limited number can be maxed, which forces specialization. **B**
 - Labor was pooled across all characters on an account. **C**
+- Mining an iron vein cost 10 labor with no proficiency needed; rarer veins cost more (Fortuna 20, Star Shard 25, Anya 50 with a mining requirement, Thiorium 100). An iron vein gave iron ore and raw stone, with a chance of a rarer ore. Small gathering such as picking flowers cost 1–2 labor. Gather times, yields and respawn times weren't found (searched 2026-10-26; docs/design/gathering.md). **B** for veins, **C** for flowers
 
 ### 2.4 Land: housing and farming
 - Houses and farms are placed freely on open-world land inside designated areas. Nothing is instanced. **A**

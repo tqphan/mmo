@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 5";
+const FORMAT: &str = "contentgen 6";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -27,6 +27,10 @@ const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
 pub const ITEM_KINDS: [&str; 3] = ["material", "consumable", "gear"];
+/// Resource node kinds, in wire order, fixed here like the item kinds.
+pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
+/// Longer than a week to regrow is a typo.
+const MAX_REGROW_S: u32 = 7 * 86_400;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -35,6 +39,7 @@ pub struct Sources {
     pub land: String,
     pub labor: String,
     pub items: String,
+    pub gathering: String,
 }
 
 impl Sources {
@@ -48,6 +53,7 @@ impl Sources {
             land: read("land.toml")?,
             labor: read("labor.toml")?,
             items: read("items.toml")?,
+            gathering: read("gathering.toml")?,
         })
     }
 }
@@ -172,6 +178,36 @@ pub struct ItemDef {
     pub stack: u32,
 }
 
+/// `gathering.toml`: resource node kinds (docs/design/gathering.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GatheringFile {
+    gathering: GatheringRules,
+    node: Vec<NodeDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GatheringRules {
+    pub reach_m: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NodeDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    /// An item id from `items.toml`.
+    pub item: String,
+    pub yield_min: u32,
+    pub yield_max: u32,
+    pub labor: i32,
+    pub gather_s: f32,
+    pub regrow_s: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -186,7 +222,17 @@ pub struct Content {
     pub bag: BagDef,
     /// Sorted by `wire`, which may have gaps.
     pub items: Vec<ItemDef>,
+    pub gathering: GatheringRules,
+    /// Sorted by `wire`, like the modes.
+    pub nodes: Vec<NodeDef>,
     pub hash: u64,
+}
+
+impl Content {
+    /// The wire of the item a node yields; parsing checked it exists.
+    fn item_wire(&self, id: &str) -> u16 {
+        self.items.iter().find(|i| i.id == id).map_or(0, |i| i.wire)
+    }
 }
 
 /// Parse and check everything, collecting every problem rather than stopping at the first.
@@ -197,10 +243,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let land: Result<LandFile, _> = from_toml("land.toml", &src.land);
     let labor: Result<LaborDef, _> = from_toml("labor.toml", &src.labor);
     let items: Result<ItemsFile, _> = from_toml("items.toml", &src.items);
-    let (mut modes, mut hulls, mut land, labor, mut items) = match (movement, ships, land, labor, items) {
-        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i)) => (m.mode, s.hull, l, b, i),
-        (m, s, l, b, i) => {
-            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).flatten().collect());
+    let gathering: Result<GatheringFile, _> = from_toml("gathering.toml", &src.gathering);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering) = match (movement, ships, land, labor, items, gathering) {
+        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g)) => (m.mode, s.hull, l, b, i, g),
+        (m, s, l, b, i, g) => {
+            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).flatten().collect());
         }
     };
     modes.sort_by_key(|m| m.wire);
@@ -208,15 +255,22 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     land.land_use.sort_by_key(|u| u.wire);
     land.climate.sort_by_key(|c| c.wire);
     items.item.sort_by_key(|i| i.wire);
+    gathering.node.sort_by_key(|n| n.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &mut errors);
     check_labor(&labor, &mut errors);
     check_items(&items, &mut errors);
+    check_gathering(&gathering, &items.item, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, bag: items.bag, items: items.item, hash: 0 };
+    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, bag: items.bag,
+        items: items.item,
+        gathering: gathering.gathering,
+        nodes: gathering.node,
+        hash: 0,
+    };
     c.hash = hash(&canonical(&c));
     Ok(c)
 }
@@ -380,6 +434,39 @@ fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
     }
 }
 
+fn check_gathering(g: &GatheringFile, items: &[ItemDef], errors: &mut Vec<String>) {
+    let file = "gathering.toml";
+    check_range(file, "gathering.reach_m", g.gathering.reach_m, 0.5, 20.0, errors);
+    check_ids(file, "node", g.node.iter().map(|n| (n.id.as_str(), n.wire)), errors);
+    let mut names = std::collections::HashSet::new();
+    for n in &g.node {
+        let at = format!("{file}: node {:?}", n.id);
+        if !is_item_name(&n.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(n.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", n.name));
+        }
+        if !NODE_KINDS.contains(&n.kind.as_str()) {
+            errors.push(format!("{at}: kind must be one of {}", NODE_KINDS.join(", ")));
+        }
+        match items.iter().find(|i| i.id == n.item) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", n.item)),
+            Some(i) if !(1..=n.yield_max).contains(&n.yield_min) || n.yield_max > i.stack => {
+                errors.push(format!("{at}: yields must be 1 ≤ yield_min ≤ yield_max ≤ the item's stack ({})", i.stack));
+            }
+            Some(_) => {}
+        }
+        if !(1..=1000).contains(&n.labor) {
+            errors.push(format!("{at}: labor must be from 1 to 1000"));
+        }
+        check_range(&at, "gather_s", n.gather_s, 0.5, 60.0, errors);
+        if !(1..=MAX_REGROW_S).contains(&n.regrow_s) {
+            errors.push(format!("{at}: regrow_s must be from 1 to {MAX_REGROW_S}"));
+        }
+    }
+}
+
 /// Safe to print as a string literal in both Rust and C# without escaping.
 fn is_item_name(s: &str) -> bool {
     s.chars().count() <= MAX_ITEM_NAME
@@ -427,6 +514,24 @@ fn canonical(c: &Content) -> String {
     writeln!(s, "bag\t{}", c.bag.slots).unwrap();
     for i in &c.items {
         writeln!(s, "item\t{}\t{}\t{}\t{}\t{}", i.wire, i.id, i.name, i.kind, i.stack).unwrap();
+    }
+    writeln!(s, "gathering\t{}", Value::F32(c.gathering.reach_m).bits()).unwrap();
+    for n in &c.nodes {
+        writeln!(
+            s,
+            "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            n.wire,
+            n.id,
+            n.name,
+            n.kind,
+            n.item,
+            n.yield_min,
+            n.yield_max,
+            n.labor,
+            Value::F32(n.gather_s).bits(),
+            n.regrow_s
+        )
+        .unwrap();
     }
     s
 }
@@ -728,7 +833,48 @@ pub fn render_rust(c: &Content) -> String {
     s += "    ITEMS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &ITEMS[i])\n}\n\n";
     s += "/// The item with content id `id`.\n";
     s += "pub fn item_by_id(id: &str) -> Option<&'static ItemData> {\n";
-    s += "    ITEMS.iter().find(|d| d.id == id)\n}\n";
+    s += "    ITEMS.iter().find(|d| d.id == id)\n}\n\n";
+
+    s += "/// Resource node kinds (`content/gathering.toml`, docs/design/gathering.md). The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum NodeKind {\n";
+    for (w, k) in NODE_KINDS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct NodeData {\n";
+    s += "    /// Stored in node rows.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    pub kind: NodeKind,\n    /// The wire of the item it yields.\n    pub item: u16,\n";
+    s += "    /// How many of the item one gather yields, inclusive.\n    pub yield_min: u32,\n    pub yield_max: u32,\n";
+    s += "    /// Labor spent when a gather finishes.\n    pub labor: i32,\n";
+    s += "    /// How long a gather takes, in seconds.\n    pub gather_s: f32,\n";
+    s += "    /// How long until it can be gathered again, in seconds.\n    pub regrow_s: u32,\n}\n\n";
+    s += "/// Every node kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static NODES: [NodeData; {}] = [", c.nodes.len()).unwrap();
+    for n in &c.nodes {
+        writeln!(
+            s,
+            "    NodeData {{ wire: {}, id: {:?}, name: {:?}, kind: NodeKind::{}, item: {}, yield_min: {}, yield_max: {}, labor: {}, gather_s: {:?}, regrow_s: {} }},",
+            n.wire,
+            n.id,
+            n.name,
+            pascal(&n.kind),
+            c.item_wire(&n.item),
+            n.yield_min,
+            n.yield_max,
+            n.labor,
+            n.gather_s,
+            n.regrow_s
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// How close a character must stand to gather, horizontally and vertically, in metres.\n";
+    writeln!(s, "pub const GATHER_REACH_M: f32 = {:?};\n", c.gathering.reach_m).unwrap();
+    s += "/// The node kind stored as `wire`.\n";
+    s += "pub fn node(wire: u8) -> Option<&'static NodeData> {\n    NODES.get(usize::from(wire))\n}\n\n";
+    s += "/// The node kind with content id `id`.\n";
+    s += "pub fn node_by_id(id: &str) -> Option<&'static NodeData> {\n";
+    s += "    NODES.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -789,6 +935,18 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"Name\">What players see.</param>\n";
     s += "    /// <param name=\"Stack\">The most in one slot.</param>\n";
     s += "    public sealed record ItemData(ushort Wire, string Id, string Name, ItemKind Kind, uint Stack);\n\n";
+    s += "    /// <summary>Resource node kinds (content/gathering.toml, docs/design/gathering.md). The value is the wire value.</summary>\n";
+    s += "    public enum NodeKind : byte\n    {\n";
+    for (w, k) in NODE_KINDS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <param name=\"Wire\">Stored in node rows.</param>\n";
+    s += "    /// <param name=\"Item\">The wire of the item it yields.</param>\n";
+    s += "    /// <param name=\"Labor\">Labor spent when a gather finishes.</param>\n";
+    s += "    /// <param name=\"GatherS\">How long a gather takes, in seconds.</param>\n";
+    s += "    /// <param name=\"RegrowS\">How long until it can be gathered again, in seconds.</param>\n";
+    s += "    public sealed record NodeData(byte Wire, string Id, string Name, NodeKind Kind, ushort Item, uint YieldMin, uint YieldMax, int Labor, float GatherS, uint RegrowS);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -845,7 +1003,31 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        };\n\n";
     s += "        private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);\n\n";
     s += "        /// <summary>The item stored as <paramref name=\"wire\"/>, if it still exists.</summary>\n";
-    s += "        public static ItemData? Item(ushort wire) => ItemsByWire.TryGetValue(wire, out var d) ? d : null;\n";
+    s += "        public static ItemData? Item(ushort wire) => ItemsByWire.TryGetValue(wire, out var d) ? d : null;\n\n";
+    s += "        /// <summary>How close a character must stand to gather, horizontally and vertically, in metres.</summary>\n";
+    writeln!(s, "        public const float GatherReachM = {:?}f;\n", c.gathering.reach_m).unwrap();
+    s += "        /// <summary>Every node kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<NodeData> Nodes = new NodeData[]\n        {\n";
+    for n in &c.nodes {
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, NodeKind.{}, {}, {}, {}, {}, {:?}f, {}),",
+            n.wire,
+            n.id,
+            n.name,
+            pascal(&n.kind),
+            c.item_wire(&n.item),
+            n.yield_min,
+            n.yield_max,
+            n.labor,
+            n.gather_s,
+            n.regrow_s
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The node kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static NodeData? Node(byte wire) => wire < Nodes.Count ? Nodes[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -954,8 +1136,52 @@ mod tests {
         stack = 1
     "#;
 
+    const GATHERING: &str = r#"
+        [gathering]
+        reach_m = 3.0
+
+        [[node]]
+        wire = 1
+        id = "hollowoak"
+        name = "Hollowoak"
+        kind = "tree"
+        item = "driftpine_log"
+        yield_min = 1
+        yield_max = 3
+        labor = 10
+        gather_s = 5.0
+        regrow_s = 1200
+
+        [[node]]
+        wire = 0
+        id = "driftpine"
+        name = "Driftpine"
+        kind = "tree"
+        item = "driftpine_log"
+        yield_min = 2
+        yield_max = 2
+        labor = 5
+        gather_s = 2.5
+        regrow_s = 300
+    "#;
+
     fn sources() -> Sources {
-        Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: LAND.into(), labor: LABOR.into(), items: ITEMS.into() }
+        Sources {
+            movement: MOVEMENT.into(),
+            ships: SHIPS.into(),
+            land: LAND.into(),
+            labor: LABOR.into(),
+            items: ITEMS.into(),
+            gathering: GATHERING.into(),
+        }
+    }
+
+    fn parse_gathering(gathering: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { gathering: gathering.into(), ..sources() })
+    }
+
+    fn gathering_errors(gathering: &str) -> String {
+        parse_gathering(gathering).unwrap_err().join("\n")
     }
 
     fn parse_items(items: &str) -> Result<Content, Vec<String>> {
@@ -1114,9 +1340,10 @@ mod tests {
             land: "[[x]\n".into(),
             labor: "cap =\n".into(),
             items: "[bag\n".into(),
+            gathering: "[gathering\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -1231,8 +1458,10 @@ mod tests {
             ("stack = 1000", "stack = 999"),
             ("slots = 50", "slots = 60"),
         ] {
+            // Nodes name items by id, so a renamed item is renamed there too.
             let changed = ITEMS.replace(from, to);
-            assert_ne!(parse_items(&changed).unwrap().hash, a, "{changed}");
+            let c = parse(&Sources { items: changed.clone(), gathering: GATHERING.replace(from, to), ..sources() });
+            assert_ne!(c.unwrap().hash, a, "{changed}");
         }
     }
 
@@ -1258,6 +1487,71 @@ mod tests {
         assert!(item_errors(&ITEMS.replace("\"driftpine_log\"", "\"Driftpine\"")).contains("ids are lower-case"));
         assert!(item_errors("item = []\n[bag]\nslots = 50").contains("no items"));
         assert!(item_errors(&ITEMS.replace("stack = 1000", "stack = 1000\nweight = 2")).contains("unknown field `weight`"));
+    }
+
+    #[test]
+    fn nodes_parse_in_wire_order_and_reach_both_outputs() {
+        let c = parse_gathering(GATHERING).unwrap();
+        assert_eq!(c.nodes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(), ["driftpine", "hollowoak"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        let row = r#"NodeData { wire: 0, id: "driftpine", name: "Driftpine", kind: NodeKind::Tree, item: 20, yield_min: 2, yield_max: 2, labor: 5, gather_s: 2.5, regrow_s: 300 },"#;
+        assert!(rs.contains(row), "{rs}");
+        assert!(rs.contains("pub static NODES: [NodeData; 2] = [") && rs.contains("pub const GATHER_REACH_M: f32 = 3.0;"));
+        assert!(rs.contains("Ore = 1,") && cs.contains("Ore = 1,"));
+        assert!(cs.contains(r#"new(1, "hollowoak", "Hollowoak", NodeKind.Tree, 20, 1, 3, 10, 5.0f, 1200),"#), "{cs}");
+        assert!(cs.contains("public const float GatherReachM = 3.0f;"));
+    }
+
+    #[test]
+    fn any_node_change_changes_the_hash() {
+        let a = parse_gathering(GATHERING).unwrap().hash;
+        for (from, to) in [
+            ("reach_m = 3.0", "reach_m = 3.5"),
+            ("\"Hollowoak\"", "\"Old Oak\""),
+            ("kind = \"tree\"", "kind = \"ore\""),
+            ("item = \"driftpine_log\"", "item = \"reedcutter_knife\""),
+            ("yield_min = 1", "yield_min = 2"),
+            ("yield_max = 3", "yield_max = 4"),
+            ("labor = 10", "labor = 11"),
+            ("gather_s = 5.0", "gather_s = 5.5"),
+            ("regrow_s = 1200", "regrow_s = 1201"),
+        ] {
+            let changed = GATHERING.replacen(from, to, 1);
+            let c = parse_gathering(&changed);
+            // The knife stacks to 1, so its yield must be 1 too.
+            let c = c.or_else(|_| parse_gathering(&changed.replace("yield_max = 3", "yield_max = 1")));
+            assert_ne!(c.unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_nodes_are_reported_together() {
+        let bad = GATHERING
+            .replace("kind = \"tree\"\n        item = \"driftpine_log\"\n        yield_min = 1", "kind = \"fish\"\n        item = \"pearl\"\n        yield_min = 1")
+            .replace("yield_min = 2", "yield_min = 3")
+            .replace("labor = 5", "labor = 0")
+            .replace("gather_s = 2.5", "gather_s = 0.1")
+            .replace("regrow_s = 300", "regrow_s = 0")
+            .replace("reach_m = 3.0", "reach_m = 50.0");
+        let e = gathering_errors(&bad);
+        for want in [
+            "kind must be one of plant, ore, tree",
+            "no item \"pearl\"",
+            "yields must be 1 ≤ yield_min ≤ yield_max",
+            "labor must be from 1",
+            "gather_s must be from",
+            "regrow_s must be from 1",
+            "reach_m must be from",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = gathering_errors(&GATHERING.replace("wire = 1", "wire = 0").replace("\"Driftpine\"", "\"Hollowoak\""));
+        for want in ["wire values must run", "duplicate name"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(gathering_errors(&GATHERING.replace("yield_max = 3", "yield_max = 1001")).contains("the item's stack (1000)"));
+        assert!(gathering_errors(&GATHERING.replace("regrow_s = 300", "regrow_s = 300\nrare = 1")).contains("unknown field `rare`"));
+        assert!(gathering_errors("node = []\n[gathering]\nreach_m = 3.0").contains("no nodes"));
     }
 
     #[test]

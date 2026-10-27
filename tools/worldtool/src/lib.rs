@@ -2,6 +2,7 @@
 //! raster as 625 region files and a manifest, read and written here, and the placeholder
 //! generator that writes them until there's editor tooling.
 
+pub mod nodes;
 pub mod placeholder;
 pub mod region;
 

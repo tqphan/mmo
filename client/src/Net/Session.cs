@@ -21,6 +21,9 @@ namespace Mmo.Net
         /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP.</summary>
         public static readonly string[] NearTables = { "entity", "transform", "vehicle" };
         public const ushort NearRadius = 2;
+        /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md).</summary>
+        public static readonly string[] StaticTables = { "resource_node" };
+        public const ushort StaticRadius = 4;
 
         private readonly ClientOptions options;
         private readonly ulong terrainHash;
@@ -39,6 +42,7 @@ namespace Mmo.Net
         public string Status { get; private set; } = "connecting";
         public Presence? Me { get; private set; }
         public SubscriptionDirector? Near { get; private set; }
+        public SubscriptionDirector? Static { get; private set; }
         public int Reconnects { get; private set; }
 
         /// <summary>
@@ -204,6 +208,8 @@ namespace Mmo.Net
             Log($"entered as {name}, entity {p.EntityId}, at ({p.X:F1}, {p.Y:F1}, {p.Z:F1})");
             Near ??= new SubscriptionDirector(new SdkCellChannel(Conn), NearTables, NearRadius);
             Near.Update(p.X, p.Z);
+            Static ??= new SubscriptionDirector(new SdkCellChannel(Conn), StaticTables, StaticRadius);
+            Static.Update(p.X, p.Z);
             if (options.Labor is int labor)
             {
                 Conn.Reducers.DevSetLabor(labor);

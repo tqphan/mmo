@@ -1,5 +1,6 @@
-//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D); `worldtool info
-//! [--dir D]` loads it, checks it and prints what's in it. Paths are relative to the repo root,
+//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes
+//! included; `worldtool nodes [--dir D]` rewrites only the nodes, from the world there; `worldtool
+//! info [--dir D]` loads it, checks it and prints what's in it. Paths are relative to the repo root,
 //! which `cargo xtask` runs from (docs/design/world.md).
 
 use std::path::PathBuf;
@@ -14,9 +15,10 @@ fn main() -> ExitCode {
     let dir = PathBuf::from(args.iter().position(|a| a == "--dir").and_then(|i| args.get(i + 1)).map_or(DEFAULT_DIR, String::as_str));
     let result = match args.first().map(String::as_str) {
         Some("gen") => generate(&dir),
+        Some("nodes") => World::load(&dir).and_then(|w| write_nodes(&dir, &w)),
         Some("info") => info(&dir),
         _ => {
-            eprintln!("usage: worldtool gen|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|info [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -35,7 +37,22 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     let hash = world.save(dir)?;
     println!("wrote the placeholder world to {} in {:.1} s, terrain hash {hash:016x}", dir.display(), started.elapsed().as_secs_f32());
     summary(&world);
+    write_nodes(dir, &world)
+}
+
+/// Place resource nodes on `world` and write them to `dir` (docs/design/gathering.md).
+fn write_nodes(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let nodes = worldtool::nodes::place(world);
+    worldtool::nodes::save(dir, &nodes)?;
+    println!("wrote {} resource nodes to {}", nodes.len(), dir.join(worldtool::nodes::FILE).display());
+    node_summary(&nodes);
     Ok(())
+}
+
+fn node_summary(nodes: &[worldtool::nodes::Placement]) {
+    for k in &sim::gather::NODES {
+        println!("  node {:<18} {}", k.id, nodes.iter().filter(|n| n.kind == k).count());
+    }
 }
 
 fn info(dir: &std::path::Path) -> Result<(), String> {
@@ -43,6 +60,9 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     let world = World::load(dir)?;
     println!("loaded {} in {:.1} s, terrain hash {:016x}", dir.display(), started.elapsed().as_secs_f32(), world.terrain_hash());
     summary(&world);
+    let nodes = worldtool::nodes::load(dir)?;
+    println!("{} resource nodes", nodes.len());
+    node_summary(&nodes);
     Ok(())
 }
 

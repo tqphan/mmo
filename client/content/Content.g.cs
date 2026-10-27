@@ -83,6 +83,21 @@ namespace Mmo.Content
     /// <param name="Stack">The most in one slot.</param>
     public sealed record ItemData(ushort Wire, string Id, string Name, ItemKind Kind, uint Stack);
 
+    /// <summary>Resource node kinds (content/gathering.toml, docs/design/gathering.md). The value is the wire value.</summary>
+    public enum NodeKind : byte
+    {
+        Plant = 0,
+        Ore = 1,
+        Tree = 2,
+    }
+
+    /// <param name="Wire">Stored in node rows.</param>
+    /// <param name="Item">The wire of the item it yields.</param>
+    /// <param name="Labor">Labor spent when a gather finishes.</param>
+    /// <param name="GatherS">How long a gather takes, in seconds.</param>
+    /// <param name="RegrowS">How long until it can be gathered again, in seconds.</param>
+    public sealed record NodeData(byte Wire, string Id, string Name, NodeKind Kind, ushort Item, uint YieldMin, uint YieldMax, int Labor, float GatherS, uint RegrowS);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -100,7 +115,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x0c241a0e7659eaedUL;
+        public const ulong Hash = 0x9c1c7b4e194bd1c1UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -155,5 +170,23 @@ namespace Mmo.Content
 
         /// <summary>The item stored as <paramref name="wire"/>, if it still exists.</summary>
         public static ItemData? Item(ushort wire) => ItemsByWire.TryGetValue(wire, out var d) ? d : null;
+
+        /// <summary>How close a character must stand to gather, horizontally and vertically, in metres.</summary>
+        public const float GatherReachM = 3.0f;
+
+        /// <summary>Every node kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<NodeData> Nodes = new NodeData[]
+        {
+            new(0, "saltreed_clump", "Saltreed Clump", NodeKind.Plant, 1, 2, 4, 5, 2.0f, 300),
+            new(1, "emberleaf_patch", "Emberleaf Patch", NodeKind.Plant, 2, 2, 4, 5, 2.0f, 300),
+            new(2, "duskberry_bush", "Duskberry Bush", NodeKind.Plant, 3, 2, 4, 5, 2.0f, 300),
+            new(3, "tinstone_vein", "Tinstone Vein", NodeKind.Ore, 10, 2, 3, 10, 4.0f, 900),
+            new(4, "rustvein_outcrop", "Rustvein Outcrop", NodeKind.Ore, 11, 2, 3, 10, 4.0f, 900),
+            new(5, "driftpine", "Driftpine", NodeKind.Tree, 20, 1, 3, 10, 5.0f, 1200),
+            new(6, "hollowoak", "Hollowoak", NodeKind.Tree, 21, 1, 3, 10, 5.0f, 1200),
+        };
+
+        /// <summary>The node kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static NodeData? Node(byte wire) => wire < Nodes.Count ? Nodes[wire] : null;
     }
 }

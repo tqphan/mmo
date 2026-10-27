@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x0c241a0e7659eaed;
+pub const CONTENT_HASH: u64 = 0x9c1c7b4e194bd1c1;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -265,4 +265,58 @@ pub fn item(wire: u16) -> Option<&'static ItemData> {
 /// The item with content id `id`.
 pub fn item_by_id(id: &str) -> Option<&'static ItemData> {
     ITEMS.iter().find(|d| d.id == id)
+}
+
+/// Resource node kinds (`content/gathering.toml`, docs/design/gathering.md). The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum NodeKind {
+    Plant = 0,
+    Ore = 1,
+    Tree = 2,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct NodeData {
+    /// Stored in node rows.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    pub kind: NodeKind,
+    /// The wire of the item it yields.
+    pub item: u16,
+    /// How many of the item one gather yields, inclusive.
+    pub yield_min: u32,
+    pub yield_max: u32,
+    /// Labor spent when a gather finishes.
+    pub labor: i32,
+    /// How long a gather takes, in seconds.
+    pub gather_s: f32,
+    /// How long until it can be gathered again, in seconds.
+    pub regrow_s: u32,
+}
+
+/// Every node kind, sorted by wire, which is the index.
+pub static NODES: [NodeData; 7] = [
+    NodeData { wire: 0, id: "saltreed_clump", name: "Saltreed Clump", kind: NodeKind::Plant, item: 1, yield_min: 2, yield_max: 4, labor: 5, gather_s: 2.0, regrow_s: 300 },
+    NodeData { wire: 1, id: "emberleaf_patch", name: "Emberleaf Patch", kind: NodeKind::Plant, item: 2, yield_min: 2, yield_max: 4, labor: 5, gather_s: 2.0, regrow_s: 300 },
+    NodeData { wire: 2, id: "duskberry_bush", name: "Duskberry Bush", kind: NodeKind::Plant, item: 3, yield_min: 2, yield_max: 4, labor: 5, gather_s: 2.0, regrow_s: 300 },
+    NodeData { wire: 3, id: "tinstone_vein", name: "Tinstone Vein", kind: NodeKind::Ore, item: 10, yield_min: 2, yield_max: 3, labor: 10, gather_s: 4.0, regrow_s: 900 },
+    NodeData { wire: 4, id: "rustvein_outcrop", name: "Rustvein Outcrop", kind: NodeKind::Ore, item: 11, yield_min: 2, yield_max: 3, labor: 10, gather_s: 4.0, regrow_s: 900 },
+    NodeData { wire: 5, id: "driftpine", name: "Driftpine", kind: NodeKind::Tree, item: 20, yield_min: 1, yield_max: 3, labor: 10, gather_s: 5.0, regrow_s: 1200 },
+    NodeData { wire: 6, id: "hollowoak", name: "Hollowoak", kind: NodeKind::Tree, item: 21, yield_min: 1, yield_max: 3, labor: 10, gather_s: 5.0, regrow_s: 1200 },
+];
+
+/// How close a character must stand to gather, horizontally and vertically, in metres.
+pub const GATHER_REACH_M: f32 = 3.0;
+
+/// The node kind stored as `wire`.
+pub fn node(wire: u8) -> Option<&'static NodeData> {
+    NODES.get(usize::from(wire))
+}
+
+/// The node kind with content id `id`.
+pub fn node_by_id(id: &str) -> Option<&'static NodeData> {
+    NODES.iter().find(|d| d.id == id)
 }

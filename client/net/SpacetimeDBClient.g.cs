@@ -36,6 +36,7 @@ namespace SpacetimeDB.Types
             AddTable(MyInventory = new(conn));
             AddTable(MyLabor = new(conn));
             AddTable(MyPresence = new(conn));
+            AddTable(ResourceNode = new(conn));
             AddTable(TerrainInfo = new(conn));
             AddTable(Transform = new(conn));
             AddTable(Vehicle = new(conn));
@@ -544,6 +545,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.MyInventory().ToSql(),
             new QueryBuilder().From.MyLabor().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
+            new QueryBuilder().From.ResourceNode().ToSql(),
             new QueryBuilder().From.TerrainInfo().ToSql(),
             new QueryBuilder().From.Transform().ToSql(),
             new QueryBuilder().From.Vehicle().ToSql(),
@@ -562,6 +564,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Item, MyInventoryCols, MyInventoryIxCols> MyInventory() => new("my_inventory", new MyInventoryCols("my_inventory"), new MyInventoryIxCols("my_inventory"));
         public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
+        public global::SpacetimeDB.Table<ResourceNode, ResourceNodeCols, ResourceNodeIxCols> ResourceNode() => new("resource_node", new ResourceNodeCols("resource_node"), new ResourceNodeIxCols("resource_node"));
         public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
         public global::SpacetimeDB.Table<Transform, TransformCols, TransformIxCols> Transform() => new("transform", new TransformCols("transform"), new TransformIxCols("transform"));
         public global::SpacetimeDB.Table<Vehicle, VehicleCols, VehicleIxCols> Vehicle() => new("vehicle", new VehicleCols("vehicle"), new VehicleIxCols("vehicle"));
@@ -646,8 +649,12 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.AdminClearNodes args => Reducers.InvokeAdminClearNodes(eventContext, args),
                 Reducer.AdminClearTerrain args => Reducers.InvokeAdminClearTerrain(eventContext, args),
+                Reducer.AdminPutNodes args => Reducers.InvokeAdminPutNodes(eventContext, args),
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
+                Reducer.AdminRemoveNodes args => Reducers.InvokeAdminRemoveNodes(eventContext, args),
+                Reducer.CancelGather args => Reducers.InvokeCancelGather(eventContext, args),
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
                 Reducer.DestroyItem args => Reducers.InvokeDestroyItem(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
@@ -661,6 +668,7 @@ namespace SpacetimeDB.Types
                 Reducer.DevTeleport args => Reducers.InvokeDevTeleport(eventContext, args),
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),
                 Reducer.Fire args => Reducers.InvokeFire(eventContext, args),
+                Reducer.Gather args => Reducers.InvokeGather(eventContext, args),
                 Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),

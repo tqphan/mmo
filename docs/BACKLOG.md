@@ -8,23 +8,23 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 ## M1: "One Coast" (PLAN §11)
 Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<system>.md`). PLAN Q3 is still open; it can reorder later tasks, not these first ones.
 
-1. **Gathering**: resource nodes placed in the world (three kinds: plants, ore, trees), a timed gather costing labor, yields into the bag, nodes regrow from timestamps; client interaction and a progress bar. Accept: out-of-range, no-labor and already-taken gathers refused; a bot gathers through a node's cycle.
-2. **Crafting**: two workstations and about 20 recipes in content; a timed craft that costs labor and materials; a craft window. Accept: recipes checked by contentgen; crafts refused without materials, labor or a station in reach.
-3. **Land**: 8 × 8 garden and 16 × 16 farm deeds, placed only on housing land without overlaps; weekly tax, a demolition timer when it lapses, and a public marker; access settings. Accept: land-rush test (two placements, one wins), tax and demolition by test clock.
-4. **Farming**: six crops, two trees and one animal; growth from planting time and climate; harvest with labor; harvesting off your plot gives crime points (wired up in the crime task). Accept: growth by test clock, no ticking.
-5. **Trade packs**: two pack recipes at a specialty bench; carried on the back with the slowdown and no gliding; three outposts, one across water; demand that falls with sales and recovers from timestamps; selling. Accept: a bot crafts, carries and sells a pack; the speed check enforces the slowdown.
-6. **Combat basics**: health and mana, targeting, `use_skill` with casts and impacts, death and respawn; three skillsets of about eight skills with two cross-skillset combos; levels 1–15. May split into two sessions.
-7. **NPCs**: about ten types, spawns near players, a simple brain, loot.
-8. **Vehicles**: a cart with pack slots, a rowboat, and the clipper built at a shipyard from a design and materials; packs loaded on ships.
-9. **Crime**: evidence (bloodstains, footprints), crime points from attacks, pack theft and crop theft, and witness reports.
-10. **Party and local chat.**
-11. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests.
-12. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
+1. **Crafting**: two workstations and about 20 recipes in content; a timed craft that costs labor and materials; a craft window. Accept: recipes checked by contentgen; crafts refused without materials, labor or a station in reach.
+2. **Land**: 8 × 8 garden and 16 × 16 farm deeds, placed only on housing land without overlaps; weekly tax, a demolition timer when it lapses, and a public marker; access settings. Accept: land-rush test (two placements, one wins), tax and demolition by test clock.
+3. **Farming**: six crops, two trees and one animal; growth from planting time and climate; harvest with labor; harvesting off your plot gives crime points (wired up in the crime task). Accept: growth by test clock, no ticking.
+4. **Trade packs**: two pack recipes at a specialty bench; carried on the back with the slowdown and no gliding; three outposts, one across water; demand that falls with sales and recovers from timestamps; selling. Accept: a bot crafts, carries and sells a pack; the speed check enforces the slowdown.
+5. **Combat basics**: health and mana, targeting, `use_skill` with casts and impacts, death and respawn; three skillsets of about eight skills with two cross-skillset combos; levels 1–15. May split into two sessions.
+6. **NPCs**: about ten types, spawns near players, a simple brain, loot.
+7. **Vehicles**: a cart with pack slots, a rowboat, and the clipper built at a shipyard from a design and materials; packs loaded on ships.
+8. **Crime**: evidence (bloodstains, footprints), crime points from attacks, pack theft and crop theft, and witness reports.
+9. **Party and local chat.**
+10. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests.
+11. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
 
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.
 - Walk speed and the pack-carrying slowdown as a percentage (run 5.4 m/s and sprint 8 m/s are known; docs/design/movement.md §1).
 - Jump height, gravity and the fall-damage threshold (docs/design/terrain.md §1). Fall damage needs a threshold in M1, ours or theirs.
+- Gathering: cast times, yields, wild-node respawn times and whether nodes respawn in place, and the labor for herbs and logging (docs/design/gathering.md §1). Only the iron vein's 10 labor is known.
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (docs/design/ships.md §1). An add-on clipper cannon is known: 48 m, 700 damage, 3 s.
 
 ## Done
@@ -53,3 +53,4 @@ Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without t
 - 2026-10-26 **Close M0 and plan M1**: every spike passed (STATUS); the Windows check moved to "Any time"; M1 broken into the tasks above, in the order proposed to the user and taken as confirmed. PLAN Q3 still open.
 - 2026-10-26 **M1: labor**: one pool per account (private `labor`, `my_labor`), 10 points every 5 minutes online and offline up to 5,000, computed from a timestamp by `sim::labor` and never ticked; new accounts start full; rules in `content/labor.toml`; `labor::spend` for work, dev `dev_spend_labor`/`dev_set_labor`; the test clock's offset is now the public `game_clock` (ADR 0021); the client's C# port is checked against vectors and drives a HUD line, with `--labor N` and F8 as dev helpers; `labor` bot scenario; captures `docs/captures/2026-10-26-labor-*.png` (docs/design/labor.md).
 - 2026-10-26 **M1: items and the bag**: nine items in `content/items.toml` with permanent wire numbers, kinds and stacks, and a 50-slot bag; private `item` rows by holder, place and slot, read through `my_inventory` (ADR 0022); `move_item` (move, merge, swap), `split_item`, `destroy_item`, an all-or-nothing `items::grant` for gathering and dev `dev_grant_item`; a bag window with click-to-place, shift-click splits and confirmed destroys, its rules in xUnit; `--bag-demo`; `items` bot scenario; captures `docs/captures/2026-10-26-bag-*.png` (docs/design/items.md).
+- 2026-10-26 **M1: gathering**: seven node kinds in `content/gathering.toml` (plants, ores, trees); public `resource_node` rows in a new Static tier, regrowing from a `ready_at` timestamp; `gather` with every refusal from the spec, a private scheduled `gather_job` that spends labor and grants the rolled yield in one transaction when it finishes, cancelled for free by moving 0.5 m, `cancel_gather` or leaving; 11,920 placeholder placements in `world/nodes.tsv` from `worldtool nodes`, uploaded by `cargo xtask world`; `sim::gather` ported to C# against vectors; placeholder node views, F to gather, a prompt and a progress bar; `--gather-demo`; `gather` bot scenario (ADR 0023); captures `docs/captures/2026-10-26-gather-*.png` (docs/design/gathering.md).

@@ -1,0 +1,95 @@
+# Gathering (docs/design/gathering.md): the kinds of resource node placed in the world. `wire` is
+# stored in node rows and runs 0, 1, 2, … like hulls. `kind` is `plant`, `ore` or `tree`, and
+# `item` is an id from items.toml. Names come from docs/world/. Ore's 10 labor is the original's
+# iron vein (B); the other numbers are ours, for the M1 playtest to tune.
+
+[gathering]
+# How close a character must stand: horizontally, and up or down.
+reach_m = 3.0
+
+# Plants
+[[node]]
+wire = 0
+id = "saltreed_clump"
+name = "Saltreed Clump"
+kind = "plant"
+item = "saltreed"
+yield_min = 2
+yield_max = 4
+labor = 5
+gather_s = 2.0
+regrow_s = 300
+
+[[node]]
+wire = 1
+id = "emberleaf_patch"
+name = "Emberleaf Patch"
+kind = "plant"
+item = "emberleaf"
+yield_min = 2
+yield_max = 4
+labor = 5
+gather_s = 2.0
+regrow_s = 300
+
+[[node]]
+wire = 2
+id = "duskberry_bush"
+name = "Duskberry Bush"
+kind = "plant"
+item = "duskberry"
+yield_min = 2
+yield_max = 4
+labor = 5
+gather_s = 2.0
+regrow_s = 300
+
+# Ore
+[[node]]
+wire = 3
+id = "tinstone_vein"
+name = "Tinstone Vein"
+kind = "ore"
+item = "tinstone"
+yield_min = 2
+yield_max = 3
+labor = 10
+gather_s = 4.0
+regrow_s = 900
+
+[[node]]
+wire = 4
+id = "rustvein_outcrop"
+name = "Rustvein Outcrop"
+kind = "ore"
+item = "rustvein_ore"
+yield_min = 2
+yield_max = 3
+labor = 10
+gather_s = 4.0
+regrow_s = 900
+
+# Trees
+[[node]]
+wire = 5
+id = "driftpine"
+name = "Driftpine"
+kind = "tree"
+item = "driftpine_log"
+yield_min = 1
+yield_max = 3
+labor = 10
+gather_s = 5.0
+regrow_s = 1200
+
+[[node]]
+wire = 6
+id = "hollowoak"
+name = "Hollowoak"
+kind = "tree"
+item = "hollowoak_log"
+yield_min = 1
+yield_max = 3
+labor = 10
+gather_s = 5.0
+regrow_s = 1200

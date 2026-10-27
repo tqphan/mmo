@@ -14,7 +14,7 @@ The original's interest management isn't public. Players saw other characters ou
 - Clients subscribe with one `cell = key` query per cell and table. Range queries cost 7× more database time (docs/spikes/throughput.md).
 
 ### Tiers
-Self, Near, Static, Far and Global, as in PLAN §4.3. Only Self and Near exist so far. Each windowed tier (Near, Static, Far) gets its own director with its tables and radius. Self and Global are fixed subscriptions made once.
+Self, Near, Static, Far and Global, as in PLAN §4.3. Self, Near and Static exist so far. The Static tier is 9 × 9 cells (radius 4, at least 248 m past the player) over `resource_node` (docs/design/gathering.md); plots, buildings and crops join it later. Each windowed tier (Near, Static, Far) gets its own director with its tables and radius. Self and Global are fixed subscriptions made once.
 
 ### The director
 - **One subscription per cell**, covering all of the tier's tables for that cell. When the window moves one cell, only the 5 new cells of a 5×5 window are fetched, and the 20 it already has stay as they are. Resubscribing the whole window would resend all 25 cells' rows.
@@ -26,7 +26,7 @@ Self, Near, Static, Far and Global, as in PLAN §4.3. Only Self and Near exist s
 
 ## 3. Deviations and not yet done
 - **Instances:** the director works in the open world only. Dungeons and arenas will pass their instance id when they exist.
-- **Static, Far and Global tiers** come with the systems that need them (housing, ships, world state).
+- **Far and Global tiers** come with the systems that need them (ships on the horizon, world state). Loadbot's director has no Static tier yet; the `gather` scenario subscribes to its one cell directly.
 - **The siege lever** (outer ring at 2 Hz, PLAN §4.3) isn't built.
 
 ## 4. Test plan

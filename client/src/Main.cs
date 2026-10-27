@@ -73,13 +73,21 @@ namespace Mmo
             var controls = new ShipControls(session, player, entities, map, options);
             AddChild(controls);
             player.Controls = controls;
+            var nodes = new NodeRegistry(session);
+            AddChild(nodes);
+            var gathering = new Gathering(session, player, nodes);
+            AddChild(gathering);
+            player.Gathering = gathering;
+            AddChild(new GatherBar(gathering));
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
-            AddChild(new Hud(session, player, entities, world.Land, controls));
+            AddChild(new Hud(session, player, entities, world.Land, controls, gathering));
             var bag = new BagWindow(session);
             AddChild(bag);
             if (options.BagDemo)
                 AddChild(new BagDemo(session, bag));
+            if (options.GatherDemo)
+                AddChild(new GatherDemo(session, player, nodes, gathering));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))

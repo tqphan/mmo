@@ -146,7 +146,6 @@ pub fn destroy_item(ctx: &ReducerContext, item_id: u64, count: u32) -> Result<()
 
 /// Put `count` of item `def` in `char_id`'s bag: topping up its stacks of that item, lowest slot
 /// first, then filling empty slots from the lowest. All or nothing: if it doesn't all fit, nothing changes.
-#[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_grant_item` grants until gathering (M1 task 3)
 pub fn grant(ctx: &ReducerContext, char_id: u64, def: u16, count: u32) -> Result<(), String> {
     let d = def_of(def).ok_or_else(|| format!("no item {def}"))?;
     if count == 0 {
@@ -183,6 +182,16 @@ pub fn grant(ctx: &ReducerContext, char_id: u64, def: u16, count: u32) -> Result
         ctx.db.item().insert(Item { id: 0, holder: char_id, place: place::BAG, slot, def, count: n });
     }
     Ok(())
+}
+
+/// How many of item `def` fit in `char_id`'s bag: room left on its stacks of that item, and whole
+/// stacks in its empty slots. `grant` of up to this many succeeds.
+pub fn room_for(ctx: &ReducerContext, char_id: u64, def: u16) -> u32 {
+    let Some(d) = def_of(def) else { return 0 };
+    let bag: Vec<Item> = ctx.db.item().by_slot().filter((char_id, place::BAG)).collect();
+    let tops: u32 = bag.iter().filter(|s| s.def == def).map(|s| d.stack.saturating_sub(s.count)).sum();
+    let empty = u32::from(BAG_SLOTS).saturating_sub(bag.len() as u32);
+    tops.saturating_add(empty.saturating_mul(d.stack))
 }
 
 /// Dev builds only: grant `count` of the item with content id `item` to the caller's character in the world.
