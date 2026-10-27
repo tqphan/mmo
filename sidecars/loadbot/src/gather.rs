@@ -118,14 +118,14 @@ pub fn scenario(args: &Args) -> Check {
 }
 
 /// A reducer's `_then` callback.
-type Then = Box<dyn FnOnce(&ReducerEventContext, Result<Result<(), String>, spacetimedb_sdk::__codegen::InternalError>) + Send>;
+pub(crate) type Then = Box<dyn FnOnce(&ReducerEventContext, Result<Result<(), String>, spacetimedb_sdk::__codegen::InternalError>) + Send>;
 
 /// Call a reducer through its `_then` form and wait for its outcome.
-fn call(_bot: &Bot, send: impl FnOnce(Then) -> spacetimedb_sdk::Result<()>) -> Check {
+pub(crate) fn call(_bot: &Bot, send: impl FnOnce(Then) -> spacetimedb_sdk::Result<()>) -> Check {
     outcome(|tx| send(Box::new(move |_, r| drop(tx.send(flatten(r))))))
 }
 
-fn subscribe(bot: &Bot, queries: &[&str]) -> Check {
+pub(crate) fn subscribe(bot: &Bot, queries: &[&str]) -> Check {
     let applied = Arc::new(AtomicBool::new(false));
     let flag = applied.clone();
     let queries: Vec<String> = queries.iter().map(|q| q.to_string()).collect();
@@ -180,24 +180,24 @@ fn step(bot: &Bot, dx: f32) -> Check {
     wait_for("the move", || bot.presence().is_some_and(|q| q.x == x))
 }
 
-fn held(bot: &Bot, char_id: u64, item: &str) -> u32 {
+pub(crate) fn held(bot: &Bot, char_id: u64, item: &str) -> u32 {
     let wire = item_by_id(item).map(|i| i.wire).unwrap_or_default();
     bot.conn.db.my_inventory().iter().filter(|i| i.holder == char_id && i.def == wire).map(|i| i.count).sum()
 }
 
-fn game_now(bot: &Bot) -> i64 {
+pub(crate) fn game_now(bot: &Bot) -> i64 {
     let offset = bot.conn.db.game_clock().iter().next().map_or(0, |c| c.offset_micros);
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_micros() as i64) + offset
 }
 
 /// The pool as of game time now.
-fn labor(bot: &Bot) -> i32 {
+pub(crate) fn labor(bot: &Bot) -> i32 {
     bot.conn.db.my_labor().iter().next().map_or(-1, |l| {
         sim::labor::Pool { points: l.points, at: l.at.to_micros_since_unix_epoch() }.current(&sim::labor::LABOR, game_now(bot))
     })
 }
 
-fn set_labor(bot: &Bot, points: i32) -> Check {
+pub(crate) fn set_labor(bot: &Bot, points: i32) -> Check {
     call(bot, |tx| bot.conn.reducers.dev_set_labor_then(points, tx))?;
     wait_for("the new pool", || bot.conn.db.my_labor().iter().next().is_some_and(|l| l.points == points))
 }

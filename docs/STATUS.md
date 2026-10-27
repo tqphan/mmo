@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-10-26 (M1 task 3: gathering).
+**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-10-26 (M1 task 4: crafting).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -34,6 +34,18 @@
   - The client draws placeholder tufts, rocks and trees, with stumps while they regrow. F on land gathers the nearest ready node in reach (otherwise F still climbs aboard). The HUD prompts `F: gather …` or `… regrows in m:ss`, and a progress bar shows the gather. Moving cancels it.
   - `--gather-demo` teleports beside the nearest plant and then the nearest tree and gathers both. Against the live server it got 4 Saltreed for 5 labor and 1 Driftpine Log for 10, with zero corrections. Captures: `docs/captures/2026-10-26-gather-{reed,tree,stump}.png`.
   - The `gather` bot scenario passes on an empty database and on the uploaded world.
+- **Crafting** (M1 task 4, docs/design/crafting.md, ADR 0024):
+  - Three stations (Joiner's Bench, Bloomery, Cookhearth) and 20 recipes in `content/crafting.toml`, and 18 new crafted items (twine, cloth, rope, sailcloth, planks, a beam, ingots, bars, nails, fittings, charcoal, food and three tools), all named in `docs/world/`. The chains run hearth → bloomery → bench: charcoal smelts ore, and bars make nails and tools. Contentgen checks stations, items, inputs, counts, labor and times. The numbers are ours.
+  - A public `station` row per station, in the Static tier, placed from `world/stations.tsv` (one of each in the town east of spawn, from `worldtool stations`). `cargo xtask world` uploads them, and admins have `admin_put_stations`, `admin_remove_stations` and `admin_clear_stations`.
+  - `craft(station, recipe, count)` refuses, with nothing changed, when the caller:
+    - isn't in the world, is aboard a ship or swimming, or is already crafting or gathering;
+    - asks for an unknown recipe, a count outside 1–100, a missing or wrong station, or one out of reach (4 m);
+    - lacks one unit's labor or inputs, or bag room for its output.
+  - A private scheduled `craft_job`, read through `my_craft`, makes one unit per run. Each run takes the inputs, grants the output and spends the labor in one all-or-nothing `items::exchange` (inputs that free a slot count as room). Then it reschedules for the next unit, or ends as soon as the next can't be made.
+  - Moving 0.5 m, `cancel_craft`, leaving the world and removing the station cancel for free.
+  - The client draws placeholder stations with names. F at one opens a craft window: the station's recipes with have/need, labor, time and how many are affordable, a count with − + and Max, and Craft and Cancel. A progress bar shows `Crafting Charcoal 2 / 3`, and moving cancels.
+  - `--craft-demo` grants logs and ore and crafts 3 Charcoal at the Cookhearth, then 2 Rustiron Bars at the Bloomery, through the window. Against the live server it made 9 Charcoal for 15 labor and 2 bars for 20. Captures: `docs/captures/2026-10-26-craft-{hearth,bloomery}.png`.
+  - The `craft` bot scenario passes: refusals, a batch of 3 that reschedules, a batch of 5 that stops after 2, and cancelling by moving and by `cancel_craft`.
 - **Godot client skeleton, working against the local server** (docs/design/client.md, ADR 0015):
   - The client connects with Gzip, keeps a token per `--profile`, makes a character if needed and enters with the content hash.
   - The player is a predicted `CharacterBody3D`. It sends movement events (start, stop, turns, jump, landing, 0.5 s heartbeats) and snaps to `my_presence` on each correction.
@@ -70,9 +82,9 @@
   - World scale: on the RTX 5070 Ti at 1080p the whole scene takes at most 2.0 ms of GPU time at p99 on every route, with no frame over 33 ms. The first view streams in 0.5–0.7 s, and a 15 km teleport re-streams in under 1 s. The world adds 122 MB to the client, and the whole map's terrain adds 172 MB to the server. On the Radeon 610M integrated GPU, far below mid-range, it holds 36–60 fps at 1080p with no frame over 33 ms, which puts mid-range inside the 4 ms budget (docs/spikes/world-scale.md).
   - Terrain: 16 bots walked procedural hills and cliff-sided mesas for 30 minutes with no false corrections, and a cheater bot's cliff teleport, fly hack and underground dive were each corrected. Walkers now count a slide once per fall and respawn when stuck sliding in a steep dip. A rerun on 2026-10-26 walked 151 km with 17 slides (against 10,020 counted frame by frame in the worst earlier run), no respawns needed and no false corrections.
 - **Tests:**
-  - 80 `sim` unit tests (one checks the client's golden vectors are current), 26 `contentgen` tests, 88 module tests (in-memory datastore), 17 `worldtool` tests (including one that loads the committed world against its manifest, and one that checks the committed nodes stand on it and are current) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
-  - 86 client xUnit tests: the bag window's click rules, and the C# ports match `sim` on 1,134 generated vectors (labor and gathering included) (including a `.mmoh` file and its chunk and terrain hashes, and ship frames, steps, courses and cannon flights), plus the director, the move sender (frame changes, mode changes inside the swim limit), the snapshot buffer, the ship predictor, boarding, swimming, the autopilot and its ship routes, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
-  - the `see-each-other`, `tick`, `cross-cells`, `terrain`, `ship`, `labor`, `items` and `gather` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
+  - 84 `sim` unit tests (one checks the client's golden vectors are current), 29 `contentgen` tests, 101 module tests (in-memory datastore), 19 `worldtool` tests (including one that loads the committed world against its manifest, and ones that check the committed nodes and stations stand on it and are current) and 5 loadbot tests (two drop a walker into a steep pit and down a steep bank), with clippy clean
+  - 92 client xUnit tests: the bag window's click rules and the craft window's rules, and the C# ports match `sim` on 1,374 generated vectors (labor, gathering and crafting included) (including a `.mmoh` file and its chunk and terrain hashes, and ship frames, steps, courses and cannon flights), plus the director, the move sender (frame changes, mode changes inside the swim limit), the snapshot buffer, the ship predictor, boarding, swimming, the autopilot and its ship routes, the heightmap reader (with per-cell collision heights), the terrain tile plan, and the world's files (the committed world loads with its manifest's hash; damaged files are refused). The Godot project compiles with warnings as errors.
+  - the `see-each-other`, `tick`, `cross-cells`, `terrain`, `ship`, `labor`, `items`, `gather` and `craft` bot scenarios, which pass against a live server, plus `swarm` for load and `visitor` as company for client tests
 - **Dev tasks:** `cargo xtask` (see CLAUDE.md, Commands).
 - **Client toolchain:** Godot 4.7.2 .NET with `SpacetimeDB.ClientSDK.Godot` 2.13.0 on Linux. The SDK declares GodotSharp 4.6.2, and NuGet resolves it to 4.7.2 without complaint. Movie Maker captures work under Wayland on the laptop's GPU.
 
@@ -87,10 +99,10 @@
 | Blender | none | none |
 
 ## Next
-1. **M1 task 4, crafting** (BACKLOG): two workstations and about 20 recipes that turn gathered materials into goods for labor.
+1. **M1, land** (BACKLOG, now first): garden and farm deeds on housing land, weekly tax and demolition by timestamp.
 2. Verify on the Windows PC when you're at it (BACKLOG, "Any time").
-3. **After pulling:** the schema changed (`resource_node`, `gather_job`), so run `cargo xtask publish --clear` and then `cargo xtask world` once.
-4. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. Press I to open the bag; `--bag-demo` fills it and plays through every operation. To gather, leave the town round spawn: Saltreed grows on the beaches about 250 m out, and herbs and driftpines stand on the hills about 300 m east. Stand by one and press F. `--gather-demo` does it for you. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
+3. **After pulling:** the schema changed (`station`, `craft_job`), so run `cargo xtask publish --clear` and then `cargo xtask world` once.
+4. **Try the client:** run `cargo xtask server`, `cargo xtask publish` and `cargo xtask world`, then `cargo xtask client --profile <name>` in one or two terminals. `cargo xtask bot visitor --secs 120` adds a bot for company. Press I to open the bag; `--bag-demo` fills it and plays through every operation. To gather, leave the town round spawn: Saltreed grows on the beaches about 250 m out, and herbs and driftpines stand on the hills about 300 m east. Stand by one and press F. `--gather-demo` does it for you. To craft, walk about 10 m east of spawn to the Cookhearth, Bloomery and Joiner's Bench and press F by one; `--craft-demo` crafts Charcoal and Rustiron Bars for you. To sail, walk west to the beach (about 350 m), wade out until the water is deep, face the sea and press F9, then swim to the ship and press F alongside it.
 
 ## Research
 Original movement and ship numbers were searched on 2026-10-26 (RESEARCH §2A.4). Our run speed and clipper speed match. Known differences, left for M1 tuning: our clipper has 12,000 HP and two cannons against the original's 7,000–9,000 and one, and our swim speed (3.5 m/s) is well under the early original's (about 6.8 m/s, later nerfed). Jump height, fall damage and ship handling remain unknown.

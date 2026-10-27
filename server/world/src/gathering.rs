@@ -78,8 +78,11 @@ pub fn gather(ctx: &ReducerContext, node_id: u64) -> Result<(), String> {
     if p.mode == MoveMode::Swim as u8 {
         return Err("can't gather while swimming".into());
     }
-    if ctx.db.gather_job().char_id().find(p.char_id).is_some() {
+    if busy(ctx, p.char_id) {
         return Err("already gathering".into());
+    }
+    if crate::crafting::busy(ctx, p.char_id) {
+        return Err("already crafting".into());
     }
     let n = ctx.db.resource_node().id().find(node_id).ok_or("no such node")?;
     let kind = kind_of(&n)?;
@@ -159,6 +162,11 @@ fn finish(ctx: &ReducerContext, job: &GatherJob, n: &ResourceNode) -> Result<&'s
     crate::labor::spend(ctx, job.identity, kind.labor)?;
     crate::items::grant(ctx, p.char_id, kind.item, job.count)?;
     Ok(kind)
+}
+
+/// `char_id` is gathering.
+pub fn busy(ctx: &ReducerContext, char_id: u64) -> bool {
+    ctx.db.gather_job().char_id().find(char_id).is_some()
 }
 
 /// Stop `char_id`'s gather, if it has one, and free its node. Costs nothing.

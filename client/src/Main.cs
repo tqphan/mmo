@@ -78,16 +78,26 @@ namespace Mmo
             var gathering = new Gathering(session, player, nodes);
             AddChild(gathering);
             player.Gathering = gathering;
-            AddChild(new GatherBar(gathering));
+            var stations = new StationRegistry(session);
+            AddChild(stations);
+            var crafting = new Crafting(session, player, stations);
+            AddChild(crafting);
+            player.Crafting = crafting;
+            var craftWindow = new CraftWindow(session, crafting);
+            AddChild(craftWindow);
+            crafting.Window = craftWindow;
+            AddChild(new GatherBar(gathering, crafting));
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
-            AddChild(new Hud(session, player, entities, world.Land, controls, gathering));
+            AddChild(new Hud(session, player, entities, world.Land, controls, gathering, crafting));
             var bag = new BagWindow(session);
             AddChild(bag);
             if (options.BagDemo)
                 AddChild(new BagDemo(session, bag));
             if (options.GatherDemo)
                 AddChild(new GatherDemo(session, player, nodes, gathering));
+            if (options.CraftDemo)
+                AddChild(new CraftDemo(session, player, stations, crafting, craftWindow));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))

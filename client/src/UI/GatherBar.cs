@@ -3,17 +3,19 @@ using Mmo.Gameplay;
 
 namespace Mmo.UI
 {
-    /// <summary>A progress bar low in the middle of the screen while we gather (docs/design/gathering.md).</summary>
+    /// <summary>A progress bar low in the middle of the screen while we gather or craft (docs/design/gathering.md, crafting.md).</summary>
     public partial class GatherBar : CanvasLayer
     {
         private readonly Gathering gathering;
+        private readonly Crafting crafting;
         private readonly Control root = new();
         private readonly ProgressBar bar = new();
         private readonly Label label = new();
 
-        public GatherBar(Gathering gathering)
+        public GatherBar(Gathering gathering, Crafting crafting)
         {
             this.gathering = gathering;
+            this.crafting = crafting;
             Name = "GatherBar";
         }
 
@@ -40,11 +42,18 @@ namespace Mmo.UI
 
         public override void _Process(double delta)
         {
-            root.Visible = gathering.Bar is not null;
+            // The craft window shows its own progress line, and would cover this one.
+            var craft = crafting.Window is { Open: true } ? null : crafting.Bar;
+            root.Visible = gathering.Bar is not null || craft is not null;
             if (gathering.Bar is { } b)
             {
                 label.Text = $"Gathering {b.Kind.Name}";
                 bar.Value = b.Progress;
+            }
+            else if (craft is { } c)
+            {
+                label.Text = $"Crafting {Content.GameContent.Item(c.Recipe.Output)?.Name}  {c.Made + 1} / {c.Count}";
+                bar.Value = c.Progress;
             }
         }
     }

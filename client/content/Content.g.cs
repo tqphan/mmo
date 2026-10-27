@@ -98,6 +98,24 @@ namespace Mmo.Content
     /// <param name="RegrowS">How long until it can be gathered again, in seconds.</param>
     public sealed record NodeData(byte Wire, string Id, string Name, NodeKind Kind, ushort Item, uint YieldMin, uint YieldMax, int Labor, float GatherS, uint RegrowS);
 
+    /// <summary>Crafting station kinds (content/crafting.toml, docs/design/crafting.md).</summary>
+    /// <param name="Wire">Stored in station rows.</param>
+    public sealed record StationData(byte Wire, string Id, string Name);
+
+    /// <summary>One input to a recipe.</summary>
+    /// <param name="Item">The item's wire.</param>
+    public sealed record Ingredient(ushort Item, uint Count);
+
+    /// <summary>Recipes (content/crafting.toml, docs/design/crafting.md).</summary>
+    /// <param name="Wire">Stored in craft jobs.</param>
+    /// <param name="Station">The wire of the station kind it needs.</param>
+    /// <param name="Inputs">Taken for each unit.</param>
+    /// <param name="Output">The wire of the item it makes.</param>
+    /// <param name="OutputCount">How many each unit makes.</param>
+    /// <param name="Labor">Labor spent for each unit.</param>
+    /// <param name="CraftS">How long one unit takes, in seconds.</param>
+    public sealed record RecipeData(ushort Wire, string Id, byte Station, IReadOnlyList<Ingredient> Inputs, ushort Output, uint OutputCount, int Labor, float CraftS);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -115,7 +133,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x9c1c7b4e194bd1c1UL;
+        public const ulong Hash = 0x80324c399b591032UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -162,8 +180,26 @@ namespace Mmo.Content
             new(11, "rustvein_ore", "Rustvein Ore", ItemKind.Material, 1000),
             new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),
             new(21, "hollowoak_log", "Hollowoak Log", ItemKind.Material, 1000),
+            new(30, "saltreed_twine", "Saltreed Twine", ItemKind.Material, 1000),
+            new(31, "reedcloth", "Reedcloth", ItemKind.Material, 1000),
+            new(32, "saltrope", "Saltrope", ItemKind.Material, 1000),
+            new(33, "sailcloth", "Sailcloth", ItemKind.Material, 1000),
+            new(40, "driftpine_plank", "Driftpine Plank", ItemKind.Material, 1000),
+            new(41, "hollowoak_plank", "Hollowoak Plank", ItemKind.Material, 1000),
+            new(42, "hollowoak_beam", "Hollowoak Beam", ItemKind.Material, 1000),
+            new(50, "tin_ingot", "Tin Ingot", ItemKind.Material, 1000),
+            new(51, "rustiron_bar", "Rustiron Bar", ItemKind.Material, 1000),
+            new(52, "rustiron_nails", "Rustiron Nails", ItemKind.Material, 1000),
+            new(53, "rustiron_fittings", "Rustiron Fittings", ItemKind.Material, 1000),
+            new(60, "charcoal", "Charcoal", ItemKind.Material, 1000),
             new(100, "duskberry_tart", "Duskberry Tart", ItemKind.Consumable, 100),
+            new(101, "duskberry_preserve", "Duskberry Preserve", ItemKind.Consumable, 100),
+            new(102, "emberleaf_salve", "Emberleaf Salve", ItemKind.Consumable, 100),
+            new(103, "emberleaf_tea", "Emberleaf Tea", ItemKind.Consumable, 100),
             new(200, "reedcutter_knife", "Reedcutter's Knife", ItemKind.Gear, 1),
+            new(201, "felling_axe", "Felling Axe", ItemKind.Gear, 1),
+            new(202, "prospector_pick", "Prospector's Pick", ItemKind.Gear, 1),
+            new(203, "tin_lantern", "Tin Lantern", ItemKind.Gear, 1),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -188,5 +224,50 @@ namespace Mmo.Content
 
         /// <summary>The node kind stored as <paramref name="wire"/>, if it exists.</summary>
         public static NodeData? Node(byte wire) => wire < Nodes.Count ? Nodes[wire] : null;
+
+        /// <summary>How close a character must stand to a station, horizontally and vertically, in metres.</summary>
+        public const float CraftReachM = 4.0f;
+
+        /// <summary>The most units one craft may ask for.</summary>
+        public const uint CraftMaxCount = 100;
+
+        /// <summary>Every station kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<StationData> Stations = new StationData[]
+        {
+            new(0, "joiners_bench", "Joiner's Bench"),
+            new(1, "bloomery", "Bloomery"),
+            new(2, "cookhearth", "Cookhearth"),
+        };
+
+        /// <summary>The station kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static StationData? Station(byte wire) => wire < Stations.Count ? Stations[wire] : null;
+
+        /// <summary>Every recipe, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<RecipeData> Recipes = new RecipeData[]
+        {
+            new(0, "saltreed_twine", 0, new Ingredient[] { new(1, 4) }, 30, 1, 5, 2.0f),
+            new(1, "reedcloth", 0, new Ingredient[] { new(30, 4) }, 31, 1, 10, 4.0f),
+            new(2, "saltrope", 0, new Ingredient[] { new(30, 3) }, 32, 1, 5, 3.0f),
+            new(3, "sailcloth", 0, new Ingredient[] { new(31, 3), new(32, 1) }, 33, 1, 20, 6.0f),
+            new(4, "driftpine_plank", 0, new Ingredient[] { new(20, 1) }, 40, 2, 5, 3.0f),
+            new(5, "hollowoak_plank", 0, new Ingredient[] { new(21, 1) }, 41, 2, 5, 3.0f),
+            new(6, "hollowoak_beam", 0, new Ingredient[] { new(41, 3), new(52, 4) }, 42, 1, 15, 5.0f),
+            new(7, "reedcutter_knife", 0, new Ingredient[] { new(51, 1), new(40, 1), new(30, 1) }, 200, 1, 20, 6.0f),
+            new(8, "felling_axe", 0, new Ingredient[] { new(51, 2), new(41, 1) }, 201, 1, 25, 8.0f),
+            new(9, "prospector_pick", 0, new Ingredient[] { new(51, 2), new(40, 1) }, 202, 1, 25, 8.0f),
+            new(10, "tin_ingot", 1, new Ingredient[] { new(10, 3), new(60, 1) }, 50, 1, 10, 5.0f),
+            new(11, "rustiron_bar", 1, new Ingredient[] { new(11, 3), new(60, 1) }, 51, 1, 10, 5.0f),
+            new(12, "rustiron_nails", 1, new Ingredient[] { new(51, 1) }, 52, 10, 5, 3.0f),
+            new(13, "rustiron_fittings", 1, new Ingredient[] { new(51, 2), new(50, 1) }, 53, 1, 15, 6.0f),
+            new(14, "tin_lantern", 1, new Ingredient[] { new(50, 2), new(30, 1) }, 203, 1, 15, 6.0f),
+            new(15, "charcoal", 2, new Ingredient[] { new(20, 2) }, 60, 3, 5, 4.0f),
+            new(16, "duskberry_tart", 2, new Ingredient[] { new(3, 6), new(2, 1) }, 100, 2, 10, 4.0f),
+            new(17, "duskberry_preserve", 2, new Ingredient[] { new(3, 8) }, 101, 2, 10, 5.0f),
+            new(18, "emberleaf_salve", 2, new Ingredient[] { new(2, 4), new(3, 1) }, 102, 2, 10, 4.0f),
+            new(19, "emberleaf_tea", 2, new Ingredient[] { new(2, 3) }, 103, 2, 5, 3.0f),
+        };
+
+        /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>
+        public static RecipeData? Recipe(ushort wire) => wire < Recipes.Count ? Recipes[wire] : null;
     }
 }

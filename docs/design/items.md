@@ -44,6 +44,7 @@ All of these act on the caller's character in the world (its `presence`); otherw
 - **`destroy_item(item_id, count)`**
   - Destroys `count`, from 1 to the stack's count. Destroying them all deletes the row.
   - The client asks for confirmation first; the server doesn't.
+- **`items::exchange(ctx, char_id, takes, give)`** is for crafting (docs/design/crafting.md). It takes each input from the smallest stacks first, ties going to the lowest slot. Then it grants the output, all or nothing. Slots the inputs empty count as room for the output.
 - **`items::grant(ctx, char_id, def, count)`** is for gathering, loot and crafting.
   - It tops up existing stacks of the item, lowest slot first, then fills empty slots from the lowest.
   - **All or nothing:** if everything doesn't fit, it returns "bag is full: room for R of C" and changes nothing.

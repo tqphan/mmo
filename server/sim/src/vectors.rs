@@ -53,7 +53,10 @@ pub fn generate() -> String {
          # labor <points> <at> <now> <settled points> <settled at> <next regen at, or none>, with the content rules\n\
          # labor_spend <points> <at> <now> <cost> <points> <at>, or short <have>\n\
          # gather_reach <node x> <y> <z> <at x> <y> <z> <in reach: 1 or 0>\n\
-         # gather_progress <node wire> <done at> <now> <progress>\n",
+         # gather_progress <node wire> <done at> <now> <progress>\n\
+         # craft_reach <station x> <y> <z> <at x> <y> <z> <in reach: 1 or 0>\n\
+         # craft_progress <recipe wire> <done at> <now> <progress>\n\
+         # craft_affordable <recipe wire> <labor> <held of each input, in order> <units>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -147,7 +150,35 @@ pub fn generate() -> String {
     ships(&mut out, &mut rng);
     labor(&mut out, &mut rng);
     gather(&mut out, &mut rng);
+    craft(&mut out, &mut rng);
     out
+}
+
+/// `sim::craft`'s reach, progress and affordability, for the client's port.
+fn craft(out: &mut String, rng: &mut Lcg) {
+    use crate::craft::{CRAFT_REACH_M, RECIPES, affordable, craft_micros, in_reach, progress};
+    for k in 0..80 {
+        let st = [rng.range(-8000.0, 8000.0), rng.range(-5.0, 200.0), rng.range(-8000.0, 8000.0)];
+        let spread = if k % 2 == 0 { CRAFT_REACH_M * 1.05 } else { CRAFT_REACH_M * 3.0 };
+        let at = [st[0] + rng.range(-spread, spread), st[1] + rng.range(-spread, spread), st[2] + rng.range(-spread, spread)];
+        let hit = u8::from(in_reach(st, at));
+        out.push_str(&format!("craft_reach {} {} {} {} {} {} {hit}\n", f(st[0]), f(st[1]), f(st[2]), f(at[0]), f(at[1]), f(at[2])));
+    }
+    let t0: i64 = 1_800_000_000_000_000;
+    for (k, r) in RECIPES.iter().enumerate() {
+        let done = t0 + k as i64 + craft_micros(r);
+        for _ in 0..4 {
+            let now = done + ((rng.next() - 0.7) * 1.6 * r.craft_s * 1e6) as i64;
+            out.push_str(&format!("craft_progress {} {done} {now} {}\n", r.wire, f(progress(r, done, now))));
+        }
+        for _ in 0..4 {
+            let held: Vec<u32> = r.inputs.iter().map(|i| (rng.next() * 12.0 * i.count as f32) as u32).collect();
+            let labor = (rng.next() * 12.0 * r.labor as f32) as i32 - r.labor;
+            let have = |w: u16| r.inputs.iter().position(|i| i.item == w).map_or(0, |p| held[p]);
+            let held_text: Vec<String> = held.iter().map(u32::to_string).collect();
+            out.push_str(&format!("craft_affordable {} {labor} {} {}\n", r.wire, held_text.join(" "), affordable(r, have, labor)));
+        }
+    }
 }
 
 /// `sim::gather`'s reach and progress, for the client's port.

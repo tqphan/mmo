@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 6";
+const FORMAT: &str = "contentgen 7";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -31,6 +31,8 @@ pub const ITEM_KINDS: [&str; 3] = ["material", "consumable", "gear"];
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
 /// Longer than a week to regrow is a typo.
 const MAX_REGROW_S: u32 = 7 * 86_400;
+/// More inputs than this to one recipe is a typo.
+const MAX_INPUTS: usize = 8;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -40,6 +42,7 @@ pub struct Sources {
     pub labor: String,
     pub items: String,
     pub gathering: String,
+    pub crafting: String,
 }
 
 impl Sources {
@@ -54,6 +57,7 @@ impl Sources {
             labor: read("labor.toml")?,
             items: read("items.toml")?,
             gathering: read("gathering.toml")?,
+            crafting: read("crafting.toml")?,
         })
     }
 }
@@ -208,6 +212,53 @@ pub struct NodeDef {
     pub regrow_s: u32,
 }
 
+/// `crafting.toml`: station kinds and recipes (docs/design/crafting.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CraftingFile {
+    crafting: CraftingRules,
+    station: Vec<StationDef>,
+    recipe: Vec<RecipeDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CraftingRules {
+    pub reach_m: f32,
+    pub max_count: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StationDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeDef {
+    pub wire: u16,
+    pub id: String,
+    /// A station id.
+    pub station: String,
+    pub inputs: Vec<IngredientDef>,
+    /// An item id from `items.toml`.
+    pub output: String,
+    pub output_count: u32,
+    pub labor: i32,
+    pub craft_s: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct IngredientDef {
+    /// An item id from `items.toml`.
+    pub item: String,
+    pub count: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -225,6 +276,11 @@ pub struct Content {
     pub gathering: GatheringRules,
     /// Sorted by `wire`, like the modes.
     pub nodes: Vec<NodeDef>,
+    pub crafting: CraftingRules,
+    /// Sorted by `wire`, like the modes.
+    pub stations: Vec<StationDef>,
+    /// Sorted by `wire`, like the modes.
+    pub recipes: Vec<RecipeDef>,
     pub hash: u64,
 }
 
@@ -232,6 +288,11 @@ impl Content {
     /// The wire of the item a node yields; parsing checked it exists.
     fn item_wire(&self, id: &str) -> u16 {
         self.items.iter().find(|i| i.id == id).map_or(0, |i| i.wire)
+    }
+
+    /// The wire of a station kind; parsing checked it exists.
+    fn station_wire(&self, id: &str) -> u8 {
+        self.stations.iter().find(|s| s.id == id).map_or(0, |s| s.wire)
     }
 }
 
@@ -244,10 +305,12 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let labor: Result<LaborDef, _> = from_toml("labor.toml", &src.labor);
     let items: Result<ItemsFile, _> = from_toml("items.toml", &src.items);
     let gathering: Result<GatheringFile, _> = from_toml("gathering.toml", &src.gathering);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering) = match (movement, ships, land, labor, items, gathering) {
-        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g)) => (m.mode, s.hull, l, b, i, g),
-        (m, s, l, b, i, g) => {
-            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).flatten().collect());
+    let crafting: Result<CraftingFile, _> = from_toml("crafting.toml", &src.crafting);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting) = match (movement, ships, land, labor, items, gathering, crafting) {
+        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c)) => (m.mode, s.hull, l, b, i, g, c),
+        (m, s, l, b, i, g, c) => {
+            let all = m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).chain(c.err());
+            return Err(all.flatten().collect());
         }
     };
     modes.sort_by_key(|m| m.wire);
@@ -256,12 +319,15 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     land.climate.sort_by_key(|c| c.wire);
     items.item.sort_by_key(|i| i.wire);
     gathering.node.sort_by_key(|n| n.wire);
+    crafting.station.sort_by_key(|s| s.wire);
+    crafting.recipe.sort_by_key(|r| r.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &mut errors);
     check_labor(&labor, &mut errors);
     check_items(&items, &mut errors);
     check_gathering(&gathering, &items.item, &mut errors);
+    check_crafting(&crafting, &items.item, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -269,6 +335,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         items: items.item,
         gathering: gathering.gathering,
         nodes: gathering.node,
+        crafting: crafting.crafting,
+        stations: crafting.station,
+        recipes: crafting.recipe,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -284,7 +353,7 @@ fn from_toml<T: serde::de::DeserializeOwned>(name: &str, text: &str) -> Result<T
 }
 
 /// The rules every table keyed by `id` and `wire` shares; `rows` is sorted by wire.
-fn check_ids<'a>(file: &str, what: &str, rows: impl Iterator<Item = (&'a str, u8)>, errors: &mut Vec<String>) {
+fn check_ids<'a>(file: &str, what: &str, rows: impl Iterator<Item = (&'a str, usize)>, errors: &mut Vec<String>) {
     let rows: Vec<_> = rows.collect();
     if rows.is_empty() {
         errors.push(format!("{file}: no {what}s"));
@@ -297,7 +366,7 @@ fn check_ids<'a>(file: &str, what: &str, rows: impl Iterator<Item = (&'a str, u8
         if rows[..i].iter().any(|o| o.0 == id) {
             errors.push(format!("{at}: duplicate id"));
         }
-        if usize::from(wire) != i {
+        if wire != i {
             errors.push(format!("{at}: wire values must run 0, 1, 2, … with no gaps or repeats (found {wire})"));
         }
     }
@@ -311,7 +380,7 @@ fn check_range(at: &str, name: &str, v: f32, lo: f32, hi: f32, errors: &mut Vec<
 }
 
 fn check_move_modes(modes: &[MoveModeDef], errors: &mut Vec<String>) {
-    check_ids("movement.toml", "mode", modes.iter().map(|m| (m.id.as_str(), m.wire)), errors);
+    check_ids("movement.toml", "mode", modes.iter().map(|m| (m.id.as_str(), usize::from(m.wire))), errors);
     for m in modes {
         let at = format!("movement.toml: mode {:?}", m.id);
         if !(m.max_speed_mps.is_finite() && m.max_speed_mps > 0.0 && m.max_speed_mps <= MAX_SPEED_LIMIT_MPS) {
@@ -321,7 +390,7 @@ fn check_move_modes(modes: &[MoveModeDef], errors: &mut Vec<String>) {
 }
 
 fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
-    check_ids("ships.toml", "hull", hulls.iter().map(|h| (h.id.as_str(), h.wire)), errors);
+    check_ids("ships.toml", "hull", hulls.iter().map(|h| (h.id.as_str(), usize::from(h.wire))), errors);
     for h in hulls {
         let at = format!("ships.toml: hull {:?}", h.id);
         let e = &mut *errors;
@@ -367,8 +436,8 @@ fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
 }
 
 fn check_land(land: &LandFile, errors: &mut Vec<String>) {
-    check_ids("land.toml", "land_use", land.land_use.iter().map(|u| (u.id.as_str(), u.wire)), errors);
-    check_ids("land.toml", "climate", land.climate.iter().map(|c| (c.id.as_str(), c.wire)), errors);
+    check_ids("land.toml", "land_use", land.land_use.iter().map(|u| (u.id.as_str(), usize::from(u.wire))), errors);
+    check_ids("land.toml", "climate", land.climate.iter().map(|c| (c.id.as_str(), usize::from(c.wire))), errors);
     if land.land_use.len() > MAX_LAND_USES {
         errors.push(format!("land.toml: at most {MAX_LAND_USES} land uses (4 bits of the raster)"));
     }
@@ -437,7 +506,7 @@ fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
 fn check_gathering(g: &GatheringFile, items: &[ItemDef], errors: &mut Vec<String>) {
     let file = "gathering.toml";
     check_range(file, "gathering.reach_m", g.gathering.reach_m, 0.5, 20.0, errors);
-    check_ids(file, "node", g.node.iter().map(|n| (n.id.as_str(), n.wire)), errors);
+    check_ids(file, "node", g.node.iter().map(|n| (n.id.as_str(), usize::from(n.wire))), errors);
     let mut names = std::collections::HashSet::new();
     for n in &g.node {
         let at = format!("{file}: node {:?}", n.id);
@@ -464,6 +533,60 @@ fn check_gathering(g: &GatheringFile, items: &[ItemDef], errors: &mut Vec<String
         if !(1..=MAX_REGROW_S).contains(&n.regrow_s) {
             errors.push(format!("{at}: regrow_s must be from 1 to {MAX_REGROW_S}"));
         }
+    }
+}
+
+fn check_crafting(c: &CraftingFile, items: &[ItemDef], errors: &mut Vec<String>) {
+    let file = "crafting.toml";
+    check_range(file, "crafting.reach_m", c.crafting.reach_m, 0.5, 20.0, errors);
+    if !(1..=1000).contains(&c.crafting.max_count) {
+        errors.push(format!("{file}: crafting.max_count must be from 1 to 1000"));
+    }
+    check_ids(file, "station", c.station.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
+    let mut names = std::collections::HashSet::new();
+    for st in &c.station {
+        let at = format!("{file}: station {:?}", st.id);
+        if !is_item_name(&st.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(st.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", st.name));
+        }
+    }
+    check_ids(file, "recipe", c.recipe.iter().map(|r| (r.id.as_str(), usize::from(r.wire))), errors);
+    for r in &c.recipe {
+        let at = format!("{file}: recipe {:?}", r.id);
+        if !c.station.iter().any(|s| s.id == r.station) {
+            errors.push(format!("{at}: no station {:?}", r.station));
+        }
+        match items.iter().find(|i| i.id == r.output) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", r.output)),
+            Some(i) if !(1..=i.stack).contains(&r.output_count) => {
+                errors.push(format!("{at}: output_count must be from 1 to the item's stack ({})", i.stack));
+            }
+            Some(_) => {}
+        }
+        if !(1..=MAX_INPUTS).contains(&r.inputs.len()) {
+            errors.push(format!("{at}: 1 to {MAX_INPUTS} inputs"));
+        }
+        for (k, input) in r.inputs.iter().enumerate() {
+            if !items.iter().any(|i| i.id == input.item) {
+                errors.push(format!("{at}: no item {:?} in items.toml", input.item));
+            }
+            if r.inputs[..k].iter().any(|o| o.item == input.item) {
+                errors.push(format!("{at}: input {:?} is listed twice", input.item));
+            }
+            if input.item == r.output {
+                errors.push(format!("{at}: the output can't be an input"));
+            }
+            if !(1..=MAX_STACK).contains(&input.count) {
+                errors.push(format!("{at}: input {:?} count must be from 1 to {MAX_STACK}", input.item));
+            }
+        }
+        if !(1..=1000).contains(&r.labor) {
+            errors.push(format!("{at}: labor must be from 1 to 1000"));
+        }
+        check_range(&at, "craft_s", r.craft_s, 0.5, 600.0, errors);
     }
 }
 
@@ -532,6 +655,18 @@ fn canonical(c: &Content) -> String {
             n.regrow_s
         )
         .unwrap();
+    }
+    writeln!(s, "crafting\t{}\t{}", Value::F32(c.crafting.reach_m).bits(), c.crafting.max_count).unwrap();
+    for st in &c.stations {
+        writeln!(s, "station\t{}\t{}\t{}", st.wire, st.id, st.name).unwrap();
+    }
+    for r in &c.recipes {
+        write!(s, "recipe\t{}\t{}\t{}\t{}\t{}\t{}\t{}", r.wire, r.id, r.station, r.output, r.output_count, r.labor, Value::F32(r.craft_s).bits())
+            .unwrap();
+        for i in &r.inputs {
+            write!(s, "\t{}:{}", i.item, i.count).unwrap();
+        }
+        s += "\n";
     }
     s
 }
@@ -874,7 +1009,61 @@ pub fn render_rust(c: &Content) -> String {
     s += "pub fn node(wire: u8) -> Option<&'static NodeData> {\n    NODES.get(usize::from(wire))\n}\n\n";
     s += "/// The node kind with content id `id`.\n";
     s += "pub fn node_by_id(id: &str) -> Option<&'static NodeData> {\n";
-    s += "    NODES.iter().find(|d| d.id == id)\n}\n";
+    s += "    NODES.iter().find(|d| d.id == id)\n}\n\n";
+
+    s += "/// Crafting station kinds (`content/crafting.toml`, docs/design/crafting.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct StationData {\n";
+    s += "    /// Stored in station rows.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n}\n\n";
+    s += "/// Every station kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static STATIONS: [StationData; {}] = [", c.stations.len()).unwrap();
+    for st in &c.stations {
+        writeln!(s, "    StationData {{ wire: {}, id: {:?}, name: {:?} }},", st.wire, st.id, st.name).unwrap();
+    }
+    s += "];\n\n";
+    s += "/// One input to a recipe.\n#[derive(Debug, PartialEq)]\npub struct Ingredient {\n";
+    s += "    /// The item's wire.\n    pub item: u16,\n    pub count: u32,\n}\n\n";
+    s += "/// Recipes (`content/crafting.toml`, docs/design/crafting.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct RecipeData {\n";
+    s += "    /// Stored in craft jobs.\n    pub wire: u16,\n    pub id: &'static str,\n";
+    s += "    /// The wire of the station kind it needs.\n    pub station: u8,\n";
+    s += "    /// Taken for each unit.\n    pub inputs: &'static [Ingredient],\n";
+    s += "    /// The wire of the item it makes, and how many each unit makes.\n    pub output: u16,\n    pub output_count: u32,\n";
+    s += "    /// Labor spent for each unit.\n    pub labor: i32,\n";
+    s += "    /// How long one unit takes, in seconds.\n    pub craft_s: f32,\n}\n\n";
+    s += "/// Every recipe, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static RECIPES: [RecipeData; {}] = [", c.recipes.len()).unwrap();
+    for r in &c.recipes {
+        let inputs: Vec<String> =
+            r.inputs.iter().map(|i| format!("Ingredient {{ item: {}, count: {} }}", c.item_wire(&i.item), i.count)).collect();
+        writeln!(
+            s,
+            "    RecipeData {{ wire: {}, id: {:?}, station: {}, inputs: &[{}], output: {}, output_count: {}, labor: {}, craft_s: {:?} }},",
+            r.wire,
+            r.id,
+            c.station_wire(&r.station),
+            inputs.join(", "),
+            c.item_wire(&r.output),
+            r.output_count,
+            r.labor,
+            r.craft_s
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// How close a character must stand to a station, horizontally and vertically, in metres.\n";
+    writeln!(s, "pub const CRAFT_REACH_M: f32 = {:?};\n", c.crafting.reach_m).unwrap();
+    s += "/// The most units one craft may ask for.\n";
+    writeln!(s, "pub const CRAFT_MAX_COUNT: u32 = {};\n", c.crafting.max_count).unwrap();
+    s += "/// The station kind stored as `wire`.\n";
+    s += "pub fn station(wire: u8) -> Option<&'static StationData> {\n    STATIONS.get(usize::from(wire))\n}\n\n";
+    s += "/// The station kind with content id `id`.\n";
+    s += "pub fn station_by_id(id: &str) -> Option<&'static StationData> {\n";
+    s += "    STATIONS.iter().find(|d| d.id == id)\n}\n\n";
+    s += "/// The recipe stored as `wire`.\n";
+    s += "pub fn recipe(wire: u16) -> Option<&'static RecipeData> {\n    RECIPES.get(usize::from(wire))\n}\n\n";
+    s += "/// The recipe with content id `id`.\n";
+    s += "pub fn recipe_by_id(id: &str) -> Option<&'static RecipeData> {\n";
+    s += "    RECIPES.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -947,6 +1136,21 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"GatherS\">How long a gather takes, in seconds.</param>\n";
     s += "    /// <param name=\"RegrowS\">How long until it can be gathered again, in seconds.</param>\n";
     s += "    public sealed record NodeData(byte Wire, string Id, string Name, NodeKind Kind, ushort Item, uint YieldMin, uint YieldMax, int Labor, float GatherS, uint RegrowS);\n\n";
+    s += "    /// <summary>Crafting station kinds (content/crafting.toml, docs/design/crafting.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in station rows.</param>\n";
+    s += "    public sealed record StationData(byte Wire, string Id, string Name);\n\n";
+    s += "    /// <summary>One input to a recipe.</summary>\n";
+    s += "    /// <param name=\"Item\">The item's wire.</param>\n";
+    s += "    public sealed record Ingredient(ushort Item, uint Count);\n\n";
+    s += "    /// <summary>Recipes (content/crafting.toml, docs/design/crafting.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in craft jobs.</param>\n";
+    s += "    /// <param name=\"Station\">The wire of the station kind it needs.</param>\n";
+    s += "    /// <param name=\"Inputs\">Taken for each unit.</param>\n";
+    s += "    /// <param name=\"Output\">The wire of the item it makes.</param>\n";
+    s += "    /// <param name=\"OutputCount\">How many each unit makes.</param>\n";
+    s += "    /// <param name=\"Labor\">Labor spent for each unit.</param>\n";
+    s += "    /// <param name=\"CraftS\">How long one unit takes, in seconds.</param>\n";
+    s += "    public sealed record RecipeData(ushort Wire, string Id, byte Station, IReadOnlyList<Ingredient> Inputs, ushort Output, uint OutputCount, int Labor, float CraftS);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -1027,7 +1231,40 @@ pub fn render_csharp(c: &Content) -> String {
     }
     s += "        };\n\n";
     s += "        /// <summary>The node kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
-    s += "        public static NodeData? Node(byte wire) => wire < Nodes.Count ? Nodes[wire] : null;\n";
+    s += "        public static NodeData? Node(byte wire) => wire < Nodes.Count ? Nodes[wire] : null;\n\n";
+    s += "        /// <summary>How close a character must stand to a station, horizontally and vertically, in metres.</summary>\n";
+    writeln!(s, "        public const float CraftReachM = {:?}f;\n", c.crafting.reach_m).unwrap();
+    s += "        /// <summary>The most units one craft may ask for.</summary>\n";
+    writeln!(s, "        public const uint CraftMaxCount = {};\n", c.crafting.max_count).unwrap();
+    s += "        /// <summary>Every station kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<StationData> Stations = new StationData[]\n        {\n";
+    for st in &c.stations {
+        writeln!(s, "            new({}, {:?}, {:?}),", st.wire, st.id, st.name).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The station kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static StationData? Station(byte wire) => wire < Stations.Count ? Stations[wire] : null;\n\n";
+    s += "        /// <summary>Every recipe, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<RecipeData> Recipes = new RecipeData[]\n        {\n";
+    for r in &c.recipes {
+        let inputs: Vec<String> = r.inputs.iter().map(|i| format!("new({}, {})", c.item_wire(&i.item), i.count)).collect();
+        writeln!(
+            s,
+            "            new({}, {:?}, {}, new Ingredient[] {{ {} }}, {}, {}, {}, {:?}f),",
+            r.wire,
+            r.id,
+            c.station_wire(&r.station),
+            inputs.join(", "),
+            c.item_wire(&r.output),
+            r.output_count,
+            r.labor,
+            r.craft_s
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The recipe stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static RecipeData? Recipe(ushort wire) => wire < Recipes.Count ? Recipes[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -1165,6 +1402,42 @@ mod tests {
         regrow_s = 300
     "#;
 
+    const CRAFTING: &str = r#"
+        [crafting]
+        reach_m = 4.0
+        max_count = 100
+
+        [[station]]
+        wire = 1
+        id = "cookhearth"
+        name = "Cookhearth"
+
+        [[station]]
+        wire = 0
+        id = "joiners_bench"
+        name = "Joiner's Bench"
+
+        [[recipe]]
+        wire = 1
+        id = "kindling"
+        station = "cookhearth"
+        inputs = [{ item = "reedcutter_knife", count = 1 }]
+        output = "driftpine_log"
+        output_count = 3
+        labor = 5
+        craft_s = 2.5
+
+        [[recipe]]
+        wire = 0
+        id = "knife"
+        station = "joiners_bench"
+        inputs = [{ item = "driftpine_log", count = 2 }]
+        output = "reedcutter_knife"
+        output_count = 1
+        labor = 20
+        craft_s = 6.0
+    "#;
+
     fn sources() -> Sources {
         Sources {
             movement: MOVEMENT.into(),
@@ -1173,7 +1446,16 @@ mod tests {
             labor: LABOR.into(),
             items: ITEMS.into(),
             gathering: GATHERING.into(),
+            crafting: CRAFTING.into(),
         }
+    }
+
+    fn parse_crafting(crafting: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { crafting: crafting.into(), ..sources() })
+    }
+
+    fn crafting_errors(crafting: &str) -> String {
+        parse_crafting(crafting).unwrap_err().join("\n")
     }
 
     fn parse_gathering(gathering: &str) -> Result<Content, Vec<String>> {
@@ -1341,9 +1623,10 @@ mod tests {
             labor: "cap =\n".into(),
             items: "[bag\n".into(),
             gathering: "[gathering\n".into(),
+            crafting: "[crafting\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -1458,9 +1741,9 @@ mod tests {
             ("stack = 1000", "stack = 999"),
             ("slots = 50", "slots = 60"),
         ] {
-            // Nodes name items by id, so a renamed item is renamed there too.
+            // Nodes and recipes name items by id, so a renamed item is renamed there too.
             let changed = ITEMS.replace(from, to);
-            let c = parse(&Sources { items: changed.clone(), gathering: GATHERING.replace(from, to), ..sources() });
+            let c = parse(&Sources { items: changed.clone(), gathering: GATHERING.replace(from, to), crafting: CRAFTING.replace(from, to), ..sources() });
             assert_ne!(c.unwrap().hash, a, "{changed}");
         }
     }
@@ -1552,6 +1835,81 @@ mod tests {
         assert!(gathering_errors(&GATHERING.replace("yield_max = 3", "yield_max = 1001")).contains("the item's stack (1000)"));
         assert!(gathering_errors(&GATHERING.replace("regrow_s = 300", "regrow_s = 300\nrare = 1")).contains("unknown field `rare`"));
         assert!(gathering_errors("node = []\n[gathering]\nreach_m = 3.0").contains("no nodes"));
+    }
+
+    #[test]
+    fn recipes_parse_in_wire_order_and_reach_both_outputs() {
+        let c = parse_crafting(CRAFTING).unwrap();
+        assert_eq!(c.stations.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["joiners_bench", "cookhearth"]);
+        assert_eq!(c.recipes.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["knife", "kindling"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        let row = r#"RecipeData { wire: 1, id: "kindling", station: 1, inputs: &[Ingredient { item: 3, count: 1 }], output: 20, output_count: 3, labor: 5, craft_s: 2.5 },"#;
+        assert!(rs.contains(row), "{rs}");
+        assert!(rs.contains(r#"StationData { wire: 0, id: "joiners_bench", name: "Joiner's Bench" },"#));
+        assert!(rs.contains("pub const CRAFT_REACH_M: f32 = 4.0;") && rs.contains("pub const CRAFT_MAX_COUNT: u32 = 100;"));
+        assert!(cs.contains(r#"new(0, "knife", 0, new Ingredient[] { new(20, 2) }, 3, 1, 20, 6.0f),"#), "{cs}");
+        assert!(cs.contains(r#"new(1, "cookhearth", "Cookhearth"),"#));
+        assert!(cs.contains("public const float CraftReachM = 4.0f;") && cs.contains("public const uint CraftMaxCount = 100;"));
+    }
+
+    #[test]
+    fn any_recipe_change_changes_the_hash() {
+        let a = parse_crafting(CRAFTING).unwrap().hash;
+        for (from, to) in [
+            ("reach_m = 4.0", "reach_m = 4.5"),
+            ("max_count = 100", "max_count = 99"),
+            ("\"Cookhearth\"", "\"Old Hearth\""),
+            ("station = \"cookhearth\"", "station = \"joiners_bench\""),
+            ("count = 2 }", "count = 3 }"),
+            ("output_count = 3", "output_count = 4"),
+            ("labor = 20", "labor = 21"),
+            ("craft_s = 6.0", "craft_s = 6.5"),
+            ("id = \"kindling\"", "id = \"tinder\""),
+            (
+                "[{ item = \"driftpine_log\", count = 2 }]",
+                "[{ item = \"driftpine_log\", count = 2 }, { item = \"reedcutter_knife\", count = 1 }]",
+            ),
+        ] {
+            let changed = CRAFTING.replacen(from, to, 1);
+            assert_ne!(parse_crafting(&changed).map(|c| c.hash), Ok(a), "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_recipes_are_reported_together() {
+        let bad = CRAFTING
+            .replace("station = \"cookhearth\"", "station = \"kiln\"")
+            .replace("output = \"driftpine_log\"", "output = \"pearl\"")
+            .replace("[{ item = \"driftpine_log\", count = 2 }]", "[{ item = \"sand\", count = 0 }, { item = \"sand\", count = 1 }]")
+            .replace("labor = 5", "labor = 0")
+            .replace("craft_s = 6.0", "craft_s = 0.1")
+            .replace("reach_m = 4.0", "reach_m = 50.0")
+            .replace("max_count = 100", "max_count = 0");
+        let e = crafting_errors(&bad);
+        for want in [
+            "no station \"kiln\"",
+            "no item \"pearl\"",
+            "no item \"sand\"",
+            "input \"sand\" is listed twice",
+            "count must be from 1",
+            "labor must be from 1",
+            "craft_s must be from",
+            "reach_m must be from",
+            "max_count must be from 1",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = crafting_errors(&CRAFTING.replace("count = 1 }", "count = 1 }, { item = \"driftpine_log\", count = 1 }").replace("output_count = 1", "output_count = 2"));
+        for want in ["the output can't be an input", "output_count must be from 1 to the item's stack (1)"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(crafting_errors(&CRAFTING.replace("[{ item = \"driftpine_log\", count = 2 }]", "[]")).contains("1 to 8 inputs"));
+        let e = crafting_errors(&CRAFTING.replace("wire = 1\n        id = \"kindling\"", "wire = 0\n        id = \"kindling\"").replace("\"Cookhearth\"", "\"Joiner's Bench\""));
+        for want in ["wire values must run", "duplicate name"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(crafting_errors(&CRAFTING.replace("craft_s = 2.5", "craft_s = 2.5\nskill = 1")).contains("unknown field `skill`"));
+        assert!(crafting_errors("station = []\nrecipe = []\n[crafting]\nreach_m = 4.0\nmax_count = 1").contains("no stations"));
     }
 
     #[test]

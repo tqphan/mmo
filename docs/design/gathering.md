@@ -50,7 +50,7 @@ Ore's 10 labor is the original's iron vein (B). The rest is ours, for the M1 pla
   - there's no such node ("no such node");
   - it's out of reach ("out of reach");
   - it isn't ready yet ("nothing to gather here yet");
-  - someone is gathering it ("someone else is gathering this"), or the caller is gathering already ("already gathering");
+  - someone is gathering it ("someone else is gathering this"), or the caller is gathering already ("already gathering") or crafting ("already crafting", docs/design/crafting.md);
   - the account doesn't have the labor now ("not enough labor: have H, need C");
   - the yield wouldn't fit in the bag ("bag is full: …").
 - The yield is rolled when the gather starts, with the reducer's RNG, and kept in the private job. A gather that starts is then checked again against that same yield when it finishes.

@@ -7,7 +7,7 @@ using Mmo.World;
 
 namespace Mmo.UI
 {
-    /// <summary>A debug readout: connection, position, labor, land use, cell windows, entities in view, corrections, the ship we're on or next to, and resource nodes in reach.</summary>
+    /// <summary>A debug readout: connection, position, labor, land use, cell windows, entities in view, corrections, the ship we're on or next to, and resource nodes and stations in reach.</summary>
     public partial class Hud : CanvasLayer
     {
         private readonly Session session;
@@ -16,11 +16,13 @@ namespace Mmo.UI
         private readonly LandRaster? land;
         private readonly ShipControls controls;
         private readonly Gathering gathering;
+        private readonly Crafting crafting;
         private readonly Label label = new();
 
-        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls, Gathering gathering)
+        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls, Gathering gathering, Crafting crafting)
         {
             this.gathering = gathering;
+            this.crafting = crafting;
             this.controls = controls;
             this.session = session;
             this.player = player;
@@ -66,6 +68,8 @@ namespace Mmo.UI
                 text += "\n" + controls.Prompt;
             if (gathering.Prompt.Length > 0)
                 text += "\n" + gathering.Prompt;
+            if (crafting.Prompt.Length > 0)
+                text += "\n" + crafting.Prompt;
             label.Text = text;
         }
 

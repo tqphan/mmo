@@ -187,11 +187,57 @@ pub fn grant(ctx: &ReducerContext, char_id: u64, def: u16, count: u32) -> Result
 /// How many of item `def` fit in `char_id`'s bag: room left on its stacks of that item, and whole
 /// stacks in its empty slots. `grant` of up to this many succeeds.
 pub fn room_for(ctx: &ReducerContext, char_id: u64, def: u16) -> u32 {
+    room_in(&ctx.db.item().by_slot().filter((char_id, place::BAG)).collect::<Vec<_>>(), def)
+}
+
+/// How many of item `def` fit in a bag holding `bag`.
+fn room_in(bag: &[Item], def: u16) -> u32 {
     let Some(d) = def_of(def) else { return 0 };
-    let bag: Vec<Item> = ctx.db.item().by_slot().filter((char_id, place::BAG)).collect();
     let tops: u32 = bag.iter().filter(|s| s.def == def).map(|s| d.stack.saturating_sub(s.count)).sum();
     let empty = u32::from(BAG_SLOTS).saturating_sub(bag.len() as u32);
     tops.saturating_add(empty.saturating_mul(d.stack))
+}
+
+/// Take `takes` (item, count) from `char_id`'s bag and put `give` in it, all or nothing
+/// (crafting, docs/design/crafting.md). Each input comes from the smallest stacks first, ties
+/// going to the lowest slot, and slots the inputs empty count as room for the output.
+pub fn exchange(ctx: &ReducerContext, char_id: u64, takes: &[(u16, u32)], give: (u16, u32)) -> Result<(), String> {
+    for (it, count) in plan_exchange(ctx, char_id, takes, give)? {
+        set_count(ctx, it, count);
+    }
+    grant(ctx, char_id, give.0, give.1)
+}
+
+/// Whether `exchange` with the same arguments would succeed; changes nothing.
+pub fn can_exchange(ctx: &ReducerContext, char_id: u64, takes: &[(u16, u32)], give: (u16, u32)) -> Result<(), String> {
+    plan_exchange(ctx, char_id, takes, give).map(drop)
+}
+
+/// The stacks an exchange changes and their new counts (0 to delete), or why it can't happen.
+fn plan_exchange(ctx: &ReducerContext, char_id: u64, takes: &[(u16, u32)], give: (u16, u32)) -> Result<Vec<(Item, u32)>, String> {
+    let bag: Vec<Item> = ctx.db.item().by_slot().filter((char_id, place::BAG)).collect();
+    let mut left: Vec<u32> = bag.iter().map(|s| s.count).collect();
+    for &(def, count) in takes {
+        let have: u32 = bag.iter().filter(|s| s.def == def).map(|s| s.count).sum();
+        if have < count {
+            let name = def_of(def).map_or_else(|| format!("item {def}"), |d| d.name.to_string());
+            return Err(format!("not enough {name}: have {have}, need {count}"));
+        }
+        let mut stacks: Vec<usize> = (0..bag.len()).filter(|&i| bag[i].def == def).collect();
+        stacks.sort_by_key(|&i| (left[i], bag[i].slot));
+        let mut want = count;
+        for i in stacks {
+            let take = want.min(left[i]);
+            left[i] -= take;
+            want -= take;
+        }
+    }
+    let after: Vec<Item> = bag.iter().zip(&left).filter(|(_, n)| **n > 0).map(|(s, &count)| Item { count, ..s.clone() }).collect();
+    let room = room_in(&after, give.0);
+    if room < give.1 {
+        return Err(format!("bag is full: room for {room} of {}", give.1));
+    }
+    Ok(bag.into_iter().zip(left).filter(|(s, n)| s.count != *n).collect())
 }
 
 /// Dev builds only: grant `count` of the item with content id `item` to the caller's character in the world.

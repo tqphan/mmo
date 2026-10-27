@@ -3,6 +3,7 @@
 
 pub mod cell;
 pub mod content;
+pub mod craft;
 pub mod gather;
 pub mod labor;
 pub mod movement;

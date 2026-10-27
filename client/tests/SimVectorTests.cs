@@ -227,6 +227,49 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void CraftReach()
+        {
+            int n = 0, hits = 0;
+            foreach (var v in Lines("craft_reach"))
+            {
+                bool want = v[7] == "1";
+                Assert.Equal(want, Craft.InReach(new System.Numerics.Vector3(F(v[1]), F(v[2]), F(v[3])), new System.Numerics.Vector3(F(v[4]), F(v[5]), F(v[6]))));
+                hits += want ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 80 && hits >= 10 && hits < n, $"{n} vectors, {hits} in reach");
+        }
+
+        [Fact]
+        public void CraftProgress()
+        {
+            int n = 0;
+            foreach (var v in Lines("craft_progress"))
+            {
+                var r = GameContent.Recipe(ushort.Parse(v[1]))!;
+                Assert.Equal(F(v[4]), Craft.Progress(r, long.Parse(v[2]), long.Parse(v[3])));
+                n++;
+            }
+            Assert.True(n >= 50, $"{n} vectors");
+        }
+
+        [Fact]
+        public void CraftAffordable()
+        {
+            int n = 0, some = 0;
+            foreach (var v in Lines("craft_affordable"))
+            {
+                var r = GameContent.Recipe(ushort.Parse(v[1]))!;
+                var held = r.Inputs.Select((i, k) => (i.Item, Count: uint.Parse(v[3 + k]))).ToDictionary(p => p.Item, p => p.Count);
+                uint want = uint.Parse(v[3 + r.Inputs.Count]);
+                Assert.Equal(want, Craft.Affordable(r, w => held.TryGetValue(w, out var c) ? c : 0, int.Parse(v[2])));
+                some += want > 0 ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 50 && some > 10 && some < n, $"{n} vectors, {some} affordable");
+        }
+
+        [Fact]
         public void YawFacingRoundTrips()
         {
             for (float yaw = -3.1f; yaw < 3.1f; yaw += 0.1f)

@@ -1,0 +1,228 @@
+# Crafting (docs/design/crafting.md): station kinds and recipes. Station `wire`s are stored in
+# station rows and recipe `wire`s in craft jobs; both run 0, 1, 2, … like hulls. Items are ids from
+# items.toml, and names come from docs/world/. Labor and times are per unit and ours, for the M1
+# playtest to tune.
+
+[crafting]
+# How close a character must stand to a station: horizontally, and up or down.
+reach_m = 4.0
+# The most units one craft may ask for.
+max_count = 100
+
+[[station]]
+wire = 0
+id = "joiners_bench"
+name = "Joiner's Bench"
+
+[[station]]
+wire = 1
+id = "bloomery"
+name = "Bloomery"
+
+[[station]]
+wire = 2
+id = "cookhearth"
+name = "Cookhearth"
+
+# Joiner's Bench: fibre, timber and tools
+[[recipe]]
+wire = 0
+id = "saltreed_twine"
+station = "joiners_bench"
+inputs = [{ item = "saltreed", count = 4 }]
+output = "saltreed_twine"
+output_count = 1
+labor = 5
+craft_s = 2.0
+
+[[recipe]]
+wire = 1
+id = "reedcloth"
+station = "joiners_bench"
+inputs = [{ item = "saltreed_twine", count = 4 }]
+output = "reedcloth"
+output_count = 1
+labor = 10
+craft_s = 4.0
+
+[[recipe]]
+wire = 2
+id = "saltrope"
+station = "joiners_bench"
+inputs = [{ item = "saltreed_twine", count = 3 }]
+output = "saltrope"
+output_count = 1
+labor = 5
+craft_s = 3.0
+
+[[recipe]]
+wire = 3
+id = "sailcloth"
+station = "joiners_bench"
+inputs = [{ item = "reedcloth", count = 3 }, { item = "saltrope", count = 1 }]
+output = "sailcloth"
+output_count = 1
+labor = 20
+craft_s = 6.0
+
+[[recipe]]
+wire = 4
+id = "driftpine_plank"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_log", count = 1 }]
+output = "driftpine_plank"
+output_count = 2
+labor = 5
+craft_s = 3.0
+
+[[recipe]]
+wire = 5
+id = "hollowoak_plank"
+station = "joiners_bench"
+inputs = [{ item = "hollowoak_log", count = 1 }]
+output = "hollowoak_plank"
+output_count = 2
+labor = 5
+craft_s = 3.0
+
+[[recipe]]
+wire = 6
+id = "hollowoak_beam"
+station = "joiners_bench"
+inputs = [{ item = "hollowoak_plank", count = 3 }, { item = "rustiron_nails", count = 4 }]
+output = "hollowoak_beam"
+output_count = 1
+labor = 15
+craft_s = 5.0
+
+[[recipe]]
+wire = 7
+id = "reedcutter_knife"
+station = "joiners_bench"
+inputs = [{ item = "rustiron_bar", count = 1 }, { item = "driftpine_plank", count = 1 }, { item = "saltreed_twine", count = 1 }]
+output = "reedcutter_knife"
+output_count = 1
+labor = 20
+craft_s = 6.0
+
+[[recipe]]
+wire = 8
+id = "felling_axe"
+station = "joiners_bench"
+inputs = [{ item = "rustiron_bar", count = 2 }, { item = "hollowoak_plank", count = 1 }]
+output = "felling_axe"
+output_count = 1
+labor = 25
+craft_s = 8.0
+
+[[recipe]]
+wire = 9
+id = "prospector_pick"
+station = "joiners_bench"
+inputs = [{ item = "rustiron_bar", count = 2 }, { item = "driftpine_plank", count = 1 }]
+output = "prospector_pick"
+output_count = 1
+labor = 25
+craft_s = 8.0
+
+# Bloomery: metal
+[[recipe]]
+wire = 10
+id = "tin_ingot"
+station = "bloomery"
+inputs = [{ item = "tinstone", count = 3 }, { item = "charcoal", count = 1 }]
+output = "tin_ingot"
+output_count = 1
+labor = 10
+craft_s = 5.0
+
+[[recipe]]
+wire = 11
+id = "rustiron_bar"
+station = "bloomery"
+inputs = [{ item = "rustvein_ore", count = 3 }, { item = "charcoal", count = 1 }]
+output = "rustiron_bar"
+output_count = 1
+labor = 10
+craft_s = 5.0
+
+[[recipe]]
+wire = 12
+id = "rustiron_nails"
+station = "bloomery"
+inputs = [{ item = "rustiron_bar", count = 1 }]
+output = "rustiron_nails"
+output_count = 10
+labor = 5
+craft_s = 3.0
+
+[[recipe]]
+wire = 13
+id = "rustiron_fittings"
+station = "bloomery"
+inputs = [{ item = "rustiron_bar", count = 2 }, { item = "tin_ingot", count = 1 }]
+output = "rustiron_fittings"
+output_count = 1
+labor = 15
+craft_s = 6.0
+
+[[recipe]]
+wire = 14
+id = "tin_lantern"
+station = "bloomery"
+inputs = [{ item = "tin_ingot", count = 2 }, { item = "saltreed_twine", count = 1 }]
+output = "tin_lantern"
+output_count = 1
+labor = 15
+craft_s = 6.0
+
+# Cookhearth: fuel and food
+[[recipe]]
+wire = 15
+id = "charcoal"
+station = "cookhearth"
+inputs = [{ item = "driftpine_log", count = 2 }]
+output = "charcoal"
+output_count = 3
+labor = 5
+craft_s = 4.0
+
+[[recipe]]
+wire = 16
+id = "duskberry_tart"
+station = "cookhearth"
+inputs = [{ item = "duskberry", count = 6 }, { item = "emberleaf", count = 1 }]
+output = "duskberry_tart"
+output_count = 2
+labor = 10
+craft_s = 4.0
+
+[[recipe]]
+wire = 17
+id = "duskberry_preserve"
+station = "cookhearth"
+inputs = [{ item = "duskberry", count = 8 }]
+output = "duskberry_preserve"
+output_count = 2
+labor = 10
+craft_s = 5.0
+
+[[recipe]]
+wire = 18
+id = "emberleaf_salve"
+station = "cookhearth"
+inputs = [{ item = "emberleaf", count = 4 }, { item = "duskberry", count = 1 }]
+output = "emberleaf_salve"
+output_count = 2
+labor = 10
+craft_s = 4.0
+
+[[recipe]]
+wire = 19
+id = "emberleaf_tea"
+station = "cookhearth"
+inputs = [{ item = "emberleaf", count = 3 }]
+output = "emberleaf_tea"
+output_count = 2
+labor = 5
+craft_s = 3.0

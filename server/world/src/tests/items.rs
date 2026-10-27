@@ -223,3 +223,38 @@ fn dev_grant_goes_by_content_id() {
     assert_eq!(call(&t, 1, |ctx| dev_grant_item(ctx, "gold".into(), 1)), Err("no item \"gold\"".into()));
     assert_eq!(call(&t, 3, |ctx| dev_grant_item(ctx, "tinstone".into(), 1)), Err("not in the world".into()));
 }
+
+#[test]
+fn exchange_takes_from_the_smallest_stacks_first() {
+    let t = world();
+    let me = arrive(&t, 1, "Mira").char_id;
+    give(&t, me, REED, 1000).unwrap();
+    give(&t, me, TART, 5).unwrap();
+    give(&t, me, REED, 30).unwrap(); // slot 0 is full, so slot 2 gets 30
+    assert_eq!(bag(&t, me), [(0, REED, 1000), (1, TART, 5), (2, REED, 30)]);
+    // 40 reeds: all of slot 2 (the smaller), then 10 from slot 0.
+    read(&t, |ctx| crate::items::exchange(ctx, me, &[(wire(REED), 40)], (wire(KNIFE), 1))).unwrap();
+    assert_eq!(bag(&t, me), [(0, REED, 990), (1, TART, 5), (2, KNIFE, 1)]);
+    // Two inputs at once.
+    read(&t, |ctx| crate::items::exchange(ctx, me, &[(wire(REED), 990), (wire(TART), 2)], (wire(TART), 10))).unwrap();
+    assert_eq!(bag(&t, me), [(1, TART, 13), (2, KNIFE, 1)]);
+}
+
+#[test]
+fn exchange_is_all_or_nothing_and_counts_freed_slots() {
+    let t = world();
+    let me = arrive(&t, 1, "Mira").char_id;
+    give(&t, me, REED, 8).unwrap();
+    give(&t, me, KNIFE, u32::from(BAG_SLOTS) - 1).unwrap();
+    let before = bag(&t, me);
+    let swap = |takes: &[(u16, u32)], out: (u16, u32)| read(&t, |ctx| crate::items::exchange(ctx, me, takes, out));
+    assert_eq!(swap(&[(wire(REED), 9)], (wire(TART), 1)), Err("not enough Saltreed: have 8, need 9".into()));
+    assert_eq!(swap(&[(wire(REED), 4)], (wire(TART), 1)), Err("bag is full: room for 0 of 1".into()));
+    assert_eq!(read(&t, |ctx| crate::items::can_exchange(ctx, me, &[(wire(REED), 4)], (wire(TART), 1))), Err("bag is full: room for 0 of 1".into()));
+    assert_eq!(bag(&t, me), before, "refusals change nothing");
+    // Taking all the reeds frees their slot for the output.
+    read(&t, |ctx| crate::items::can_exchange(ctx, me, &[(wire(REED), 8)], (wire(TART), 2))).unwrap();
+    assert_eq!(bag(&t, me), before, "a check changes nothing");
+    swap(&[(wire(REED), 8)], (wire(TART), 2)).unwrap();
+    assert_eq!(bag(&t, me)[0], (0, TART, 2));
+}

@@ -78,6 +78,9 @@ namespace Mmo.Gameplay
         /// <summary>Gathering from resource nodes; set by <see cref="Main"/>. F on land gathers before it climbs.</summary>
         public Gathering? Gathering { get; set; }
 
+        /// <summary>Crafting at stations; set by <see cref="Main"/>. F on land uses a station when there's nothing to gather.</summary>
+        public Crafting? Crafting { get; set; }
+
         /// <summary>Why the last climb didn't happen, for the HUD.</summary>
         public string? ClimbNote { get; private set; }
 
@@ -150,7 +153,7 @@ namespace Mmo.Gameplay
             swimming = Parent == 0 && Swimming.Swims(swimming, ground.Map.Height(GlobalPosition.X, GlobalPosition.Z), GlobalPosition.Y);
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
-            if (interact && Parent == 0 && Gathering?.Interact() == true)
+            if (interact && Parent == 0 && (Gathering?.Interact() == true || Crafting?.Interact() == true))
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;

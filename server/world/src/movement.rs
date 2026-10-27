@@ -82,6 +82,7 @@ pub fn move_event(
                 ..p
             });
             crate::gathering::moved(ctx, p.char_id, parent, to);
+            crate::crafting::moved(ctx, p.char_id, parent, to);
             // Walking away from the helm, or off the ship, lets go of it.
             if let Frame::Deck(d) = from
                 && (parent != p.parent || sim::ship::reach(to, d.hull.helm_x, d.hull.helm_z) > sim::ship::REACH_M)

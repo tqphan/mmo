@@ -92,7 +92,7 @@ pub fn place(world: &World) -> Vec<Placement> {
     out
 }
 
-fn round2(v: f32) -> f32 {
+pub(crate) fn round2(v: f32) -> f32 {
     (v * 100.0).round() / 100.0
 }
 
@@ -105,6 +105,15 @@ pub fn to_text(nodes: &[Placement]) -> String {
 }
 
 pub fn parse(text: &str) -> Result<Vec<Placement>, String> {
+    parse_lines(text, "node", node_by_id).map(|rows| rows.into_iter().map(|(kind, x, y, z, yaw_deg)| Placement { kind, x, y, z, yaw_deg }).collect())
+}
+
+/// One placement line: kind, x, y, z and yaw in degrees.
+pub(crate) type Line<K> = (K, f32, f32, f32, u16);
+
+/// Lines of `kind x y z yaw-degrees`, kinds by content id looked up with `kind_of`; blank lines
+/// and `#` comments are skipped. Shared with `stations.tsv`.
+pub(crate) fn parse_lines<K>(text: &str, what: &str, kind_of: impl Fn(&str) -> Option<K>) -> Result<Vec<Line<K>>, String> {
     let mut out = Vec::new();
     for (i, line) in text.lines().enumerate() {
         let line = line.trim();
@@ -116,14 +125,14 @@ pub fn parse(text: &str) -> Result<Vec<Placement>, String> {
         if f.len() != 5 {
             return Err(at(format!("expected 5 tab-separated fields, found {}", f.len())));
         }
-        let kind = node_by_id(f[0]).ok_or_else(|| at(format!("no node kind {:?}", f[0])))?;
+        let kind = kind_of(f[0]).ok_or_else(|| at(format!("no {what} kind {:?}", f[0])))?;
         let num = |s: &str| s.parse::<f32>().ok().filter(|v| v.is_finite()).ok_or_else(|| at(format!("bad number {s:?}")));
         let (x, y, z) = (num(f[1])?, num(f[2])?, num(f[3])?);
         if x.abs() >= WORLD_HALF_M || z.abs() >= WORLD_HALF_M {
             return Err(at("off the map".into()));
         }
         let yaw_deg = f[4].parse::<u16>().ok().filter(|&d| d < 360).ok_or_else(|| at(format!("bad yaw {:?}", f[4])))?;
-        out.push(Placement { kind, x, y, z, yaw_deg });
+        out.push((kind, x, y, z, yaw_deg));
     }
     Ok(out)
 }

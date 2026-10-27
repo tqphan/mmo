@@ -58,6 +58,94 @@ name = "Hollowoak Log"
 kind = "material"
 stack = 1000
 
+# Fibre and cloth (crafted)
+[[item]]
+wire = 30
+id = "saltreed_twine"
+name = "Saltreed Twine"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 31
+id = "reedcloth"
+name = "Reedcloth"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 32
+id = "saltrope"
+name = "Saltrope"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 33
+id = "sailcloth"
+name = "Sailcloth"
+kind = "material"
+stack = 1000
+
+# Timber (crafted)
+[[item]]
+wire = 40
+id = "driftpine_plank"
+name = "Driftpine Plank"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 41
+id = "hollowoak_plank"
+name = "Hollowoak Plank"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 42
+id = "hollowoak_beam"
+name = "Hollowoak Beam"
+kind = "material"
+stack = 1000
+
+# Metal (crafted)
+[[item]]
+wire = 50
+id = "tin_ingot"
+name = "Tin Ingot"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 51
+id = "rustiron_bar"
+name = "Rustiron Bar"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 52
+id = "rustiron_nails"
+name = "Rustiron Nails"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 53
+id = "rustiron_fittings"
+name = "Rustiron Fittings"
+kind = "material"
+stack = 1000
+
+# Fuel (crafted)
+[[item]]
+wire = 60
+id = "charcoal"
+name = "Charcoal"
+kind = "material"
+stack = 1000
+
 # Food
 [[item]]
 wire = 100
@@ -66,10 +154,52 @@ name = "Duskberry Tart"
 kind = "consumable"
 stack = 100
 
+[[item]]
+wire = 101
+id = "duskberry_preserve"
+name = "Duskberry Preserve"
+kind = "consumable"
+stack = 100
+
+[[item]]
+wire = 102
+id = "emberleaf_salve"
+name = "Emberleaf Salve"
+kind = "consumable"
+stack = 100
+
+[[item]]
+wire = 103
+id = "emberleaf_tea"
+name = "Emberleaf Tea"
+kind = "consumable"
+stack = 100
+
 # Tools
 [[item]]
 wire = 200
 id = "reedcutter_knife"
 name = "Reedcutter's Knife"
+kind = "gear"
+stack = 1
+
+[[item]]
+wire = 201
+id = "felling_axe"
+name = "Felling Axe"
+kind = "gear"
+stack = 1
+
+[[item]]
+wire = 202
+id = "prospector_pick"
+name = "Prospector's Pick"
+kind = "gear"
+stack = 1
+
+[[item]]
+wire = 203
+id = "tin_lantern"
+name = "Tin Lantern"
 kind = "gear"
 stack = 1

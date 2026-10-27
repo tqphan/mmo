@@ -9,6 +9,7 @@
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
+mod craft;
 mod director;
 mod gather;
 mod items;
@@ -104,6 +105,7 @@ fn main() {
         "labor" => labor::scenario(&args),
         "items" => items::scenario(&args),
         "gather" => gather::scenario(&args),
+        "craft" => craft::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -120,7 +122,8 @@ fn main() {
                  visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)\n  \
                  labor            a new account's labor pool regenerates with the dev clock, fills, and refuses what it can't cover\n  \
                  items            a bot fills its bag, then moves, merges, splits, swaps and destroys stacks, and has bad requests refused\n  \
-                 gather           two bots by a node: refusals, a gather that pays out, regrowth by the dev clock, cancelling"
+                 gather           two bots by a node: refusals, a gather that pays out, regrowth by the dev clock, cancelling\n  \
+                 craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling"
             );
             std::process::exit(2);
         }

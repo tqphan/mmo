@@ -8,10 +8,14 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod account_type;
 pub mod admin_clear_nodes_reducer;
+pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
 pub mod admin_put_nodes_reducer;
+pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
 pub mod admin_remove_nodes_reducer;
+pub mod admin_remove_stations_reducer;
+pub mod cancel_craft_reducer;
 pub mod cancel_gather_reducer;
 pub mod cannon_shot_type;
 pub mod character_private_type;
@@ -19,6 +23,8 @@ pub mod character_public_table;
 pub mod character_public_type;
 pub mod combat_event_table;
 pub mod combat_event_type;
+pub mod craft_job_type;
+pub mod craft_reducer;
 pub mod create_character_reducer;
 pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
@@ -48,6 +54,7 @@ pub mod move_event_reducer;
 pub mod move_item_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
+pub mod my_craft_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
 pub mod my_presence_table;
@@ -58,6 +65,9 @@ pub mod resource_node_table;
 pub mod resource_node_type;
 pub mod ship_motion_type;
 pub mod split_item_reducer;
+pub mod station_placement_type;
+pub mod station_table;
+pub mod station_type;
 pub mod suspicion_type;
 pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
@@ -72,10 +82,14 @@ pub mod world_tick_timer_type;
 
 pub use account_type::Account;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
+pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
 pub use admin_put_nodes_reducer::admin_put_nodes;
+pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
+pub use admin_remove_stations_reducer::admin_remove_stations;
+pub use cancel_craft_reducer::cancel_craft;
 pub use cancel_gather_reducer::cancel_gather;
 pub use cannon_shot_type::CannonShot;
 pub use character_private_type::CharacterPrivate;
@@ -83,6 +97,8 @@ pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
 pub use combat_event_table::*;
 pub use combat_event_type::CombatEvent;
+pub use craft_job_type::CraftJob;
+pub use craft_reducer::craft;
 pub use create_character_reducer::create_character;
 pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
@@ -112,6 +128,7 @@ pub use move_event_reducer::move_event;
 pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
+pub use my_craft_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
 pub use my_presence_table::*;
@@ -122,6 +139,9 @@ pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
 pub use ship_motion_type::ShipMotion;
 pub use split_item_reducer::split_item;
+pub use station_placement_type::StationPlacement;
+pub use station_table::*;
+pub use station_type::Station;
 pub use suspicion_type::Suspicion;
 pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
@@ -143,9 +163,13 @@ pub use world_tick_timer_type::WorldTickTimer;
 
 pub enum Reducer {
     AdminClearNodes,
+    AdminClearStations,
     AdminClearTerrain,
     AdminPutNodes {
         nodes: Vec<NodePlacement>,
+    },
+    AdminPutStations {
+        stations: Vec<StationPlacement>,
     },
     AdminPutTerrain {
         chunks: Vec<TerrainChunk>,
@@ -153,7 +177,16 @@ pub enum Reducer {
     AdminRemoveNodes {
         ids: Vec<u64>,
     },
+    AdminRemoveStations {
+        ids: Vec<u64>,
+    },
+    CancelCraft,
     CancelGather,
+    Craft {
+        station_id: u64,
+        recipe: u16,
+        count: u32,
+    },
     CreateCharacter {
         name: String,
     },
@@ -242,11 +275,16 @@ impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
             Reducer::AdminClearNodes => "admin_clear_nodes",
+            Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
+            Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
+            Reducer::AdminRemoveStations { .. } => "admin_remove_stations",
+            Reducer::CancelCraft => "cancel_craft",
             Reducer::CancelGather => "cancel_gather",
+            Reducer::Craft { .. } => "craft",
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
@@ -277,12 +315,20 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearNodes => {
                 __sats::bsatn::to_vec(&admin_clear_nodes_reducer::AdminClearNodesArgs {})
             }
+            Reducer::AdminClearStations => {
+                __sats::bsatn::to_vec(&admin_clear_stations_reducer::AdminClearStationsArgs {})
+            }
             Reducer::AdminClearTerrain => {
                 __sats::bsatn::to_vec(&admin_clear_terrain_reducer::AdminClearTerrainArgs {})
             }
             Reducer::AdminPutNodes { nodes } => {
                 __sats::bsatn::to_vec(&admin_put_nodes_reducer::AdminPutNodesArgs {
                     nodes: nodes.clone(),
+                })
+            }
+            Reducer::AdminPutStations { stations } => {
+                __sats::bsatn::to_vec(&admin_put_stations_reducer::AdminPutStationsArgs {
+                    stations: stations.clone(),
                 })
             }
             Reducer::AdminPutTerrain { chunks } => {
@@ -295,9 +341,26 @@ impl __sdk::Reducer for Reducer {
                     ids: ids.clone(),
                 })
             }
+            Reducer::AdminRemoveStations { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_stations_reducer::AdminRemoveStationsArgs {
+                    ids: ids.clone(),
+                })
+            }
+            Reducer::CancelCraft => {
+                __sats::bsatn::to_vec(&cancel_craft_reducer::CancelCraftArgs {})
+            }
             Reducer::CancelGather => {
                 __sats::bsatn::to_vec(&cancel_gather_reducer::CancelGatherArgs {})
             }
+            Reducer::Craft {
+                station_id,
+                recipe,
+                count,
+            } => __sats::bsatn::to_vec(&craft_reducer::CraftArgs {
+                station_id: station_id.clone(),
+                recipe: recipe.clone(),
+                count: count.clone(),
+            }),
             Reducer::CreateCharacter { name } => {
                 __sats::bsatn::to_vec(&create_character_reducer::CreateCharacterArgs {
                     name: name.clone(),
@@ -432,10 +495,12 @@ pub struct DbUpdate {
     entity: __sdk::TableUpdate<Entity>,
     game_clock: __sdk::TableUpdate<GameClock>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
+    my_craft: __sdk::TableUpdate<CraftJob>,
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_presence: __sdk::TableUpdate<Presence>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
+    station: __sdk::TableUpdate<Station>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
     transform: __sdk::TableUpdate<Transform>,
     vehicle: __sdk::TableUpdate<Vehicle>,
@@ -465,6 +530,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_characters" => db_update
                     .my_characters
                     .append(my_characters_table::parse_table_update(table_update)?),
+                "my_craft" => db_update
+                    .my_craft
+                    .append(my_craft_table::parse_table_update(table_update)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(my_inventory_table::parse_table_update(table_update)?),
@@ -477,6 +545,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "resource_node" => db_update
                     .resource_node
                     .append(resource_node_table::parse_table_update(table_update)?),
+                "station" => db_update
+                    .station
+                    .append(station_table::parse_table_update(table_update)?),
                 "terrain_info" => db_update
                     .terrain_info
                     .append(terrain_info_table::parse_table_update(table_update)?),
@@ -525,6 +596,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.resource_node = cache
             .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
             .with_updates_by_pk(|row| &row.id);
+        diff.station = cache
+            .apply_diff_to_table::<Station>("station", &self.station)
+            .with_updates_by_pk(|row| &row.id);
         diff.terrain_info = cache
             .apply_diff_to_table::<TerrainInfo>("terrain_info", &self.terrain_info)
             .with_updates_by_pk(|row| &row.id);
@@ -537,6 +611,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
+        diff.my_craft = cache.apply_diff_to_table::<CraftJob>("my_craft", &self.my_craft);
         diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
@@ -565,6 +640,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_characters" => db_update
                     .my_characters
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_craft" => db_update
+                    .my_craft
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -576,6 +654,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "station" => db_update
+                    .station
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
@@ -617,6 +698,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_characters" => db_update
                     .my_characters
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_craft" => db_update
+                    .my_craft
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -628,6 +712,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "station" => db_update
+                    .station
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
@@ -659,10 +746,12 @@ pub struct AppliedDiff<'r> {
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
+    my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
+    station: __sdk::TableAppliedDiff<'r, Station>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
     vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
@@ -697,6 +786,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.my_characters,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<CraftJob>("my_craft", &self.my_craft, event);
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
@@ -705,6 +795,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.resource_node,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
             "terrain_info",
             &self.terrain_info,
@@ -1378,10 +1469,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         entity_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
+        my_craft_table::register_table(client_cache);
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
+        station_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
         transform_table::register_table(client_cache);
         vehicle_table::register_table(client_cache);
@@ -1393,10 +1486,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "entity",
         "game_clock",
         "my_characters",
+        "my_craft",
         "my_inventory",
         "my_labor",
         "my_presence",
         "resource_node",
+        "station",
         "terrain_info",
         "transform",
         "vehicle",

@@ -173,7 +173,8 @@ pub fn upload_file(args: &Args, ta: &TerrainArgs) -> Check {
 
 /// `loadbot world-upload [--world DIR]`: replace the server's terrain with the world's, then check
 /// that the server's terrain hash is the manifest's; then replace its resource nodes with the
-/// world's (docs/design/gathering.md) and check they all arrived.
+/// world's (docs/design/gathering.md), and its crafting stations (docs/design/crafting.md), and
+/// check they all arrived.
 pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     let started = Instant::now();
     let world = worldtool::World::load(std::path::Path::new(&ta.world))?;
@@ -188,6 +189,7 @@ pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
         .map_err(|_| format!("the server's terrain hash is {:016x} over {} chunks, expected {want:016x}", got().hash, got().chunks))?;
     println!("the server's terrain hash matches: {want:016x} over {} chunks", got().chunks);
     upload_nodes(&admin, &worldtool::nodes::load(std::path::Path::new(&ta.world))?)?;
+    upload_stations(&admin, &worldtool::stations::load(std::path::Path::new(&ta.world))?)?;
     admin.conn.disconnect().map_err(|e| e.to_string())
 }
 
@@ -221,6 +223,32 @@ fn upload_nodes(admin: &Bot, nodes: &[worldtool::nodes::Placement]) -> Check {
         return Err(format!("the server has {got} resource nodes, expected {}", nodes.len()));
     }
     println!("uploaded {got} resource nodes in {:.1} s", started.elapsed().as_secs_f32());
+    Ok(())
+}
+
+/// Replace every crafting station on the server with `stations`, and check the count.
+fn upload_stations(admin: &Bot, stations: &[worldtool::stations::Placement]) -> Check {
+    outcome(|tx| admin.conn.reducers.admin_clear_stations_then(move |_, r| drop(tx.send(flatten(r)))))?;
+    let rows: Vec<StationPlacement> = stations
+        .iter()
+        .map(|s| StationPlacement { kind: s.kind.wire, x: s.x, y: s.y, z: s.z, yaw: sim::ship::yaw_to_u16(f32::from(s.yaw_deg).to_radians()) })
+        .collect();
+    outcome(|tx| admin.conn.reducers.admin_put_stations_then(rows, move |_, r| drop(tx.send(flatten(r)))))?;
+    let (tx, rx) = mpsc::channel();
+    admin
+        .conn
+        .subscription_builder()
+        .on_applied(move |_| {
+            let _ = tx.send(());
+        })
+        .on_error(|_, e| eprintln!("subscription error: {e}"))
+        .subscribe(["SELECT * FROM station"]);
+    rx.recv_timeout(WAIT).map_err(|_| "no reply to the station subscription".to_string())?;
+    let got = admin.conn.db.station().count() as usize;
+    if got != stations.len() {
+        return Err(format!("the server has {got} crafting stations, expected {}", stations.len()));
+    }
+    println!("uploaded {got} crafting stations");
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 //! The `world` SpacetimeDB module: the whole game world in one database (PLAN §4, §5).
 
 mod combat;
+mod crafting;
 #[cfg(feature = "dev")]
 mod dev;
 mod gathering;

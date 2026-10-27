@@ -7,6 +7,7 @@ use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
 use sim::content::CONTENT_HASH;
 
+mod crafting;
 mod gathering;
 mod items;
 mod labor;

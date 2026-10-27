@@ -19,6 +19,7 @@
     <Compile Include="../src/Gameplay/Boarding.cs" Link="Client/Gameplay/Boarding.cs" />
     <Compile Include="../src/Gameplay/Swimming.cs" Link="Client/Gameplay/Swimming.cs" />
     <Compile Include="../src/Gameplay/BagModel.cs" Link="Client/Gameplay/BagModel.cs" />
+    <Compile Include="../src/Gameplay/CraftModel.cs" Link="Client/Gameplay/CraftModel.cs" />
     <Compile Include="../src/World/ShipPredictor.cs" Link="Client/World/ShipPredictor.cs" />
     <Compile Include="../content/*.cs" Link="Client/Content/%(Filename)%(Extension)" />
   </ItemGroup>

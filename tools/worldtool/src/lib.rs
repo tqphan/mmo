@@ -5,6 +5,7 @@
 pub mod nodes;
 pub mod placeholder;
 pub mod region;
+pub mod stations;
 
 use std::path::Path;
 

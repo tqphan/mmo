@@ -1,0 +1,4 @@
+# Crafting stations (docs/design/crafting.md): kind, x, y, z, yaw in degrees. Written by worldtool: don't edit by hand.
+joiners_bench	9.00	12.47	-5.00	270
+bloomery	12.00	12.91	2.00	270
+cookhearth	8.00	13.28	8.00	0

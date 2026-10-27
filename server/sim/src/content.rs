@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x9c1c7b4e194bd1c1;
+pub const CONTENT_HASH: u64 = 0x80324c399b591032;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -242,7 +242,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 9] = [
+pub static ITEMS: [ItemData; 27] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -250,8 +250,26 @@ pub static ITEMS: [ItemData; 9] = [
     ItemData { wire: 11, id: "rustvein_ore", name: "Rustvein Ore", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 20, id: "driftpine_log", name: "Driftpine Log", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 21, id: "hollowoak_log", name: "Hollowoak Log", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 30, id: "saltreed_twine", name: "Saltreed Twine", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 31, id: "reedcloth", name: "Reedcloth", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 32, id: "saltrope", name: "Saltrope", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 33, id: "sailcloth", name: "Sailcloth", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 40, id: "driftpine_plank", name: "Driftpine Plank", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 41, id: "hollowoak_plank", name: "Hollowoak Plank", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 42, id: "hollowoak_beam", name: "Hollowoak Beam", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 50, id: "tin_ingot", name: "Tin Ingot", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 51, id: "rustiron_bar", name: "Rustiron Bar", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 52, id: "rustiron_nails", name: "Rustiron Nails", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 53, id: "rustiron_fittings", name: "Rustiron Fittings", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 60, id: "charcoal", name: "Charcoal", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 100, id: "duskberry_tart", name: "Duskberry Tart", kind: ItemKind::Consumable, stack: 100 },
+    ItemData { wire: 101, id: "duskberry_preserve", name: "Duskberry Preserve", kind: ItemKind::Consumable, stack: 100 },
+    ItemData { wire: 102, id: "emberleaf_salve", name: "Emberleaf Salve", kind: ItemKind::Consumable, stack: 100 },
+    ItemData { wire: 103, id: "emberleaf_tea", name: "Emberleaf Tea", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 200, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },
+    ItemData { wire: 201, id: "felling_axe", name: "Felling Axe", kind: ItemKind::Gear, stack: 1 },
+    ItemData { wire: 202, id: "prospector_pick", name: "Prospector's Pick", kind: ItemKind::Gear, stack: 1 },
+    ItemData { wire: 203, id: "tin_lantern", name: "Tin Lantern", kind: ItemKind::Gear, stack: 1 },
 ];
 
 /// Slots in every character's bag.
@@ -319,4 +337,98 @@ pub fn node(wire: u8) -> Option<&'static NodeData> {
 /// The node kind with content id `id`.
 pub fn node_by_id(id: &str) -> Option<&'static NodeData> {
     NODES.iter().find(|d| d.id == id)
+}
+
+/// Crafting station kinds (`content/crafting.toml`, docs/design/crafting.md).
+#[derive(Debug, PartialEq)]
+pub struct StationData {
+    /// Stored in station rows.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+}
+
+/// Every station kind, sorted by wire, which is the index.
+pub static STATIONS: [StationData; 3] = [
+    StationData { wire: 0, id: "joiners_bench", name: "Joiner's Bench" },
+    StationData { wire: 1, id: "bloomery", name: "Bloomery" },
+    StationData { wire: 2, id: "cookhearth", name: "Cookhearth" },
+];
+
+/// One input to a recipe.
+#[derive(Debug, PartialEq)]
+pub struct Ingredient {
+    /// The item's wire.
+    pub item: u16,
+    pub count: u32,
+}
+
+/// Recipes (`content/crafting.toml`, docs/design/crafting.md).
+#[derive(Debug, PartialEq)]
+pub struct RecipeData {
+    /// Stored in craft jobs.
+    pub wire: u16,
+    pub id: &'static str,
+    /// The wire of the station kind it needs.
+    pub station: u8,
+    /// Taken for each unit.
+    pub inputs: &'static [Ingredient],
+    /// The wire of the item it makes, and how many each unit makes.
+    pub output: u16,
+    pub output_count: u32,
+    /// Labor spent for each unit.
+    pub labor: i32,
+    /// How long one unit takes, in seconds.
+    pub craft_s: f32,
+}
+
+/// Every recipe, sorted by wire, which is the index.
+pub static RECIPES: [RecipeData; 20] = [
+    RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
+    RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
+    RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
+    RecipeData { wire: 3, id: "sailcloth", station: 0, inputs: &[Ingredient { item: 31, count: 3 }, Ingredient { item: 32, count: 1 }], output: 33, output_count: 1, labor: 20, craft_s: 6.0 },
+    RecipeData { wire: 4, id: "driftpine_plank", station: 0, inputs: &[Ingredient { item: 20, count: 1 }], output: 40, output_count: 2, labor: 5, craft_s: 3.0 },
+    RecipeData { wire: 5, id: "hollowoak_plank", station: 0, inputs: &[Ingredient { item: 21, count: 1 }], output: 41, output_count: 2, labor: 5, craft_s: 3.0 },
+    RecipeData { wire: 6, id: "hollowoak_beam", station: 0, inputs: &[Ingredient { item: 41, count: 3 }, Ingredient { item: 52, count: 4 }], output: 42, output_count: 1, labor: 15, craft_s: 5.0 },
+    RecipeData { wire: 7, id: "reedcutter_knife", station: 0, inputs: &[Ingredient { item: 51, count: 1 }, Ingredient { item: 40, count: 1 }, Ingredient { item: 30, count: 1 }], output: 200, output_count: 1, labor: 20, craft_s: 6.0 },
+    RecipeData { wire: 8, id: "felling_axe", station: 0, inputs: &[Ingredient { item: 51, count: 2 }, Ingredient { item: 41, count: 1 }], output: 201, output_count: 1, labor: 25, craft_s: 8.0 },
+    RecipeData { wire: 9, id: "prospector_pick", station: 0, inputs: &[Ingredient { item: 51, count: 2 }, Ingredient { item: 40, count: 1 }], output: 202, output_count: 1, labor: 25, craft_s: 8.0 },
+    RecipeData { wire: 10, id: "tin_ingot", station: 1, inputs: &[Ingredient { item: 10, count: 3 }, Ingredient { item: 60, count: 1 }], output: 50, output_count: 1, labor: 10, craft_s: 5.0 },
+    RecipeData { wire: 11, id: "rustiron_bar", station: 1, inputs: &[Ingredient { item: 11, count: 3 }, Ingredient { item: 60, count: 1 }], output: 51, output_count: 1, labor: 10, craft_s: 5.0 },
+    RecipeData { wire: 12, id: "rustiron_nails", station: 1, inputs: &[Ingredient { item: 51, count: 1 }], output: 52, output_count: 10, labor: 5, craft_s: 3.0 },
+    RecipeData { wire: 13, id: "rustiron_fittings", station: 1, inputs: &[Ingredient { item: 51, count: 2 }, Ingredient { item: 50, count: 1 }], output: 53, output_count: 1, labor: 15, craft_s: 6.0 },
+    RecipeData { wire: 14, id: "tin_lantern", station: 1, inputs: &[Ingredient { item: 50, count: 2 }, Ingredient { item: 30, count: 1 }], output: 203, output_count: 1, labor: 15, craft_s: 6.0 },
+    RecipeData { wire: 15, id: "charcoal", station: 2, inputs: &[Ingredient { item: 20, count: 2 }], output: 60, output_count: 3, labor: 5, craft_s: 4.0 },
+    RecipeData { wire: 16, id: "duskberry_tart", station: 2, inputs: &[Ingredient { item: 3, count: 6 }, Ingredient { item: 2, count: 1 }], output: 100, output_count: 2, labor: 10, craft_s: 4.0 },
+    RecipeData { wire: 17, id: "duskberry_preserve", station: 2, inputs: &[Ingredient { item: 3, count: 8 }], output: 101, output_count: 2, labor: 10, craft_s: 5.0 },
+    RecipeData { wire: 18, id: "emberleaf_salve", station: 2, inputs: &[Ingredient { item: 2, count: 4 }, Ingredient { item: 3, count: 1 }], output: 102, output_count: 2, labor: 10, craft_s: 4.0 },
+    RecipeData { wire: 19, id: "emberleaf_tea", station: 2, inputs: &[Ingredient { item: 2, count: 3 }], output: 103, output_count: 2, labor: 5, craft_s: 3.0 },
+];
+
+/// How close a character must stand to a station, horizontally and vertically, in metres.
+pub const CRAFT_REACH_M: f32 = 4.0;
+
+/// The most units one craft may ask for.
+pub const CRAFT_MAX_COUNT: u32 = 100;
+
+/// The station kind stored as `wire`.
+pub fn station(wire: u8) -> Option<&'static StationData> {
+    STATIONS.get(usize::from(wire))
+}
+
+/// The station kind with content id `id`.
+pub fn station_by_id(id: &str) -> Option<&'static StationData> {
+    STATIONS.iter().find(|d| d.id == id)
+}
+
+/// The recipe stored as `wire`.
+pub fn recipe(wire: u16) -> Option<&'static RecipeData> {
+    RECIPES.get(usize::from(wire))
+}
+
+/// The recipe with content id `id`.
+pub fn recipe_by_id(id: &str) -> Option<&'static RecipeData> {
+    RECIPES.iter().find(|d| d.id == id)
 }

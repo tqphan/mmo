@@ -1,6 +1,7 @@
-//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes
-//! included; `worldtool nodes [--dir D]` rewrites only the nodes, from the world there; `worldtool
-//! info [--dir D]` loads it, checks it and prints what's in it. Paths are relative to the repo root,
+//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes and
+//! crafting stations included; `worldtool nodes [--dir D]` and `worldtool stations [--dir D]`
+//! rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
+//! prints what's in it. Paths are relative to the repo root,
 //! which `cargo xtask` runs from (docs/design/world.md).
 
 use std::path::PathBuf;
@@ -16,9 +17,10 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("gen") => generate(&dir),
         Some("nodes") => World::load(&dir).and_then(|w| write_nodes(&dir, &w)),
+        Some("stations") => World::load(&dir).and_then(|w| write_stations(&dir, &w)),
         Some("info") => info(&dir),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|info [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -37,7 +39,16 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     let hash = world.save(dir)?;
     println!("wrote the placeholder world to {} in {:.1} s, terrain hash {hash:016x}", dir.display(), started.elapsed().as_secs_f32());
     summary(&world);
-    write_nodes(dir, &world)
+    write_nodes(dir, &world)?;
+    write_stations(dir, &world)
+}
+
+/// Place crafting stations on `world` and write them to `dir` (docs/design/crafting.md).
+fn write_stations(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let stations = worldtool::stations::place(world);
+    worldtool::stations::save(dir, &stations)?;
+    println!("wrote {} crafting stations to {}", stations.len(), dir.join(worldtool::stations::FILE).display());
+    Ok(())
 }
 
 /// Place resource nodes on `world` and write them to `dir` (docs/design/gathering.md).
@@ -63,6 +74,11 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     let nodes = worldtool::nodes::load(dir)?;
     println!("{} resource nodes", nodes.len());
     node_summary(&nodes);
+    let stations = worldtool::stations::load(dir)?;
+    println!("{} crafting stations", stations.len());
+    for s in &stations {
+        println!("  {:<14} ({:.1}, {:.1}, {:.1})", s.kind.id, s.x, s.y, s.z);
+    }
     Ok(())
 }
 
