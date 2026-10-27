@@ -138,6 +138,14 @@ name = "Rustiron Fittings"
 kind = "material"
 stack = 1000
 
+# Tax (crafted; docs/design/land.md)
+[[item]]
+wire = 70
+id = "levy_seal"
+name = "Levy Seal"
+kind = "material"
+stack = 1000
+
 # Fuel (crafted)
 [[item]]
 wire = 60
@@ -203,3 +211,18 @@ id = "tin_lantern"
 name = "Tin Lantern"
 kind = "gear"
 stack = 1
+
+# Deeds (crafted; docs/design/land.md)
+[[item]]
+wire = 300
+id = "garden_deed"
+name = "Garden Deed"
+kind = "deed"
+stack = 10
+
+[[item]]
+wire = 301
+id = "farm_deed"
+name = "Farm Deed"
+kind = "deed"
+stack = 10

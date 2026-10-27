@@ -2,7 +2,7 @@
 # means. `wire` is the value stored in the raster: the use class in the low 4 bits, the climate in
 # bits 4–6, so there can be at most 16 uses and 8 climates. The values must run 0, 1, 2, … with no
 # gaps. Which uses allow building is from RESEARCH §2.4 (A); climate growth multipliers come with
-# farming (M2).
+# farming (M2). Plots, their tax and demolition follow (docs/design/land.md).
 
 [[land_use]]
 id = "wild"
@@ -39,3 +39,36 @@ wire = 2
 [[climate]]
 id = "subarctic"
 wire = 3
+
+# Property rules (docs/design/land.md). A week's grace and a fixed hour of demolition are from the
+# original (B); the hour, the prepay limit, the multipliers and the reach are ours.
+[property]
+tax_item = "levy_seal"
+week_s = 604800
+grace_s = 604800
+demolish_hour_utc = 20
+prepay_weeks = 4
+# Every plot's weekly tax is multiplied by the entry for how many plots the account owns; the
+# length is the most it may own. "Steeply after two" (B).
+heavy_tax_pct = [100, 100, 200, 300, 400]
+reach_m = 8.0
+
+# Plot kinds. `wire` is stored in plot rows; sizes are multiples of the 4 m land texel. The taxes
+# are the original's 8×8 and 16×16 rates in certificates (B).
+[[plot]]
+wire = 0
+id = "garden"
+name = "Garden"
+deed = "garden_deed"
+size_m = 8
+max_rise_m = 2.0
+tax = 5
+
+[[plot]]
+wire = 1
+id = "farm"
+name = "Farm"
+deed = "farm_deed"
+size_m = 16
+max_rise_m = 3.0
+tax = 10

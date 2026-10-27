@@ -9,7 +9,7 @@ namespace Mmo.UI
     /// <summary>
     /// The bag (docs/design/items.md): I or B opens it. Click a stack to pick it up and a slot to put
     /// it there, shift-click to split off half, ctrl + right-click to destroy (after a confirmation),
-    /// Esc to put down what's held. It draws the server's rows every frame; the click rules are in
+    /// right-click to use (a deed starts placing its plot, docs/design/land.md), Esc to put down what's held. It draws the server's rows every frame; the click rules are in
     /// <see cref="BagModel"/>.
     /// </summary>
     public partial class BagWindow : CanvasLayer
@@ -32,6 +32,9 @@ namespace Mmo.UI
         }
 
         public BagModel Model { get; } = new();
+
+        /// <summary>Right-click on a stack: use it. True if it was used, which closes the bag; set by <see cref="Main"/>.</summary>
+        public System.Func<BagStack, bool>? Use { get; set; }
 
         public BagStack?[] Grid { get; private set; } = new BagStack?[GameContent.BagSlots];
 
@@ -76,7 +79,7 @@ namespace Mmo.UI
                 grid.AddChild(s);
             }
             box.AddChild(grid);
-            var help = new Label { Text = "click: move · shift-click: split half · ctrl+right-click: destroy · Esc: put down" };
+            var help = new Label { Text = "click: move · shift-click: split half · right-click: use · ctrl+right-click: destroy · Esc: put down" };
             help.AddThemeFontSizeOverride("font_size", 11);
             help.AddThemeColorOverride("font_color", new Color(0.7f, 0.7f, 0.7f));
             box.AddChild(help);
@@ -137,6 +140,13 @@ namespace Mmo.UI
             confirm.PopupCentered();
         }
 
+        /// <summary>A right-click on <paramref name="slot"/>: use what's there.</summary>
+        public void UseSlot(ushort slot)
+        {
+            if (Grid[slot] is { } s && Use?.Invoke(s) == true)
+                Open = false;
+        }
+
         /// <summary>Press OK on the open destroy confirmation.</summary>
         public void ConfirmDestroy()
         {
@@ -155,6 +165,8 @@ namespace Mmo.UI
                 ClickSlot(slot, b.ShiftPressed);
             else if (b.ButtonIndex == MouseButton.Right && b.CtrlPressed)
                 DestroySlot(slot);
+            else if (b.ButtonIndex == MouseButton.Right)
+                UseSlot(slot);
             else
                 return;
             slots[slot].AcceptEvent();
@@ -223,6 +235,7 @@ namespace Mmo.UI
                 ItemKind.Material => new Color(0.30f, 0.36f, 0.24f),
                 ItemKind.Consumable => new Color(0.48f, 0.30f, 0.20f),
                 ItemKind.Gear => new Color(0.24f, 0.32f, 0.46f),
+                ItemKind.Deed => new Color(0.50f, 0.42f, 0.18f),
                 _ => new Color(0.4f, 0.2f, 0.4f),
             };
         }

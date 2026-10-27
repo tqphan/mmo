@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 7";
+const FORMAT: &str = "contentgen 8";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -26,13 +26,18 @@ const MAX_STACK: u32 = 10_000;
 const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
-pub const ITEM_KINDS: [&str; 3] = ["material", "consumable", "gear"];
+pub const ITEM_KINDS: [&str; 4] = ["material", "consumable", "gear", "deed"];
 /// Resource node kinds, in wire order, fixed here like the item kinds.
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
 /// Longer than a week to regrow is a typo.
 const MAX_REGROW_S: u32 = 7 * 86_400;
 /// More inputs than this to one recipe is a typo.
 const MAX_INPUTS: usize = 8;
+/// Land texels are 4 m (docs/design/world.md); plots cover whole texels, and one cell at most.
+const TEXEL_M: u32 = 4;
+const MAX_PLOT_M: u32 = 64;
+/// More steps of heavy tax than this is a typo.
+const MAX_HEAVY_TAX_STEPS: usize = 10;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -130,6 +135,38 @@ pub struct MountDef {
 struct LandFile {
     land_use: Vec<LandUseDef>,
     climate: Vec<ClimateDef>,
+    /// Required; optional here so a missing table is reported with the other problems.
+    property: Option<PropertyRules>,
+    #[serde(default)]
+    plot: Vec<PlotDef>,
+}
+
+/// `[property]` in `land.toml`: tax and demolition (docs/design/land.md).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PropertyRules {
+    /// An item id from `items.toml`.
+    pub tax_item: String,
+    pub week_s: u32,
+    pub grace_s: u32,
+    pub demolish_hour_utc: u8,
+    pub prepay_weeks: u32,
+    pub heavy_tax_pct: Vec<u32>,
+    pub reach_m: f32,
+}
+
+/// `[[plot]]` in `land.toml`: a kind of plot and the deed that claims it.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PlotDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    /// An item id from `items.toml`, of kind `deed`.
+    pub deed: String,
+    pub size_m: u32,
+    pub max_rise_m: f32,
+    pub tax: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -269,6 +306,9 @@ pub struct Content {
     /// Sorted by `wire`, like the modes.
     pub land_uses: Vec<LandUseDef>,
     pub climates: Vec<ClimateDef>,
+    pub property: PropertyRules,
+    /// Sorted by `wire`, like the modes.
+    pub plots: Vec<PlotDef>,
     pub labor: LaborDef,
     pub bag: BagDef,
     /// Sorted by `wire`, which may have gaps.
@@ -317,13 +357,14 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     hulls.sort_by_key(|h| h.wire);
     land.land_use.sort_by_key(|u| u.wire);
     land.climate.sort_by_key(|c| c.wire);
+    land.plot.sort_by_key(|p| p.wire);
     items.item.sort_by_key(|i| i.wire);
     gathering.node.sort_by_key(|n| n.wire);
     crafting.station.sort_by_key(|s| s.wire);
     crafting.recipe.sort_by_key(|r| r.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
-    check_land(&land, &mut errors);
+    check_land(&land, &items.item, &mut errors);
     check_labor(&labor, &mut errors);
     check_items(&items, &mut errors);
     check_gathering(&gathering, &items.item, &mut errors);
@@ -331,7 +372,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     if !errors.is_empty() {
         return Err(errors);
     }
-    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, bag: items.bag,
+    let Some(property) = land.property else { unreachable!("check_land reports a missing [property]") };
+    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, property, plots: land.plot, labor, bag: items.bag,
         items: items.item,
         gathering: gathering.gathering,
         nodes: gathering.node,
@@ -435,7 +477,7 @@ fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
     }
 }
 
-fn check_land(land: &LandFile, errors: &mut Vec<String>) {
+fn check_land(land: &LandFile, items: &[ItemDef], errors: &mut Vec<String>) {
     check_ids("land.toml", "land_use", land.land_use.iter().map(|u| (u.id.as_str(), usize::from(u.wire))), errors);
     check_ids("land.toml", "climate", land.climate.iter().map(|c| (c.id.as_str(), usize::from(c.wire))), errors);
     if land.land_use.len() > MAX_LAND_USES {
@@ -443,6 +485,66 @@ fn check_land(land: &LandFile, errors: &mut Vec<String>) {
     }
     if land.climate.len() > MAX_CLIMATES {
         errors.push(format!("land.toml: at most {MAX_CLIMATES} climates (3 bits of the raster)"));
+    }
+    check_property(land, items, errors);
+}
+
+fn check_property(land: &LandFile, items: &[ItemDef], errors: &mut Vec<String>) {
+    let file = "land.toml";
+    match &land.property {
+        None => errors.push(format!("{file}: no [property]")),
+        Some(p) => {
+            if !items.iter().any(|i| i.id == p.tax_item) {
+                errors.push(format!("{file}: property.tax_item: no item {:?} in items.toml", p.tax_item));
+            }
+            for (name, v) in [("week_s", p.week_s), ("grace_s", p.grace_s)] {
+                if !(60..=30 * 86_400).contains(&v) {
+                    errors.push(format!("{file}: property.{name} must be from 60 to 2592000"));
+                }
+            }
+            if p.demolish_hour_utc > 23 {
+                errors.push(format!("{file}: property.demolish_hour_utc must be from 0 to 23"));
+            }
+            if !(1..=52).contains(&p.prepay_weeks) {
+                errors.push(format!("{file}: property.prepay_weeks must be from 1 to 52"));
+            }
+            let steps = &p.heavy_tax_pct;
+            if !(1..=MAX_HEAVY_TAX_STEPS).contains(&steps.len())
+                || steps.iter().any(|v| !(100..=10_000).contains(v))
+                || steps.windows(2).any(|w| w[1] < w[0])
+            {
+                errors.push(format!(
+                    "{file}: property.heavy_tax_pct needs 1 to {MAX_HEAVY_TAX_STEPS} entries from 100 to 10000 that never fall"
+                ));
+            }
+            check_range(file, "property.reach_m", p.reach_m, 1.0, 64.0, errors);
+        }
+    }
+    check_ids(file, "plot", land.plot.iter().map(|p| (p.id.as_str(), usize::from(p.wire))), errors);
+    let mut names = std::collections::HashSet::new();
+    for (k, pl) in land.plot.iter().enumerate() {
+        let at = format!("{file}: plot {:?}", pl.id);
+        if !is_item_name(&pl.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(pl.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", pl.name));
+        }
+        match items.iter().find(|i| i.id == pl.deed) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", pl.deed)),
+            Some(i) if i.kind != "deed" => errors.push(format!("{at}: {:?} isn't of kind \"deed\"", pl.deed)),
+            Some(_) => {}
+        }
+        if land.plot[..k].iter().any(|o| o.deed == pl.deed) {
+            errors.push(format!("{at}: deed {:?} claims another plot too", pl.deed));
+        }
+        if pl.size_m % TEXEL_M != 0 || !(TEXEL_M..=MAX_PLOT_M).contains(&pl.size_m) {
+            errors.push(format!("{at}: size_m must be a multiple of {TEXEL_M} from {TEXEL_M} to {MAX_PLOT_M}"));
+        }
+        check_range(&at, "max_rise_m", pl.max_rise_m, 0.25, 16.0, errors);
+        if !(1..=1000).contains(&pl.tax) {
+            errors.push(format!("{at}: tax must be from 1 to 1000"));
+        }
     }
 }
 
@@ -628,6 +730,24 @@ fn canonical(c: &Content) -> String {
     }
     for cl in &c.climates {
         writeln!(s, "climate\t{}\t{}", cl.id, cl.wire).unwrap();
+    }
+    let p = &c.property;
+    let steps: Vec<String> = p.heavy_tax_pct.iter().map(u32::to_string).collect();
+    writeln!(
+        s,
+        "property\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        p.tax_item,
+        p.week_s,
+        p.grace_s,
+        p.demolish_hour_utc,
+        p.prepay_weeks,
+        steps.join(","),
+        Value::F32(p.reach_m).bits()
+    )
+    .unwrap();
+    for pl in &c.plots {
+        writeln!(s, "plot\t{}\t{}\t{}\t{}\t{}\t{}\t{}", pl.wire, pl.id, pl.name, pl.deed, pl.size_m, Value::F32(pl.max_rise_m).bits(), pl.tax)
+            .unwrap();
     }
     s += "labor";
     for f in labor_fields(&c.labor) {
@@ -930,6 +1050,57 @@ pub fn render_rust(c: &Content) -> String {
     s += "            _ => None,\n        }\n    }\n\n";
     s += "    pub fn id(self) -> &'static str {\n        CLIMATE_IDS[self as usize]\n    }\n}\n\n";
 
+    let p = &c.property;
+    s += "/// Property rules (`content/land.toml`, docs/design/land.md).\n#[derive(Debug, PartialEq)]\npub struct PropertyRules {\n";
+    s += "    /// The wire of the item tax is paid in.\n    pub tax_item: u16,\n";
+    s += "    /// One tax period, s.\n    pub week_s: u32,\n";
+    s += "    /// How long a plot stands after its tax runs out, s.\n    pub grace_s: u32,\n";
+    s += "    /// The hour of the day (UTC, game time) demolitions happen.\n    pub demolish_hour_utc: u8,\n";
+    s += "    /// How many weeks ahead tax may be paid.\n    pub prepay_weeks: u32,\n";
+    s += "    /// The weekly tax in percent, by how many plots the account owns (the first entry for one);\n";
+    s += "    /// its length is the most an account may own.\n    pub heavy_tax_pct: &'static [u32],\n";
+    s += "    /// How far from a plot's edge a character may place it, pay it or change it, m.\n    pub reach_m: f32,\n}\n\n";
+    let steps: Vec<String> = p.heavy_tax_pct.iter().map(u32::to_string).collect();
+    writeln!(
+        s,
+        "pub static PROPERTY: PropertyRules = PropertyRules {{ tax_item: {}, week_s: {}, grace_s: {}, demolish_hour_utc: {}, prepay_weeks: {}, heavy_tax_pct: &[{}], reach_m: {:?} }};\n",
+        c.item_wire(&p.tax_item),
+        p.week_s,
+        p.grace_s,
+        p.demolish_hour_utc,
+        p.prepay_weeks,
+        steps.join(", "),
+        p.reach_m
+    )
+    .unwrap();
+    s += "/// Plot kinds (`content/land.toml`, docs/design/land.md).\n#[derive(Debug, PartialEq)]\npub struct PlotData {\n";
+    s += "    /// Stored in plot rows.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    /// The wire of the deed item that claims it.\n    pub deed: u16,\n";
+    s += "    /// The side of its square, m: a multiple of the 4 m land texel.\n    pub size_m: u32,\n";
+    s += "    /// The most the ground may rise across it, m.\n    pub max_rise_m: f32,\n";
+    s += "    /// Tax items a week, before the heavy-tax multiplier.\n    pub tax: u32,\n}\n\n";
+    s += "/// Every plot kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static PLOTS: [PlotData; {}] = [", c.plots.len()).unwrap();
+    for pl in &c.plots {
+        writeln!(
+            s,
+            "    PlotData {{ wire: {}, id: {:?}, name: {:?}, deed: {}, size_m: {}, max_rise_m: {:?}, tax: {} }},",
+            pl.wire,
+            pl.id,
+            pl.name,
+            c.item_wire(&pl.deed),
+            pl.size_m,
+            pl.max_rise_m,
+            pl.tax
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The plot kind stored as `wire`.\n";
+    s += "pub fn plot(wire: u8) -> Option<&'static PlotData> {\n    PLOTS.get(usize::from(wire))\n}\n\n";
+    s += "/// The plot kind a deed item claims.\n";
+    s += "pub fn plot_by_deed(item: u16) -> Option<&'static PlotData> {\n    PLOTS.iter().find(|d| d.deed == item)\n}\n\n";
+
     let labor = labor_fields(&c.labor);
     s += "/// Labor rules (`content/labor.toml`, docs/design/labor.md).\n#[derive(Debug, PartialEq)]\npub struct LaborRules {\n";
     rust_struct_fields(&mut s, &labor);
@@ -1110,6 +1281,22 @@ pub fn render_csharp(c: &Content) -> String {
         writeln!(s, "        {} = {},", pascal(&cl.id), cl.wire).unwrap();
     }
     s += "    }\n\n";
+    s += "    /// <summary>Property rules (content/land.toml, docs/design/land.md).</summary>\n";
+    s += "    /// <param name=\"TaxItem\">The wire of the item tax is paid in.</param>\n";
+    s += "    /// <param name=\"WeekS\">One tax period, s.</param>\n";
+    s += "    /// <param name=\"GraceS\">How long a plot stands after its tax runs out, s.</param>\n";
+    s += "    /// <param name=\"DemolishHourUtc\">The hour of the day (UTC, game time) demolitions happen.</param>\n";
+    s += "    /// <param name=\"PrepayWeeks\">How many weeks ahead tax may be paid.</param>\n";
+    s += "    /// <param name=\"HeavyTaxPct\">The weekly tax in percent by plots owned; its length is the most an account may own.</param>\n";
+    s += "    /// <param name=\"ReachM\">How far from a plot's edge a character may place it, pay it or change it, m.</param>\n";
+    s += "    public sealed record PropertyRules(ushort TaxItem, uint WeekS, uint GraceS, byte DemolishHourUtc, uint PrepayWeeks, IReadOnlyList<uint> HeavyTaxPct, float ReachM);\n\n";
+    s += "    /// <summary>Plot kinds (content/land.toml, docs/design/land.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in plot rows.</param>\n";
+    s += "    /// <param name=\"Deed\">The wire of the deed item that claims it.</param>\n";
+    s += "    /// <param name=\"SizeM\">The side of its square, m.</param>\n";
+    s += "    /// <param name=\"MaxRiseM\">The most the ground may rise across it, m.</param>\n";
+    s += "    /// <param name=\"Tax\">Tax items a week, before the heavy-tax multiplier.</param>\n";
+    s += "    public sealed record PlotData(byte Wire, string Id, string Name, ushort Deed, uint SizeM, float MaxRiseM, uint Tax);\n\n";
     let labor = labor_fields(&c.labor);
     s += "    /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>\n";
     csharp_param_docs(&mut s, &labor);
@@ -1196,6 +1383,41 @@ pub fn render_csharp(c: &Content) -> String {
     s += &c.climates.iter().map(|cl| format!("{:?}", cl.id)).collect::<Vec<_>>().join(", ");
     s += " };\n\n";
     s += "        public static string Id(this Climate climate) => ClimateIds[(int)climate];\n\n";
+    let p = &c.property;
+    let steps: Vec<String> = p.heavy_tax_pct.iter().map(|v| format!("{v}u")).collect();
+    writeln!(
+        s,
+        "        public static readonly PropertyRules Property = new({}, {}, {}, {}, {}, new uint[] {{ {} }}, {:?}f);\n",
+        c.item_wire(&p.tax_item),
+        p.week_s,
+        p.grace_s,
+        p.demolish_hour_utc,
+        p.prepay_weeks,
+        steps.join(", "),
+        p.reach_m
+    )
+    .unwrap();
+    s += "        /// <summary>Every plot kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<PlotData> Plots = new PlotData[]\n        {\n";
+    for pl in &c.plots {
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, {}, {}, {:?}f, {}),",
+            pl.wire,
+            pl.id,
+            pl.name,
+            c.item_wire(&pl.deed),
+            pl.size_m,
+            pl.max_rise_m,
+            pl.tax
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The plot kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static PlotData? Plot(byte wire) => wire < Plots.Count ? Plots[wire] : null;\n\n";
+    s += "        /// <summary>The plot kind a deed item claims, if it is a deed.</summary>\n";
+    s += "        public static PlotData? PlotByDeed(ushort item) => Plots.FirstOrDefault(p => p.Deed == item);\n\n";
     writeln!(s, "        public static readonly LaborRules Labor = new({});\n", csharp_values(&labor)).unwrap();
     s += "        /// <summary>Slots in every character's bag.</summary>\n";
     writeln!(s, "        public const ushort BagSlots = {};\n", c.bag.slots).unwrap();
@@ -1345,6 +1567,33 @@ mod tests {
         [[climate]]
         id = "arid"
         wire = 1
+
+        [property]
+        tax_item = "driftpine_log"
+        week_s = 604800
+        grace_s = 604800
+        demolish_hour_utc = 20
+        prepay_weeks = 4
+        heavy_tax_pct = [100, 100, 200]
+        reach_m = 8.0
+
+        [[plot]]
+        wire = 1
+        id = "farm"
+        name = "Farm"
+        deed = "farm_deed"
+        size_m = 16
+        max_rise_m = 3.0
+        tax = 10
+
+        [[plot]]
+        wire = 0
+        id = "garden"
+        name = "Garden"
+        deed = "garden_deed"
+        size_m = 8
+        max_rise_m = 2.0
+        tax = 5
     "#;
 
     const LABOR: &str = r#"
@@ -1371,6 +1620,20 @@ mod tests {
         name = "Reedcutter's Knife"
         kind = "gear"
         stack = 1
+
+        [[item]]
+        wire = 300
+        id = "garden_deed"
+        name = "Garden Deed"
+        kind = "deed"
+        stack = 10
+
+        [[item]]
+        wire = 301
+        id = "farm_deed"
+        name = "Farm Deed"
+        kind = "deed"
+        stack = 10
     "#;
 
     const GATHERING: &str = r#"
@@ -1687,6 +1950,76 @@ mod tests {
     }
 
     #[test]
+    fn plots_parse_in_wire_order_and_reach_both_outputs() {
+        let c = parse_land(LAND).unwrap();
+        assert_eq!(c.plots.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["garden", "farm"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains(r#"PlotData { wire: 0, id: "garden", name: "Garden", deed: 300, size_m: 8, max_rise_m: 2.0, tax: 5 },"#), "{rs}");
+        assert!(rs.contains("heavy_tax_pct: &[100, 100, 200], reach_m: 8.0 };"), "{rs}");
+        assert!(rs.contains("tax_item: 20, week_s: 604800, grace_s: 604800, demolish_hour_utc: 20, prepay_weeks: 4,"), "{rs}");
+        assert!(cs.contains(r#"new(1, "farm", "Farm", 301, 16, 3.0f, 10),"#), "{cs}");
+        assert!(cs.contains("Property = new(20, 604800, 604800, 20, 4, new uint[] { 100u, 100u, 200u }, 8.0f);"), "{cs}");
+        assert!(rs.contains("Deed = 3,") && cs.contains("Deed = 3,"));
+    }
+
+    #[test]
+    fn any_property_change_changes_the_hash() {
+        let a = parse_land(LAND).unwrap().hash;
+        for (from, to) in [
+            ("week_s = 604800", "week_s = 604801"),
+            ("grace_s = 604800", "grace_s = 86400"),
+            ("demolish_hour_utc = 20", "demolish_hour_utc = 3"),
+            ("prepay_weeks = 4", "prepay_weeks = 2"),
+            ("[100, 100, 200]", "[100, 150, 200]"),
+            ("reach_m = 8.0", "reach_m = 9.0"),
+            ("size_m = 16", "size_m = 20"),
+            ("max_rise_m = 2.0", "max_rise_m = 2.5"),
+            ("tax = 5", "tax = 6"),
+            ("\"Garden\"", "\"Yard\""),
+        ] {
+            let changed = LAND.replace(from, to);
+            assert_ne!(parse_land(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_plots_are_reported_together() {
+        let e = |land: &str| parse_land(land).unwrap_err().join("\n");
+        let bad = LAND
+            .replace("tax_item = \"driftpine_log\"", "tax_item = \"gold\"")
+            .replace("week_s = 604800", "week_s = 10")
+            .replace("demolish_hour_utc = 20", "demolish_hour_utc = 24")
+            .replace("prepay_weeks = 4", "prepay_weeks = 0")
+            .replace("[100, 100, 200]", "[100, 200, 150]")
+            .replace("reach_m = 8.0", "reach_m = 0.5")
+            .replace("size_m = 16", "size_m = 18")
+            .replace("max_rise_m = 2.0", "max_rise_m = 0.1")
+            .replace("tax = 5", "tax = 0")
+            .replace("deed = \"farm_deed\"", "deed = \"driftpine_log\"");
+        let got = e(&bad);
+        for want in [
+            "property.tax_item: no item \"gold\"",
+            "property.week_s must be",
+            "demolish_hour_utc must be",
+            "prepay_weeks must be",
+            "heavy_tax_pct needs",
+            "property.reach_m",
+            "size_m must be a multiple of 4",
+            "max_rise_m",
+            "tax must be from 1",
+            "\"driftpine_log\" isn't of kind \"deed\"",
+        ] {
+            assert!(got.contains(want), "{want} missing from:\n{got}");
+        }
+        assert!(e(&LAND.replace("deed = \"farm_deed\"", "deed = \"garden_deed\"")).contains("claims another plot too"));
+        assert!(e(&LAND.replace("deed = \"farm_deed\"", "deed = \"barn_deed\"")).contains("no item \"barn_deed\""));
+        assert!(e(&LAND.replace("[100, 100, 200]", "[]")).contains("heavy_tax_pct needs"));
+        assert!(e(&LAND.replace("[100, 100, 200]", "[90]")).contains("heavy_tax_pct needs"));
+        let no_property = LAND.split("[property]").next().unwrap();
+        assert!(e(no_property).contains("no [property]"));
+    }
+
+    #[test]
     fn labor_rules_reach_both_outputs() {
         let c = parse_labor(LABOR).unwrap();
         assert_eq!(c.labor, LaborDef { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 });
@@ -1720,11 +2053,11 @@ mod tests {
     #[test]
     fn items_parse_in_wire_order_and_reach_both_outputs() {
         let c = parse_items(ITEMS).unwrap();
-        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20]);
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301]);
         assert_eq!(c.bag.slots, 50);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
-        assert!(rs.contains("pub static ITEMS: [ItemData; 2] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("pub static ITEMS: [ItemData; 4] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
         assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
@@ -1743,7 +2076,13 @@ mod tests {
         ] {
             // Nodes and recipes name items by id, so a renamed item is renamed there too.
             let changed = ITEMS.replace(from, to);
-            let c = parse(&Sources { items: changed.clone(), gathering: GATHERING.replace(from, to), crafting: CRAFTING.replace(from, to), ..sources() });
+            let c = parse(&Sources {
+                items: changed.clone(),
+                gathering: GATHERING.replace(from, to),
+                crafting: CRAFTING.replace(from, to),
+                land: LAND.replace(from, to),
+                ..sources()
+            });
             assert_ne!(c.unwrap().hash, a, "{changed}");
         }
     }
@@ -1751,12 +2090,12 @@ mod tests {
     #[test]
     fn bad_items_are_reported_together() {
         let bad = ITEMS
-            .replace("wire = 3", "wire = 0")
+            .replace("wire = 3\n", "wire = 0\n")
             .replace("\"material\"", "\"junk\"")
             .replace("stack = 1\n", "stack = 5\n")
             .replace("slots = 50", "slots = 151");
         let e = item_errors(&bad);
-        for want in ["wire 0 is reserved", "kind must be one of material, consumable, gear", "gear doesn't stack", "bag.slots must be"] {
+        for want in ["wire 0 is reserved", "kind must be one of material, consumable, gear, deed", "gear doesn't stack", "bag.slots must be"] {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
         let twin = format!("{ITEMS}\n[[item]]\nwire = 20\nid = \"driftpine_log\"\nname = \"Driftpine Log\"\nkind = \"material\"\nstack = 1000\n");

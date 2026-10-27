@@ -14,6 +14,7 @@ mod director;
 mod gather;
 mod items;
 mod labor;
+mod land;
 mod metrics;
 mod ship;
 mod swarm;
@@ -106,6 +107,7 @@ fn main() {
         "items" => items::scenario(&args),
         "gather" => gather::scenario(&args),
         "craft" => craft::scenario(&args),
+        "land" => land::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -123,7 +125,8 @@ fn main() {
                  labor            a new account's labor pool regenerates with the dev clock, fills, and refuses what it can't cover\n  \
                  items            a bot fills its bag, then moves, merges, splits, swaps and destroys stacks, and has bad requests refused\n  \
                  gather           two bots by a node: refusals, a gather that pays out, regrowth by the dev clock, cancelling\n  \
-                 craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling"
+                 craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling\n  \
+                 land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock"
             );
             std::process::exit(2);
         }
@@ -202,7 +205,7 @@ impl Bot {
     /// The server's terrain hash (docs/design/world.md). Bots enter with it: they test the server,
     /// not a world file. No row yet means no terrain.
     fn server_terrain(&self) -> TerrainInfo {
-        self.conn.db.terrain_info().iter().next().unwrap_or(TerrainInfo { id: 0, chunks: 0, hash: 0 })
+        self.conn.db.terrain_info().iter().next().unwrap_or(TerrainInfo { id: 0, chunks: 0, hash: 0, land_chunks: 0, land_hash: 0 })
     }
 
     /// Start the Near tier around `(x, z)`; `step` keeps it following us from then on.

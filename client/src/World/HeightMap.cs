@@ -109,6 +109,23 @@ namespace Mmo.World
             return Decode(samples[j * Width + i]);
         }
 
+        /// <summary>
+        /// The height at grid point (<paramref name="i"/>, <paramref name="j"/>) counted in 2 m steps
+        /// from the map's corner, read the way the server reads its chunks (<c>sim::terrain::sample</c>):
+        /// from the cell the point starts, or the last cell at the map's edge. Null where the file has
+        /// no such cell.
+        /// </summary>
+        public float? GridSample(int i, int j)
+        {
+            int side = CellsPerSide * QuadsPerCell;
+            if (i < 0 || j < 0 || i > side || j > side)
+                return null;
+            int cx = Math.Min(i / QuadsPerCell, CellsPerSide - 1), cz = Math.Min(j / QuadsPerCell, CellsPerSide - 1);
+            if (cx < CellX || cx >= CellX + CellsX || cz < CellZ || cz >= CellZ + CellsZ)
+                return null;
+            return Decode(samples[(j - CellZ * QuadsPerCell) * Width + i - CellX * QuadsPerCell]);
+        }
+
         /// <summary>Bilinear height at a world position, clamped to the file's edges.</summary>
         public float Height(float x, float z)
         {

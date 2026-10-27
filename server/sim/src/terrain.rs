@@ -110,6 +110,20 @@ pub fn ground(src: &mut impl Chunks, x: f32, z: f32) -> Option<Ground> {
     Some(Ground { lo: a.min(b), hi: a.max(b), gradient: ga.min(gb) })
 }
 
+/// The height sample at grid point `(i, j)`, counted in 2 m steps from the map's (−x, −z) corner,
+/// or `None` off the map or where the cell has no terrain. Points on a cell's far edge are read
+/// from the cell itself except at the map's edge.
+pub fn sample(src: &mut impl Chunks, i: usize, j: usize) -> Option<f32> {
+    if i > QUADS_PER_SIDE || j > QUADS_PER_SIDE {
+        return None;
+    }
+    let last = usize::from(CELLS_PER_SIDE) - 1;
+    let (cx, cz) = ((i / QUADS_PER_CHUNK).min(last), (j / QUADS_PER_CHUNK).min(last));
+    let samples = src.chunk(pack(OPEN_WORLD, cz as u16, cx as u16))?;
+    let (lx, lz) = (i - cx * QUADS_PER_CHUNK, j - cz * QUADS_PER_CHUNK);
+    Some(decode(samples[lz * CHUNK_SIDE + lx]))
+}
+
 /// Whether nothing in the terrain blocks the segment from `a` to `b` (both `[x, y, z]`). The ground
 /// is sampled at least every `LOS_STEP_M` along it, and only blocks where the segment dips below
 /// both triangulations. Unknown terrain blocks nothing.
@@ -259,6 +273,11 @@ pub fn chunk_hash(cell: u64, samples: &[u16]) -> u64 {
     for s in samples {
         h = s.to_le_bytes().into_iter().fold(h, fnv);
     }
+    finish(h)
+}
+
+/// The splitmix64 finaliser, so that sums of hashes mix well.
+pub(crate) fn finish(mut h: u64) -> u64 {
     h ^= h >> 30;
     h = h.wrapping_mul(0xbf58_476d_1ce4_e5b9);
     h ^= h >> 27;

@@ -64,7 +64,7 @@ At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 - `cargo xtask world` uploads `world/` to the local server through `loadbot world-upload`, with the **publisher's identity**: the xtask reads the SpacetimeDB CLI's token (`spacetime login show --token`) and passes it to loadbot in `MMO_ADMIN_TOKEN`. The publisher is always an admin (`owner`, docs/design/terrain.md), so this also works on `--prod` builds, which have no `dev_set_gm`. Without the variable, loadbot falls back to a fresh identity and `dev_set_gm` (dev builds only).
 - After uploading, `world-upload` checks that the server's `terrain_info` hash equals the manifest's. Then it replaces every resource node with `world/nodes.tsv` (`admin_clear_nodes`, then `admin_put_nodes` in batches of 1,000) and checks the count. That resets every node to ready.
 - `cargo xtask world --gen` regenerates `world/` first. The result should be committed.
-- Land use isn't uploaded yet: nothing on the server reads it until housing and farming (M2). It comes with them, as a private table keyed by cell like `terrain_chunk`, with its own hash.
+- Then it replaces the server's land use with the world's (`admin_clear_land`, `admin_put_land`): one private `land_chunk` row per cell that isn't all wild and temperate, 32,568 for the placeholder world, and checks the land hash in `terrain_info` (docs/design/land.md).
 
 ### The client
 - `--world DIR` (default `world`) loads the manifest and all regions in parallel into one `HeightMap` and one `LandRaster`, in about 0.2 s on the laptop. `--world FILE.mmoh` still loads a bare height file, for tests and the old spike files.
@@ -78,7 +78,6 @@ At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 
 ## 3. Deviations and not yet done
 - **No roads, no water bodies, no obstacle outlines or placements** (PLAN §5.4). Lakes and rivers above sea level need a water-surface layer; it can be another stream in the region file (version 2).
-- **Land use is client-only** until housing and farming need it on the server (above).
 - **No editor tooling.** The generator writes everything.
 - **Ocean regions are stored in full.** They compress to almost nothing, so a special case isn't worth it yet.
 

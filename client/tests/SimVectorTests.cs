@@ -269,6 +269,85 @@ namespace Mmo.Tests
             Assert.True(n >= 50 && some > 10 && some < n, $"{n} vectors, {some} affordable");
         }
 
+        private static byte[] Hex(string hex) => Convert.FromHexString(hex);
+
+        [Fact]
+        public void LandSnap()
+        {
+            int n = 0;
+            foreach (var v in Lines("land_snap"))
+            {
+                Assert.Equal(F(v[2]), Land.Snap(F(v[1])));
+                n++;
+            }
+            Assert.True(n >= 5, $"{n} vectors");
+        }
+
+        [Fact]
+        public void LandSite()
+        {
+            var map = Mmo.World.HeightMap.Parse(Hex(Lines("land_mmoh").Single()[1]));
+            var chunks = Lines("land_chunk").ToDictionary(v => ulong.Parse(v[1]), v => Hex(v[2]));
+            byte Texel(int i, int j)
+            {
+                ulong cell = ((ulong)(uint)(j / 16) << 16) | (uint)(i / 16);
+                return chunks.TryGetValue(cell, out var t) ? t[j % 16 * 16 + i % 16] : (byte)0;
+            }
+            int n = 0;
+            var seen = new HashSet<string>();
+            foreach (var v in Lines("land_site"))
+            {
+                var kind = GameContent.Plot(byte.Parse(v[1]))!;
+                var others = v[4] == "-"
+                    ? new List<Rect>()
+                    : v[4].Split(',').Select(o => o.Split(':')).Select(o => Rect.Plot(GameContent.Plot(byte.Parse(o[0]))!, F(o[1]), F(o[2]))).ToList();
+                var (lowest, error) = Land.CheckSite(Texel, map.GridSample, kind, F(v[2]), F(v[3]), others);
+                string got = error is SiteError e ? ((byte)e).ToString(CultureInfo.InvariantCulture) : $"ok:{lowest.ToString("R", CultureInfo.InvariantCulture)}";
+                if (v[5].StartsWith("ok:"))
+                {
+                    Assert.Null(error);
+                    Assert.Equal(F(v[5][3..]), lowest);
+                }
+                else
+                    Assert.Equal(v[5], got);
+                seen.Add(v[5].StartsWith("ok:") ? "ok" : v[5]);
+                n++;
+            }
+            Assert.True(n >= 300 && seen.Count == 7, $"{n} vectors, results {string.Join(",", seen)}");
+        }
+
+        [Fact]
+        public void LandTimes()
+        {
+            int n = 0;
+            foreach (var v in Lines("land_demolish_at"))
+            {
+                Assert.Equal(long.Parse(v[2]), Land.DemolishAt(long.Parse(v[1])));
+                n++;
+            }
+            foreach (var v in Lines("land_standing"))
+            {
+                long paid = long.Parse(v[1]), now = long.Parse(v[2]);
+                Assert.Equal((Standing)byte.Parse(v[3]), Land.StandingOf(paid, now));
+                Assert.Equal(v[4] == "1", Land.CanPay(paid, now));
+                n++;
+            }
+            Assert.True(n >= 100, $"{n} vectors");
+        }
+
+        [Fact]
+        public void LandTax()
+        {
+            int n = 0;
+            foreach (var v in Lines("land_tax"))
+            {
+                var got = Land.WeeklyTax(GameContent.Plot(byte.Parse(v[1]))!, int.Parse(v[2]));
+                Assert.Equal(v[3] == "none" ? null : uint.Parse(v[3]), got);
+                n++;
+            }
+            Assert.True(n >= 10, $"{n} vectors");
+        }
+
         [Fact]
         public void YawFacingRoundTrips()
         {

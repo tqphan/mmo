@@ -33,6 +33,11 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Item: tool | Felling Axe | (`felling_axe`) |
 | Item: tool | Prospector's Pick | (`prospector_pick`) |
 | Item: tool | Tin Lantern | (`tin_lantern`) |
+| Item: tax | Levy Seal | A stamped tin token that pays a plot's weekly tax (`levy_seal`) |
+| Item: deed | Garden Deed | Claims an 8 × 8 m garden on housing land (`garden_deed`) |
+| Item: deed | Farm Deed | Claims a 16 × 16 m farm on housing land (`farm_deed`) |
+| Plot | Garden | An 8 × 8 m plot (`garden`) |
+| Plot | Farm | A 16 × 16 m plot (`farm`) |
 | Node: plant | Saltreed Clump | Saltreed growing on the shore (`saltreed_clump`) |
 | Node: plant | Emberleaf Patch | (`emberleaf_patch`) |
 | Node: plant | Duskberry Bush | (`duskberry_bush`) |

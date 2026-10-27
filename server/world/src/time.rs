@@ -39,6 +39,7 @@ pub fn dev_advance_clock(ctx: &ReducerContext, micros: i64) -> Result<(), String
     let offset_micros = offset.checked_add(micros).ok_or("dev clock offset overflow")?;
     ctx.db.game_clock().id().delete(0);
     ctx.db.game_clock().insert(GameClock { id: 0, offset_micros });
+    crate::land::clock_moved(ctx);
     log::info!("dev clock now {offset_micros} µs ahead");
     Ok(())
 }

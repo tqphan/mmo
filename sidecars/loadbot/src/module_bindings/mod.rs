@@ -6,15 +6,21 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+pub mod abandon_plot_reducer;
 pub mod account_type;
+pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
 pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
+pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
 pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
+pub mod admin_remove_land_reducer;
 pub mod admin_remove_nodes_reducer;
+pub mod admin_remove_plots_reducer;
 pub mod admin_remove_stations_reducer;
+pub mod admin_remove_terrain_reducer;
 pub mod cancel_craft_reducer;
 pub mod cancel_gather_reducer;
 pub mod cannon_shot_type;
@@ -48,6 +54,7 @@ pub mod gather_reducer;
 pub mod helm_reducer;
 pub mod item_type;
 pub mod labor_type;
+pub mod land_chunk_type;
 pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
 pub mod move_event_reducer;
@@ -60,9 +67,15 @@ pub mod my_labor_table;
 pub mod my_presence_table;
 pub mod node_placement_type;
 pub mod owner_type;
+pub mod pay_tax_reducer;
+pub mod place_plot_reducer;
+pub mod plot_demolition_type;
+pub mod plot_table;
+pub mod plot_type;
 pub mod presence_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
+pub mod set_plot_access_reducer;
 pub mod ship_motion_type;
 pub mod split_item_reducer;
 pub mod station_placement_type;
@@ -80,15 +93,21 @@ pub mod vehicle_table;
 pub mod vehicle_type;
 pub mod world_tick_timer_type;
 
+pub use abandon_plot_reducer::abandon_plot;
 pub use account_type::Account;
+pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
 pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
+pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
+pub use admin_remove_land_reducer::admin_remove_land;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
+pub use admin_remove_plots_reducer::admin_remove_plots;
 pub use admin_remove_stations_reducer::admin_remove_stations;
+pub use admin_remove_terrain_reducer::admin_remove_terrain;
 pub use cancel_craft_reducer::cancel_craft;
 pub use cancel_gather_reducer::cancel_gather;
 pub use cannon_shot_type::CannonShot;
@@ -122,6 +141,7 @@ pub use gather_reducer::gather;
 pub use helm_reducer::helm;
 pub use item_type::Item;
 pub use labor_type::Labor;
+pub use land_chunk_type::LandChunk;
 pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
 pub use move_event_reducer::move_event;
@@ -134,9 +154,15 @@ pub use my_labor_table::*;
 pub use my_presence_table::*;
 pub use node_placement_type::NodePlacement;
 pub use owner_type::Owner;
+pub use pay_tax_reducer::pay_tax;
+pub use place_plot_reducer::place_plot;
+pub use plot_demolition_type::PlotDemolition;
+pub use plot_table::*;
+pub use plot_type::Plot;
 pub use presence_type::Presence;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
+pub use set_plot_access_reducer::set_plot_access;
 pub use ship_motion_type::ShipMotion;
 pub use split_item_reducer::split_item;
 pub use station_placement_type::StationPlacement;
@@ -162,9 +188,16 @@ pub use world_tick_timer_type::WorldTickTimer;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
+    AbandonPlot {
+        plot_id: u64,
+    },
+    AdminClearLand,
     AdminClearNodes,
     AdminClearStations,
     AdminClearTerrain,
+    AdminPutLand {
+        chunks: Vec<LandChunk>,
+    },
     AdminPutNodes {
         nodes: Vec<NodePlacement>,
     },
@@ -174,11 +207,20 @@ pub enum Reducer {
     AdminPutTerrain {
         chunks: Vec<TerrainChunk>,
     },
+    AdminRemoveLand {
+        cells: Vec<u64>,
+    },
     AdminRemoveNodes {
+        ids: Vec<u64>,
+    },
+    AdminRemovePlots {
         ids: Vec<u64>,
     },
     AdminRemoveStations {
         ids: Vec<u64>,
+    },
+    AdminRemoveTerrain {
+        cells: Vec<u64>,
     },
     CancelCraft,
     CancelGather,
@@ -259,6 +301,19 @@ pub enum Reducer {
         item_id: u64,
         to_slot: u16,
     },
+    PayTax {
+        plot_id: u64,
+    },
+    PlacePlot {
+        item_id: u64,
+        x: f32,
+        z: f32,
+        yaw: u8,
+    },
+    SetPlotAccess {
+        plot_id: u64,
+        access: u8,
+    },
     SplitItem {
         item_id: u64,
         count: u32,
@@ -274,14 +329,20 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
+            Reducer::AbandonPlot { .. } => "abandon_plot",
+            Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
+            Reducer::AdminPutLand { .. } => "admin_put_land",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
+            Reducer::AdminRemoveLand { .. } => "admin_remove_land",
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
+            Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
             Reducer::AdminRemoveStations { .. } => "admin_remove_stations",
+            Reducer::AdminRemoveTerrain { .. } => "admin_remove_terrain",
             Reducer::CancelCraft => "cancel_craft",
             Reducer::CancelGather => "cancel_gather",
             Reducer::Craft { .. } => "craft",
@@ -304,6 +365,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::LeaveWorld => "leave_world",
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
+            Reducer::PayTax { .. } => "pay_tax",
+            Reducer::PlacePlot { .. } => "place_plot",
+            Reducer::SetPlotAccess { .. } => "set_plot_access",
             Reducer::SplitItem { .. } => "split_item",
             Reducer::TakeHelm => "take_helm",
             _ => unreachable!(),
@@ -312,6 +376,14 @@ impl __sdk::Reducer for Reducer {
     #[allow(clippy::clone_on_copy)]
     fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
+            Reducer::AbandonPlot { plot_id } => {
+                __sats::bsatn::to_vec(&abandon_plot_reducer::AbandonPlotArgs {
+                    plot_id: plot_id.clone(),
+                })
+            }
+            Reducer::AdminClearLand => {
+                __sats::bsatn::to_vec(&admin_clear_land_reducer::AdminClearLandArgs {})
+            }
             Reducer::AdminClearNodes => {
                 __sats::bsatn::to_vec(&admin_clear_nodes_reducer::AdminClearNodesArgs {})
             }
@@ -320,6 +392,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::AdminClearTerrain => {
                 __sats::bsatn::to_vec(&admin_clear_terrain_reducer::AdminClearTerrainArgs {})
+            }
+            Reducer::AdminPutLand { chunks } => {
+                __sats::bsatn::to_vec(&admin_put_land_reducer::AdminPutLandArgs {
+                    chunks: chunks.clone(),
+                })
             }
             Reducer::AdminPutNodes { nodes } => {
                 __sats::bsatn::to_vec(&admin_put_nodes_reducer::AdminPutNodesArgs {
@@ -336,14 +413,29 @@ impl __sdk::Reducer for Reducer {
                     chunks: chunks.clone(),
                 })
             }
+            Reducer::AdminRemoveLand { cells } => {
+                __sats::bsatn::to_vec(&admin_remove_land_reducer::AdminRemoveLandArgs {
+                    cells: cells.clone(),
+                })
+            }
             Reducer::AdminRemoveNodes { ids } => {
                 __sats::bsatn::to_vec(&admin_remove_nodes_reducer::AdminRemoveNodesArgs {
+                    ids: ids.clone(),
+                })
+            }
+            Reducer::AdminRemovePlots { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_plots_reducer::AdminRemovePlotsArgs {
                     ids: ids.clone(),
                 })
             }
             Reducer::AdminRemoveStations { ids } => {
                 __sats::bsatn::to_vec(&admin_remove_stations_reducer::AdminRemoveStationsArgs {
                     ids: ids.clone(),
+                })
+            }
+            Reducer::AdminRemoveTerrain { cells } => {
+                __sats::bsatn::to_vec(&admin_remove_terrain_reducer::AdminRemoveTerrainArgs {
+                    cells: cells.clone(),
                 })
             }
             Reducer::CancelCraft => {
@@ -470,6 +562,23 @@ impl __sdk::Reducer for Reducer {
                     to_slot: to_slot.clone(),
                 })
             }
+            Reducer::PayTax { plot_id } => __sats::bsatn::to_vec(&pay_tax_reducer::PayTaxArgs {
+                plot_id: plot_id.clone(),
+            }),
+            Reducer::PlacePlot { item_id, x, z, yaw } => {
+                __sats::bsatn::to_vec(&place_plot_reducer::PlacePlotArgs {
+                    item_id: item_id.clone(),
+                    x: x.clone(),
+                    z: z.clone(),
+                    yaw: yaw.clone(),
+                })
+            }
+            Reducer::SetPlotAccess { plot_id, access } => {
+                __sats::bsatn::to_vec(&set_plot_access_reducer::SetPlotAccessArgs {
+                    plot_id: plot_id.clone(),
+                    access: access.clone(),
+                })
+            }
             Reducer::SplitItem {
                 item_id,
                 count,
@@ -499,6 +608,7 @@ pub struct DbUpdate {
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_presence: __sdk::TableUpdate<Presence>,
+    plot: __sdk::TableUpdate<Plot>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
     station: __sdk::TableUpdate<Station>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
@@ -542,6 +652,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
+                "plot" => db_update
+                    .plot
+                    .append(plot_table::parse_table_update(table_update)?),
                 "resource_node" => db_update
                     .resource_node
                     .append(resource_node_table::parse_table_update(table_update)?),
@@ -592,6 +705,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.game_clock = cache
             .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
+            .with_updates_by_pk(|row| &row.id);
+        diff.plot = cache
+            .apply_diff_to_table::<Plot>("plot", &self.plot)
             .with_updates_by_pk(|row| &row.id);
         diff.resource_node = cache
             .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
@@ -652,6 +768,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "plot" => db_update
+                    .plot
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -710,6 +829,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_presence" => db_update
                     .my_presence
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "plot" => db_update
+                    .plot
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -750,6 +872,7 @@ pub struct AppliedDiff<'r> {
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
+    plot: __sdk::TableAppliedDiff<'r, Plot>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
@@ -790,6 +913,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
+        callbacks.invoke_table_row_callbacks::<Plot>("plot", &self.plot, event);
         callbacks.invoke_table_row_callbacks::<ResourceNode>(
             "resource_node",
             &self.resource_node,
@@ -1473,6 +1597,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
+        plot_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
         station_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
@@ -1490,6 +1615,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_inventory",
         "my_labor",
         "my_presence",
+        "plot",
         "resource_node",
         "station",
         "terrain_info",

@@ -10,6 +10,8 @@ pub struct TerrainInfo {
     pub id: u8,
     pub chunks: u32,
     pub hash: u64,
+    pub land_chunks: u32,
+    pub land_hash: u64,
 }
 
 impl __sdk::InModule for TerrainInfo {
@@ -23,6 +25,8 @@ pub struct TerrainInfoCols {
     pub id: __sdk::__query_builder::Col<TerrainInfo, u8>,
     pub chunks: __sdk::__query_builder::Col<TerrainInfo, u32>,
     pub hash: __sdk::__query_builder::Col<TerrainInfo, u64>,
+    pub land_chunks: __sdk::__query_builder::Col<TerrainInfo, u32>,
+    pub land_hash: __sdk::__query_builder::Col<TerrainInfo, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for TerrainInfo {
@@ -32,6 +36,8 @@ impl __sdk::__query_builder::HasCols for TerrainInfo {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             chunks: __sdk::__query_builder::Col::new(table_name, "chunks"),
             hash: __sdk::__query_builder::Col::new(table_name, "hash"),
+            land_chunks: __sdk::__query_builder::Col::new(table_name, "land_chunks"),
+            land_hash: __sdk::__query_builder::Col::new(table_name, "land_hash"),
         }
     }
 }

@@ -30,6 +30,9 @@ namespace Mmo.World
             return texels[j * Side + i];
         }
 
+        /// <summary>The texel at (<paramref name="i"/>, <paramref name="j"/>) from the map's (−x, −z) corner; 0 (wild, temperate) off the map.</summary>
+        public byte Texel(int i, int j) => i >= 0 && j >= 0 && i < Side && j < Side ? texels[j * Side + i] : (byte)0;
+
         public static LandUse Use(byte texel) => (LandUse)(texel & 0x0f);
 
         public static Climate ClimateOf(byte texel) => (Climate)((texel >> 4) & 0x07);

@@ -63,6 +63,24 @@ namespace Mmo.Content
         Subarctic = 3,
     }
 
+    /// <summary>Property rules (content/land.toml, docs/design/land.md).</summary>
+    /// <param name="TaxItem">The wire of the item tax is paid in.</param>
+    /// <param name="WeekS">One tax period, s.</param>
+    /// <param name="GraceS">How long a plot stands after its tax runs out, s.</param>
+    /// <param name="DemolishHourUtc">The hour of the day (UTC, game time) demolitions happen.</param>
+    /// <param name="PrepayWeeks">How many weeks ahead tax may be paid.</param>
+    /// <param name="HeavyTaxPct">The weekly tax in percent by plots owned; its length is the most an account may own.</param>
+    /// <param name="ReachM">How far from a plot's edge a character may place it, pay it or change it, m.</param>
+    public sealed record PropertyRules(ushort TaxItem, uint WeekS, uint GraceS, byte DemolishHourUtc, uint PrepayWeeks, IReadOnlyList<uint> HeavyTaxPct, float ReachM);
+
+    /// <summary>Plot kinds (content/land.toml, docs/design/land.md).</summary>
+    /// <param name="Wire">Stored in plot rows.</param>
+    /// <param name="Deed">The wire of the deed item that claims it.</param>
+    /// <param name="SizeM">The side of its square, m.</param>
+    /// <param name="MaxRiseM">The most the ground may rise across it, m.</param>
+    /// <param name="Tax">Tax items a week, before the heavy-tax multiplier.</param>
+    public sealed record PlotData(byte Wire, string Id, string Name, ushort Deed, uint SizeM, float MaxRiseM, uint Tax);
+
     /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>
     /// <param name="Cap">The most a pool holds by regenerating.</param>
     /// <param name="RegenPoints">Points added at the end of each period.</param>
@@ -76,6 +94,7 @@ namespace Mmo.Content
         Material = 0,
         Consumable = 1,
         Gear = 2,
+        Deed = 3,
     }
 
     /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
@@ -133,7 +152,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x80324c399b591032UL;
+        public const ulong Hash = 0x2887382dded4f650UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -165,6 +184,21 @@ namespace Mmo.Content
 
         public static string Id(this Climate climate) => ClimateIds[(int)climate];
 
+        public static readonly PropertyRules Property = new(70, 604800, 604800, 20, 4, new uint[] { 100u, 100u, 200u, 300u, 400u }, 8.0f);
+
+        /// <summary>Every plot kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<PlotData> Plots = new PlotData[]
+        {
+            new(0, "garden", "Garden", 300, 8, 2.0f, 5),
+            new(1, "farm", "Farm", 301, 16, 3.0f, 10),
+        };
+
+        /// <summary>The plot kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static PlotData? Plot(byte wire) => wire < Plots.Count ? Plots[wire] : null;
+
+        /// <summary>The plot kind a deed item claims, if it is a deed.</summary>
+        public static PlotData? PlotByDeed(ushort item) => Plots.FirstOrDefault(p => p.Deed == item);
+
         public static readonly LaborRules Labor = new(5000, 10, 300, 5000);
 
         /// <summary>Slots in every character's bag.</summary>
@@ -192,6 +226,7 @@ namespace Mmo.Content
             new(52, "rustiron_nails", "Rustiron Nails", ItemKind.Material, 1000),
             new(53, "rustiron_fittings", "Rustiron Fittings", ItemKind.Material, 1000),
             new(60, "charcoal", "Charcoal", ItemKind.Material, 1000),
+            new(70, "levy_seal", "Levy Seal", ItemKind.Material, 1000),
             new(100, "duskberry_tart", "Duskberry Tart", ItemKind.Consumable, 100),
             new(101, "duskberry_preserve", "Duskberry Preserve", ItemKind.Consumable, 100),
             new(102, "emberleaf_salve", "Emberleaf Salve", ItemKind.Consumable, 100),
@@ -200,6 +235,8 @@ namespace Mmo.Content
             new(201, "felling_axe", "Felling Axe", ItemKind.Gear, 1),
             new(202, "prospector_pick", "Prospector's Pick", ItemKind.Gear, 1),
             new(203, "tin_lantern", "Tin Lantern", ItemKind.Gear, 1),
+            new(300, "garden_deed", "Garden Deed", ItemKind.Deed, 10),
+            new(301, "farm_deed", "Farm Deed", ItemKind.Deed, 10),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -265,6 +302,9 @@ namespace Mmo.Content
             new(17, "duskberry_preserve", 2, new Ingredient[] { new(3, 8) }, 101, 2, 10, 5.0f),
             new(18, "emberleaf_salve", 2, new Ingredient[] { new(2, 4), new(3, 1) }, 102, 2, 10, 4.0f),
             new(19, "emberleaf_tea", 2, new Ingredient[] { new(2, 3) }, 103, 2, 5, 3.0f),
+            new(20, "levy_seal", 1, new Ingredient[] { new(50, 1), new(60, 1) }, 70, 5, 10, 4.0f),
+            new(21, "garden_deed", 0, new Ingredient[] { new(40, 6), new(30, 4) }, 300, 1, 25, 8.0f),
+            new(22, "farm_deed", 0, new Ingredient[] { new(41, 8), new(42, 2), new(32, 2) }, 301, 1, 50, 12.0f),
         };
 
         /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>

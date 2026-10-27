@@ -10,6 +10,9 @@ use crate::session::{character_private__view, presence};
 pub mod place {
     /// A character's bag; the holder is its `char_id`.
     pub const BAG: u8 = 1;
+    /// Held for a character until mail delivers it (M2): a demolished plot's deed that didn't fit
+    /// in the bag (docs/design/land.md). Slots only order the stacks.
+    pub const RETURNS: u8 = 2;
 }
 
 /// Private: one stack. At most one per slot, and `1 ≤ count ≤` the item's stack size; the
@@ -142,6 +145,25 @@ pub fn destroy_item(ctx: &ReducerContext, item_id: u64, count: u32) -> Result<()
     let left = it.count - count;
     set_count(ctx, it, left);
     Ok(())
+}
+
+/// A stack in `char_id`'s bag.
+pub fn held(ctx: &ReducerContext, char_id: u64, item_id: u64) -> Option<Item> {
+    ctx.db.item().id().find(item_id).filter(|i| i.holder == char_id && i.place == place::BAG)
+}
+
+/// Take `takes` (item, count) from `char_id`'s bag, smallest stacks first, all or nothing.
+pub fn take(ctx: &ReducerContext, char_id: u64, takes: &[(u16, u32)]) -> Result<(), String> {
+    for (it, count) in plan_exchange(ctx, char_id, takes, (0, 0))? {
+        set_count(ctx, it, count);
+    }
+    Ok(())
+}
+
+/// Hold `count` of `def` for `char_id` in a place other than the bag, as one more stack.
+pub fn hold(ctx: &ReducerContext, char_id: u64, at: u8, def: u16, count: u32) {
+    let slot = ctx.db.item().by_slot().filter((char_id, at)).map(|i| i.slot + 1).max().unwrap_or(0);
+    ctx.db.item().insert(Item { id: 0, holder: char_id, place: at, slot, def, count });
 }
 
 /// Put `count` of item `def` in `char_id`'s bag: topping up its stacks of that item, lowest slot

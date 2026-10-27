@@ -81,6 +81,15 @@ namespace Mmo.Gameplay
         /// <summary>Crafting at stations; set by <see cref="Main"/>. F on land uses a station when there's nothing to gather.</summary>
         public Crafting? Crafting { get; set; }
 
+        /// <summary>Placing a plot; set by <see cref="Main"/>. While placing, F places and does nothing else.</summary>
+        public Placement? Placement { get; set; }
+
+        /// <summary>Plots; set by <see cref="Main"/>. F on land opens a plot's window when there's nothing else to use.</summary>
+        public Plots? Plots { get; set; }
+
+        /// <summary>Which way the body faces in the world.</summary>
+        public float Facing => FrameYaw + heading;
+
         /// <summary>Why the last climb didn't happen, for the HUD.</summary>
         public string? ClimbNote { get; private set; }
 
@@ -153,7 +162,8 @@ namespace Mmo.Gameplay
             swimming = Parent == 0 && Swimming.Swims(swimming, ground.Map.Height(GlobalPosition.X, GlobalPosition.Z), GlobalPosition.Y);
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
-            if (interact && Parent == 0 && (Gathering?.Interact() == true || Crafting?.Interact() == true))
+            if (interact && Parent == 0
+                && (Placement?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;

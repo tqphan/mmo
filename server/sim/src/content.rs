@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x80324c399b591032;
+pub const CONTENT_HASH: u64 = 0x2887382dded4f650;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -205,6 +205,62 @@ impl Climate {
     }
 }
 
+/// Property rules (`content/land.toml`, docs/design/land.md).
+#[derive(Debug, PartialEq)]
+pub struct PropertyRules {
+    /// The wire of the item tax is paid in.
+    pub tax_item: u16,
+    /// One tax period, s.
+    pub week_s: u32,
+    /// How long a plot stands after its tax runs out, s.
+    pub grace_s: u32,
+    /// The hour of the day (UTC, game time) demolitions happen.
+    pub demolish_hour_utc: u8,
+    /// How many weeks ahead tax may be paid.
+    pub prepay_weeks: u32,
+    /// The weekly tax in percent, by how many plots the account owns (the first entry for one);
+    /// its length is the most an account may own.
+    pub heavy_tax_pct: &'static [u32],
+    /// How far from a plot's edge a character may place it, pay it or change it, m.
+    pub reach_m: f32,
+}
+
+pub static PROPERTY: PropertyRules = PropertyRules { tax_item: 70, week_s: 604800, grace_s: 604800, demolish_hour_utc: 20, prepay_weeks: 4, heavy_tax_pct: &[100, 100, 200, 300, 400], reach_m: 8.0 };
+
+/// Plot kinds (`content/land.toml`, docs/design/land.md).
+#[derive(Debug, PartialEq)]
+pub struct PlotData {
+    /// Stored in plot rows.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    /// The wire of the deed item that claims it.
+    pub deed: u16,
+    /// The side of its square, m: a multiple of the 4 m land texel.
+    pub size_m: u32,
+    /// The most the ground may rise across it, m.
+    pub max_rise_m: f32,
+    /// Tax items a week, before the heavy-tax multiplier.
+    pub tax: u32,
+}
+
+/// Every plot kind, sorted by wire, which is the index.
+pub static PLOTS: [PlotData; 2] = [
+    PlotData { wire: 0, id: "garden", name: "Garden", deed: 300, size_m: 8, max_rise_m: 2.0, tax: 5 },
+    PlotData { wire: 1, id: "farm", name: "Farm", deed: 301, size_m: 16, max_rise_m: 3.0, tax: 10 },
+];
+
+/// The plot kind stored as `wire`.
+pub fn plot(wire: u8) -> Option<&'static PlotData> {
+    PLOTS.get(usize::from(wire))
+}
+
+/// The plot kind a deed item claims.
+pub fn plot_by_deed(item: u16) -> Option<&'static PlotData> {
+    PLOTS.iter().find(|d| d.deed == item)
+}
+
 /// Labor rules (`content/labor.toml`, docs/design/labor.md).
 #[derive(Debug, PartialEq)]
 pub struct LaborRules {
@@ -227,6 +283,7 @@ pub enum ItemKind {
     Material = 0,
     Consumable = 1,
     Gear = 2,
+    Deed = 3,
 }
 
 #[derive(Debug, PartialEq)]
@@ -242,7 +299,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 27] = [
+pub static ITEMS: [ItemData; 30] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -262,6 +319,7 @@ pub static ITEMS: [ItemData; 27] = [
     ItemData { wire: 52, id: "rustiron_nails", name: "Rustiron Nails", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 53, id: "rustiron_fittings", name: "Rustiron Fittings", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 60, id: "charcoal", name: "Charcoal", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 70, id: "levy_seal", name: "Levy Seal", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 100, id: "duskberry_tart", name: "Duskberry Tart", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 101, id: "duskberry_preserve", name: "Duskberry Preserve", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 102, id: "emberleaf_salve", name: "Emberleaf Salve", kind: ItemKind::Consumable, stack: 100 },
@@ -270,6 +328,8 @@ pub static ITEMS: [ItemData; 27] = [
     ItemData { wire: 201, id: "felling_axe", name: "Felling Axe", kind: ItemKind::Gear, stack: 1 },
     ItemData { wire: 202, id: "prospector_pick", name: "Prospector's Pick", kind: ItemKind::Gear, stack: 1 },
     ItemData { wire: 203, id: "tin_lantern", name: "Tin Lantern", kind: ItemKind::Gear, stack: 1 },
+    ItemData { wire: 300, id: "garden_deed", name: "Garden Deed", kind: ItemKind::Deed, stack: 10 },
+    ItemData { wire: 301, id: "farm_deed", name: "Farm Deed", kind: ItemKind::Deed, stack: 10 },
 ];
 
 /// Slots in every character's bag.
@@ -384,7 +444,7 @@ pub struct RecipeData {
 }
 
 /// Every recipe, sorted by wire, which is the index.
-pub static RECIPES: [RecipeData; 20] = [
+pub static RECIPES: [RecipeData; 23] = [
     RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
     RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
@@ -405,6 +465,9 @@ pub static RECIPES: [RecipeData; 20] = [
     RecipeData { wire: 17, id: "duskberry_preserve", station: 2, inputs: &[Ingredient { item: 3, count: 8 }], output: 101, output_count: 2, labor: 10, craft_s: 5.0 },
     RecipeData { wire: 18, id: "emberleaf_salve", station: 2, inputs: &[Ingredient { item: 2, count: 4 }, Ingredient { item: 3, count: 1 }], output: 102, output_count: 2, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 19, id: "emberleaf_tea", station: 2, inputs: &[Ingredient { item: 2, count: 3 }], output: 103, output_count: 2, labor: 5, craft_s: 3.0 },
+    RecipeData { wire: 20, id: "levy_seal", station: 1, inputs: &[Ingredient { item: 50, count: 1 }, Ingredient { item: 60, count: 1 }], output: 70, output_count: 5, labor: 10, craft_s: 4.0 },
+    RecipeData { wire: 21, id: "garden_deed", station: 0, inputs: &[Ingredient { item: 40, count: 6 }, Ingredient { item: 30, count: 4 }], output: 300, output_count: 1, labor: 25, craft_s: 8.0 },
+    RecipeData { wire: 22, id: "farm_deed", station: 0, inputs: &[Ingredient { item: 41, count: 8 }, Ingredient { item: 42, count: 2 }, Ingredient { item: 32, count: 2 }], output: 301, output_count: 1, labor: 50, craft_s: 12.0 },
 ];
 
 /// How close a character must stand to a station, horizontally and vertically, in metres.

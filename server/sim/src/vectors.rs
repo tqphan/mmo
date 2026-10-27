@@ -56,7 +56,14 @@ pub fn generate() -> String {
          # gather_progress <node wire> <done at> <now> <progress>\n\
          # craft_reach <station x> <y> <z> <at x> <y> <z> <in reach: 1 or 0>\n\
          # craft_progress <recipe wire> <done at> <now> <progress>\n\
-         # craft_affordable <recipe wire> <labor> <held of each input, in order> <units>\n",
+         # craft_affordable <recipe wire> <labor> <held of each input, in order> <units>\n\
+         # land_mmoh <hex bytes of the height file the land_site vectors stand on>\n\
+         # land_chunk <cell key> <hex of its 256 texels>; cells without one are wild\n\
+         # land_snap <v> <snapped>\n\
+         # land_site <plot wire> <x> <z> <other plots as wire:x:z, comma-separated, or -> <ok:lowest, or the error code>\n\
+         # land_demolish_at <paid until> <demolish at>\n\
+         # land_standing <paid until> <now> <standing: 0 paid, 1 overdue, 2 demolished> <can pay: 1 or 0>\n\
+         # land_tax <plot wire> <plots owned> <seals a week, or none>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -151,7 +158,89 @@ pub fn generate() -> String {
     labor(&mut out, &mut rng);
     gather(&mut out, &mut rng);
     craft(&mut out, &mut rng);
+    land(&mut out, &mut rng);
     out
+}
+
+/// `sim::land`'s site checks, demolition time, standing and tax, for the client's port.
+fn land(out: &mut String, rng: &mut Lcg) {
+    use crate::land::{PLOTS, Rect, can_pay, check_site, demolish_at, snap, standing, weekly_tax, week_micros, LAND_CHUNK_LEN, max_plots};
+    use std::collections::HashMap;
+    // 2 × 2 cells from the origin: a gentle swell, a steep knoll at (90, 30) and a dip into the sea
+    // at (30, 100).
+    let file = HeightFile::generate(125, 125, 2, 2, |x, z| {
+        let knoll = 6.0 * (-((x - 90.0).powi(2) + (z - 30.0).powi(2)) / 40.0).exp();
+        let dip = 5.0 * (-((x - 30.0).powi(2) + (z - 100.0).powi(2)) / 300.0).exp();
+        3.0 + 1.5 * (x * 0.05).sin() * (z * 0.07).cos() + knoll - dip
+    });
+    let hex: String = file.to_bytes().iter().map(|b| format!("{b:02x}")).collect();
+    out.push_str(&format!("land_mmoh {hex}\n"));
+    // Housing everywhere but a town strip at x 40–48 m, a wild hole and the far cell, with climates mixed in.
+    let mut land: HashMap<u64, Vec<u8>> = HashMap::new();
+    for (cx, cz) in [(125u16, 125u16), (126, 125), (125, 126)] {
+        let mut t = vec![0u8; LAND_CHUNK_LEN];
+        for (k, v) in t.iter_mut().enumerate() {
+            let x = (cx as f32 - 125.0) * CELL_SIZE_M + (k % 16) as f32 * 4.0;
+            let z = (cz as f32 - 125.0) * CELL_SIZE_M + (k / 16) as f32 * 4.0;
+            let class = if (40.0..48.0).contains(&x) { 2 } else if (x, z) == (20.0, 80.0) { 0 } else { 1 };
+            *v = class | ((k as u8 / 7) % 4) << 4;
+        }
+        let cell = cell::pack(OPEN_WORLD, cz, cx);
+        let hex: String = t.iter().map(|b| format!("{b:02x}")).collect();
+        out.push_str(&format!("land_chunk {cell} {hex}\n"));
+        land.insert(cell, t);
+    }
+    for v in [0.0, 0.9, 1.0, 1.1, -1.0, -3.2, 7.0, 63.3, -8000.0] {
+        out.push_str(&format!("land_snap {} {}\n", f(v), f(snap(v))));
+    }
+    let mut heights = terrain::FileChunks::new(&file);
+    let mut codes = [0usize; 7];
+    for k in 0..400 {
+        let kind = &PLOTS[k % PLOTS.len()];
+        let (x, z) = match k {
+            0 => (WORLD_HALF_M - 2.0, 0.0),
+            1 => (0.0, -WORLD_HALF_M + 6.0),
+            _ => (snap(rng.range(2.0, 126.0)), snap(rng.range(2.0, 126.0))),
+        };
+        let pick = |rng: &mut Lcg| (rng.next() * PLOTS.len() as f32) as u8 % PLOTS.len() as u8;
+        let others: Vec<(u8, f32, f32)> =
+            (0..(k % 3)).map(|_| (pick(rng), snap(x + rng.range(-16.0, 16.0)), snap(z + rng.range(-16.0, 16.0)))).collect();
+        let rects = others.iter().map(|&(w, ox, oz)| Rect::plot(&PLOTS[usize::from(w)], ox, oz));
+        let got = check_site(&mut land, &mut heights, kind, x, z, rects);
+        let text = match got {
+            Ok(lowest) => {
+                codes[0] += 1;
+                format!("ok:{}", f(lowest))
+            }
+            Err(e) => {
+                codes[e as usize] += 1;
+                (e as u8).to_string()
+            }
+        };
+        let others_text = if others.is_empty() {
+            "-".to_string()
+        } else {
+            others.iter().map(|(w, ox, oz)| format!("{w}:{}:{}", f(*ox), f(*oz))).collect::<Vec<_>>().join(",")
+        };
+        out.push_str(&format!("land_site {} {} {} {others_text} {text}\n", kind.wire, f(x), f(z)));
+    }
+    assert!(codes.iter().all(|&n| n > 0), "every site result is covered: {codes:?}");
+    let t0: i64 = 1_800_000_000_000_000;
+    for _ in 0..40 {
+        let paid = t0 + (rng.next() * 30.0 * 86_400e6) as i64;
+        out.push_str(&format!("land_demolish_at {paid} {}\n", demolish_at(paid)));
+    }
+    for _ in 0..60 {
+        let paid = t0 + (rng.next() * 30.0 * 86_400e6) as i64;
+        let now = paid + ((rng.next() - 0.5) * 12.0 * week_micros() as f32) as i64;
+        out.push_str(&format!("land_standing {paid} {now} {} {}\n", standing(paid, now) as u8, u8::from(can_pay(paid, now))));
+    }
+    for kind in &PLOTS {
+        for owned in 0..=max_plots() + 1 {
+            let tax = weekly_tax(kind, owned).map_or("none".to_string(), |t| t.to_string());
+            out.push_str(&format!("land_tax {} {owned} {tax}\n", kind.wire));
+        }
+    }
 }
 
 /// `sim::craft`'s reach, progress and affordability, for the client's port.

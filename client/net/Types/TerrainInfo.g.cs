@@ -19,16 +19,24 @@ namespace SpacetimeDB.Types
         public uint Chunks;
         [DataMember(Name = "hash")]
         public ulong Hash;
+        [DataMember(Name = "land_chunks")]
+        public uint LandChunks;
+        [DataMember(Name = "land_hash")]
+        public ulong LandHash;
 
         public TerrainInfo(
             byte Id,
             uint Chunks,
-            ulong Hash
+            ulong Hash,
+            uint LandChunks,
+            ulong LandHash
         )
         {
             this.Id = Id;
             this.Chunks = Chunks;
             this.Hash = Hash;
+            this.LandChunks = LandChunks;
+            this.LandHash = LandHash;
         }
 
         public TerrainInfo()

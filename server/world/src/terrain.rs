@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use spacetimedb::{ReducerContext, Table};
 use sim::terrain::{CHUNK_LEN, Chunks, Ground, chunk_hash, valid_chunk_cell};
 
+use crate::land::land_chunk;
 use crate::session::require_admin;
 
 /// Private: one 64 m cell of terrain, 33 × 33 height samples including the far edge.
@@ -17,13 +18,16 @@ pub struct TerrainChunk {
 }
 
 /// Public, one row: how many chunks there are and their terrain hash (docs/design/world.md), so
-/// `enter_world` can refuse a client standing on other ground. Kept up to date by the uploads.
+/// `enter_world` can refuse a client standing on other ground, and the same for the land-use
+/// raster's chunks (docs/design/land.md). Kept up to date by the uploads.
 #[spacetimedb::table(accessor = terrain_info, public)]
 pub struct TerrainInfo {
     #[primary_key]
     pub id: u8,
     pub chunks: u32,
     pub hash: u64,
+    pub land_chunks: u32,
+    pub land_hash: u64,
 }
 
 /// The terrain's row, rebuilt from the chunks if it's missing (a database from before the table).
@@ -36,13 +40,18 @@ pub fn terrain_info(ctx: &ReducerContext) -> TerrainInfo {
         chunks += 1;
         hash = hash.wrapping_add(chunk_hash(c.cell, &c.samples));
     }
-    if chunks > 0 {
-        log::info!("terrain_info rebuilt from {chunks} chunks");
+    let (mut land_chunks, mut land_hash) = (0u32, 0u64);
+    for c in ctx.db.land_chunk().iter() {
+        land_chunks += 1;
+        land_hash = land_hash.wrapping_add(sim::land::land_chunk_hash(c.cell, &c.texels));
     }
-    ctx.db.terrain_info().insert(TerrainInfo { id: 0, chunks, hash })
+    if chunks > 0 || land_chunks > 0 {
+        log::info!("terrain_info rebuilt from {chunks} chunks and {land_chunks} land chunks");
+    }
+    ctx.db.terrain_info().insert(TerrainInfo { id: 0, chunks, hash, land_chunks, land_hash })
 }
 
-fn set_terrain_info(ctx: &ReducerContext, info: TerrainInfo) {
+pub fn set_terrain_info(ctx: &ReducerContext, info: TerrainInfo) {
     ctx.db.terrain_info().id().delete(info.id);
     ctx.db.terrain_info().insert(info);
 }
@@ -102,7 +111,23 @@ pub fn admin_clear_terrain(ctx: &ReducerContext) -> Result<(), String> {
     for &cell in &cells {
         ctx.db.terrain_chunk().cell().delete(cell);
     }
-    set_terrain_info(ctx, TerrainInfo { id: 0, chunks: 0, hash: 0 });
+    set_terrain_info(ctx, TerrainInfo { chunks: 0, hash: 0, ..terrain_info(ctx) });
     log::info!("{} terrain chunks cleared", cells.len());
+    Ok(())
+}
+
+/// Remove chunks by cell. Unknown cells are ignored.
+#[spacetimedb::reducer]
+pub fn admin_remove_terrain(ctx: &ReducerContext, cells: Vec<u64>) -> Result<(), String> {
+    require_admin(ctx)?;
+    let mut info = terrain_info(ctx);
+    for cell in cells {
+        if let Some(old) = ctx.db.terrain_chunk().cell().find(cell) {
+            info.hash = info.hash.wrapping_sub(chunk_hash(old.cell, &old.samples));
+            info.chunks -= 1;
+            ctx.db.terrain_chunk().cell().delete(cell);
+        }
+    }
+    set_terrain_info(ctx, info);
     Ok(())
 }

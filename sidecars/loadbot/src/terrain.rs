@@ -188,9 +188,31 @@ pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     wait_for("the server's terrain hash", || got().hash == want)
         .map_err(|_| format!("the server's terrain hash is {:016x} over {} chunks, expected {want:016x}", got().hash, got().chunks))?;
     println!("the server's terrain hash matches: {want:016x} over {} chunks", got().chunks);
+    upload_land(&admin, &world)?;
     upload_nodes(&admin, &worldtool::nodes::load(std::path::Path::new(&ta.world))?)?;
     upload_stations(&admin, &worldtool::stations::load(std::path::Path::new(&ta.world))?)?;
     admin.conn.disconnect().map_err(|e| e.to_string())
+}
+
+/// Land chunks per `admin_put_land` call: 256 bytes each.
+const LAND_BATCH: usize = 512;
+
+/// Replace the server's land use with the world's (docs/design/land.md) and check its land hash.
+fn upload_land(admin: &Bot, world: &worldtool::World) -> Check {
+    let chunks = world.land_chunks();
+    let want = chunks.iter().fold(0u64, |h, (cell, t)| h.wrapping_add(sim::land::land_chunk_hash(*cell, t)));
+    outcome(|tx| admin.conn.reducers.admin_clear_land_then(move |_, r| drop(tx.send(flatten(r)))))?;
+    let rows: Vec<LandChunk> = chunks.into_iter().map(|(cell, texels)| LandChunk { cell, texels }).collect();
+    let n = rows.len();
+    for batch in rows.chunks(LAND_BATCH) {
+        let batch = batch.to_vec();
+        outcome(|tx| admin.conn.reducers.admin_put_land_then(batch, move |_, r| drop(tx.send(flatten(r)))))?;
+    }
+    let got = || admin.server_terrain();
+    wait_for("the server's land hash", || got().land_hash == want)
+        .map_err(|_| format!("the server's land hash is {:016x} over {} chunks, expected {want:016x}", got().land_hash, got().land_chunks))?;
+    println!("uploaded {n} land chunks; the server's land hash matches: {want:016x}");
+    Ok(())
 }
 
 /// Nodes per `admin_put_nodes` call.

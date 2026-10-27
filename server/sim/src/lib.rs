@@ -6,6 +6,7 @@ pub mod content;
 pub mod craft;
 pub mod gather;
 pub mod labor;
+pub mod land;
 pub mod movement;
 pub mod ship;
 pub mod terrain;

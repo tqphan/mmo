@@ -42,12 +42,16 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<TerrainInfo, byte> Id { get; }
         public global::SpacetimeDB.Col<TerrainInfo, uint> Chunks { get; }
         public global::SpacetimeDB.Col<TerrainInfo, ulong> Hash { get; }
+        public global::SpacetimeDB.Col<TerrainInfo, uint> LandChunks { get; }
+        public global::SpacetimeDB.Col<TerrainInfo, ulong> LandHash { get; }
 
         public TerrainInfoCols(string tableName)
         {
             Id = new global::SpacetimeDB.Col<TerrainInfo, byte>(tableName, "id");
             Chunks = new global::SpacetimeDB.Col<TerrainInfo, uint>(tableName, "chunks");
             Hash = new global::SpacetimeDB.Col<TerrainInfo, ulong>(tableName, "hash");
+            LandChunks = new global::SpacetimeDB.Col<TerrainInfo, uint>(tableName, "land_chunks");
+            LandHash = new global::SpacetimeDB.Col<TerrainInfo, ulong>(tableName, "land_hash");
         }
     }
 

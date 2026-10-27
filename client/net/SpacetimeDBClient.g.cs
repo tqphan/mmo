@@ -37,6 +37,7 @@ namespace SpacetimeDB.Types
             AddTable(MyInventory = new(conn));
             AddTable(MyLabor = new(conn));
             AddTable(MyPresence = new(conn));
+            AddTable(Plot = new(conn));
             AddTable(ResourceNode = new(conn));
             AddTable(Station = new(conn));
             AddTable(TerrainInfo = new(conn));
@@ -548,6 +549,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.MyInventory().ToSql(),
             new QueryBuilder().From.MyLabor().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
+            new QueryBuilder().From.Plot().ToSql(),
             new QueryBuilder().From.ResourceNode().ToSql(),
             new QueryBuilder().From.Station().ToSql(),
             new QueryBuilder().From.TerrainInfo().ToSql(),
@@ -569,6 +571,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Item, MyInventoryCols, MyInventoryIxCols> MyInventory() => new("my_inventory", new MyInventoryCols("my_inventory"), new MyInventoryIxCols("my_inventory"));
         public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
+        public global::SpacetimeDB.Table<Plot, PlotCols, PlotIxCols> Plot() => new("plot", new PlotCols("plot"), new PlotIxCols("plot"));
         public global::SpacetimeDB.Table<ResourceNode, ResourceNodeCols, ResourceNodeIxCols> ResourceNode() => new("resource_node", new ResourceNodeCols("resource_node"), new ResourceNodeIxCols("resource_node"));
         public global::SpacetimeDB.Table<Station, StationCols, StationIxCols> Station() => new("station", new StationCols("station"), new StationIxCols("station"));
         public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
@@ -655,14 +658,20 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.AbandonPlot args => Reducers.InvokeAbandonPlot(eventContext, args),
+                Reducer.AdminClearLand args => Reducers.InvokeAdminClearLand(eventContext, args),
                 Reducer.AdminClearNodes args => Reducers.InvokeAdminClearNodes(eventContext, args),
                 Reducer.AdminClearStations args => Reducers.InvokeAdminClearStations(eventContext, args),
                 Reducer.AdminClearTerrain args => Reducers.InvokeAdminClearTerrain(eventContext, args),
+                Reducer.AdminPutLand args => Reducers.InvokeAdminPutLand(eventContext, args),
                 Reducer.AdminPutNodes args => Reducers.InvokeAdminPutNodes(eventContext, args),
                 Reducer.AdminPutStations args => Reducers.InvokeAdminPutStations(eventContext, args),
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
+                Reducer.AdminRemoveLand args => Reducers.InvokeAdminRemoveLand(eventContext, args),
                 Reducer.AdminRemoveNodes args => Reducers.InvokeAdminRemoveNodes(eventContext, args),
+                Reducer.AdminRemovePlots args => Reducers.InvokeAdminRemovePlots(eventContext, args),
                 Reducer.AdminRemoveStations args => Reducers.InvokeAdminRemoveStations(eventContext, args),
+                Reducer.AdminRemoveTerrain args => Reducers.InvokeAdminRemoveTerrain(eventContext, args),
                 Reducer.CancelCraft args => Reducers.InvokeCancelCraft(eventContext, args),
                 Reducer.CancelGather args => Reducers.InvokeCancelGather(eventContext, args),
                 Reducer.Craft args => Reducers.InvokeCraft(eventContext, args),
@@ -685,6 +694,9 @@ namespace SpacetimeDB.Types
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
+                Reducer.PayTax args => Reducers.InvokePayTax(eventContext, args),
+                Reducer.PlacePlot args => Reducers.InvokePlacePlot(eventContext, args),
+                Reducer.SetPlotAccess args => Reducers.InvokeSetPlotAccess(eventContext, args),
                 Reducer.SplitItem args => Reducers.InvokeSplitItem(eventContext, args),
                 Reducer.TakeHelm args => Reducers.InvokeTakeHelm(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")

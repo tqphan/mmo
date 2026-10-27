@@ -19,6 +19,9 @@ namespace Mmo.UI
         private readonly Crafting crafting;
         private readonly Label label = new();
 
+        /// <summary>More prompts, each shown on its own line when not empty (land: docs/design/land.md).</summary>
+        public System.Collections.Generic.List<Func<string>> Prompts { get; } = new();
+
         public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls, Gathering gathering, Crafting crafting)
         {
             this.gathering = gathering;
@@ -70,6 +73,9 @@ namespace Mmo.UI
                 text += "\n" + gathering.Prompt;
             if (crafting.Prompt.Length > 0)
                 text += "\n" + crafting.Prompt;
+            foreach (var prompt in Prompts)
+                if (prompt() is { Length: > 0 } line)
+                    text += "\n" + line;
             label.Text = text;
         }
 

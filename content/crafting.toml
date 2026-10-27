@@ -226,3 +226,33 @@ output = "emberleaf_tea"
 output_count = 2
 labor = 5
 craft_s = 3.0
+
+[[recipe]]
+wire = 20
+id = "levy_seal"
+station = "bloomery"
+inputs = [{ item = "tin_ingot", count = 1 }, { item = "charcoal", count = 1 }]
+output = "levy_seal"
+output_count = 5
+labor = 10
+craft_s = 4.0
+
+[[recipe]]
+wire = 21
+id = "garden_deed"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_plank", count = 6 }, { item = "saltreed_twine", count = 4 }]
+output = "garden_deed"
+output_count = 1
+labor = 25
+craft_s = 8.0
+
+[[recipe]]
+wire = 22
+id = "farm_deed"
+station = "joiners_bench"
+inputs = [{ item = "hollowoak_plank", count = 8 }, { item = "hollowoak_beam", count = 2 }, { item = "saltrope", count = 2 }]
+output = "farm_deed"
+output_count = 1
+labor = 50
+craft_s = 12.0

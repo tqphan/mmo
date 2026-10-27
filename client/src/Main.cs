@@ -87,10 +87,24 @@ namespace Mmo
             AddChild(craftWindow);
             crafting.Window = craftWindow;
             AddChild(new GatherBar(gathering, crafting));
+            var plotRegistry = new PlotRegistry(session, map);
+            AddChild(plotRegistry);
+            var placement = new Placement(session, player, map, world.Land, plotRegistry);
+            AddChild(placement);
+            player.Placement = placement;
+            var plots = new Plots(session, player, plotRegistry);
+            AddChild(plots);
+            player.Plots = plots;
+            var plotWindow = new PlotWindow(session, plots);
+            AddChild(plotWindow);
+            plots.Window = plotWindow;
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
-            AddChild(new Hud(session, player, entities, world.Land, controls, gathering, crafting));
-            var bag = new BagWindow(session);
+            var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
+            hud.Prompts.Add(() => placement.Prompt);
+            hud.Prompts.Add(() => placement.Active is null ? plots.Prompt : "");
+            AddChild(hud);
+            var bag = new BagWindow(session) { Use = placement.Begin };
             AddChild(bag);
             if (options.BagDemo)
                 AddChild(new BagDemo(session, bag));
@@ -98,6 +112,8 @@ namespace Mmo
                 AddChild(new GatherDemo(session, player, nodes, gathering));
             if (options.CraftDemo)
                 AddChild(new CraftDemo(session, player, stations, crafting, craftWindow));
+            if (options.LandDemo)
+                AddChild(new LandDemo(session, player, map, world.Land, bag, placement, plots, plotWindow));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -190,6 +206,7 @@ namespace Mmo
             Bind("dev_remove_ship", Key.F10);
             Bind("dev_spend_labor", Key.F8);
             Bind("bag", Key.I, Key.B);
+            Bind("rotate", Key.R);
         }
     }
 }

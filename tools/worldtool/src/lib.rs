@@ -19,6 +19,20 @@ use region::Region;
 pub const DEFAULT_DIR: &str = "world";
 pub const MANIFEST: &str = "world.toml";
 pub const FORMAT: u32 = 1;
+/// One cell's 16 × 16 land texels, rows of increasing z; all 0 off the map.
+pub fn land_chunk(world: &World, cell: u64) -> Vec<u8> {
+    let (instance, cz, cx) = sim::cell::unpack(cell);
+    if instance != sim::cell::OPEN_WORLD || cx >= CELLS_PER_SIDE || cz >= CELLS_PER_SIDE {
+        return vec![0; TEXELS_PER_CELL * TEXELS_PER_CELL];
+    }
+    let (t0, u0) = (cx as usize * TEXELS_PER_CELL, cz as usize * TEXELS_PER_CELL);
+    let mut out = Vec::with_capacity(TEXELS_PER_CELL * TEXELS_PER_CELL);
+    for j in 0..TEXELS_PER_CELL {
+        out.extend_from_slice(&world.land[(u0 + j) * LAND_SIDE + t0..][..TEXELS_PER_CELL]);
+    }
+    out
+}
+
 /// Cells along a region's side: 640 m, 25 regions along the map's.
 pub const REGION_CELLS: u16 = 10;
 pub const REGIONS_PER_SIDE: u16 = CELLS_PER_SIDE / REGION_CELLS;
@@ -83,6 +97,27 @@ impl World {
             }
         }
         sum
+    }
+
+    /// Every cell's land chunk that isn't all wild and temperate (texel 0), as the server stores
+    /// them (docs/design/land.md): `(cell key, 256 texels)`, rows of increasing z.
+    pub fn land_chunks(&self) -> Vec<(u64, Vec<u8>)> {
+        let mut out = Vec::new();
+        for cz in 0..CELLS_PER_SIDE {
+            for cx in 0..CELLS_PER_SIDE {
+                let key = sim::cell::pack(sim::cell::OPEN_WORLD, cz, cx);
+                let texels = land_chunk(self, key);
+                if texels.iter().any(|&t| t != 0) {
+                    out.push((key, texels));
+                }
+            }
+        }
+        out
+    }
+
+    /// The land hash the server should hold after uploading `land_chunks`.
+    pub fn land_hash(&self) -> u64 {
+        self.land_chunks().iter().fold(0u64, |h, (cell, t)| h.wrapping_add(sim::land::land_chunk_hash(*cell, t)))
     }
 
     /// Region `(rx, rz)` cut out of the map.
@@ -234,6 +269,24 @@ fn parallel<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> R + Sync) -> Vec<R>
 mod tests {
     use super::*;
     use sim::terrain::encode;
+
+    #[test]
+    fn land_chunks_skip_wild_temperate_cells_and_match_the_hash() {
+        let mut w = World::flat(0);
+        assert!(w.land_chunks().is_empty());
+        assert_eq!(w.land_hash(), 0);
+        // The texel at (x 5, z 70) m: cell (125, 126), texel (1, 1) in it.
+        let (i, j) = (((5.0 + WORLD_HALF_M) / TEXEL_M) as usize, ((70.0 + WORLD_HALF_M) / TEXEL_M) as usize);
+        w.land[j * LAND_SIDE + i] = texel(LandUse::Housing, Climate::Arid);
+        let chunks = w.land_chunks();
+        assert_eq!(chunks.len(), 1);
+        let (cell, t) = &chunks[0];
+        assert_eq!(*cell, sim::cell::cell_of(sim::cell::OPEN_WORLD, 5.0, 70.0));
+        assert_eq!(t.len(), sim::land::LAND_CHUNK_LEN);
+        assert_eq!(t.iter().position(|&v| v != 0), Some(TEXELS_PER_CELL + 1));
+        assert_eq!(w.land_hash(), sim::land::land_chunk_hash(*cell, t));
+        assert_eq!(&land_chunk(&w, *cell), t);
+    }
 
     fn scratch(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("worldtool-{name}-{}", std::process::id()));

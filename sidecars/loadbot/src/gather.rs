@@ -202,7 +202,7 @@ pub(crate) fn set_labor(bot: &Bot, points: i32) -> Check {
     wait_for("the new pool", || bot.conn.db.my_labor().iter().next().is_some_and(|l| l.points == points))
 }
 
-fn advance(bot: &Bot, micros: i64) -> Check {
+pub(crate) fn advance(bot: &Bot, micros: i64) -> Check {
     let offset = || bot.conn.db.game_clock().iter().next().map_or(0, |c| c.offset_micros);
     let before = offset();
     call(bot, |tx| bot.conn.reducers.dev_advance_clock_then(micros, tx))?;

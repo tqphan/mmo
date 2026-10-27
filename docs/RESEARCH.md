@@ -60,6 +60,7 @@ The fidelity target is **the final Western version, as it stood at shutdown in J
 - Crops, trees and livestock have fixed growth times. **Climate zones** from tropical to subarctic speed up crops suited to them. Without water, feed or medicine, they wither and die. Mature ones can be harvested repeatedly or removed for base materials. Livestock occasionally produces mount or pet offspring. Trees supply timber for houses and ships. **B**
 - Planting on unclaimed land is allowed, but anyone can harvest or uproot the plants, which earns crime points. Small public farms protect produce. **B**
 - Scarce land led to "land rush" events and to hoarding through alt accounts. **B**
+- Tax rates (searched 2026-10-26, docs/design/land.md): the 8×8 garden cost at least 5 tax certificates a week, rising with buildings owned, with a 10-certificate deposit; the 16×16 scarecrow cost 10 a week from placement. Unpaid tax gave about a week's notice before demolition, and a garden removed for tax had its design returned 22 hours late. How far ahead tax could be prepaid, the demolition hour and any property limit weren't found. **B**
 
 ### 2.5 Trade packs
 - Packs are crafted at specialty workbenches from regional produce and worn on the back. The carrier is slowed (**A**) and cannot glide or ride most mounts (**C**). Packs expire after about six days (**B**).

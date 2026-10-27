@@ -8,22 +8,22 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 ## M1: "One Coast" (PLAN §11)
 Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<system>.md`). PLAN Q3 is still open; it can reorder later tasks, not these first ones.
 
-1. **Land**: 8 × 8 garden and 16 × 16 farm deeds, placed only on housing land without overlaps; weekly tax, a demolition timer when it lapses, and a public marker; access settings. Accept: land-rush test (two placements, one wins), tax and demolition by test clock.
-2. **Farming**: six crops, two trees and one animal; growth from planting time and climate; harvest with labor; harvesting off your plot gives crime points (wired up in the crime task). Accept: growth by test clock, no ticking.
-3. **Trade packs**: two pack recipes at a specialty bench; carried on the back with the slowdown and no gliding; three outposts, one across water; demand that falls with sales and recovers from timestamps; selling. Accept: a bot crafts, carries and sells a pack; the speed check enforces the slowdown.
-4. **Combat basics**: health and mana, targeting, `use_skill` with casts and impacts, death and respawn; three skillsets of about eight skills with two cross-skillset combos; levels 1–15. May split into two sessions.
-5. **NPCs**: about ten types, spawns near players, a simple brain, loot.
-6. **Vehicles**: a cart with pack slots, a rowboat, and the clipper built at a shipyard from a design and materials; packs loaded on ships.
-7. **Crime**: evidence (bloodstains, footprints), crime points from attacks, pack theft and crop theft, and witness reports.
-8. **Party and local chat.**
-9. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests.
-10. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
+1. **Farming**: six crops, two trees and one animal; growth from planting time and climate; harvest with labor; harvesting off your plot gives crime points (wired up in the crime task). Accept: growth by test clock, no ticking.
+2. **Trade packs**: two pack recipes at a specialty bench; carried on the back with the slowdown and no gliding; three outposts, one across water; demand that falls with sales and recovers from timestamps; selling. Accept: a bot crafts, carries and sells a pack; the speed check enforces the slowdown.
+3. **Combat basics**: health and mana, targeting, `use_skill` with casts and impacts, death and respawn; three skillsets of about eight skills with two cross-skillset combos; levels 1–15. May split into two sessions.
+4. **NPCs**: about ten types, spawns near players, a simple brain, loot.
+5. **Vehicles**: a cart with pack slots, a rowboat, and the clipper built at a shipyard from a design and materials; packs loaded on ships.
+6. **Crime**: evidence (bloodstains, footprints), crime points from attacks, pack theft and crop theft, and witness reports.
+7. **Party and local chat.**
+8. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests.
+9. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
 
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.
 - Walk speed and the pack-carrying slowdown as a percentage (run 5.4 m/s and sprint 8 m/s are known; docs/design/movement.md §1).
 - Jump height, gravity and the fall-damage threshold (docs/design/terrain.md §1). Fall damage needs a threshold in M1, ours or theirs.
 - Gathering: cast times, yields, wild-node respawn times and whether nodes respawn in place, and the labor for herbs and logging (docs/design/gathering.md §1). Only the iron vein's 10 labor is known.
+- Land: how far ahead tax could be prepaid, the hour demolitions ran, and any limit on properties (docs/design/land.md §1). Ours: 4 weeks, 20:00 UTC, 5 per account.
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (docs/design/ships.md §1). An add-on clipper cannon is known: 48 m, 700 damage, 3 s.
 
 ## Done
@@ -54,3 +54,4 @@ Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without t
 - 2026-10-26 **M1: items and the bag**: nine items in `content/items.toml` with permanent wire numbers, kinds and stacks, and a 50-slot bag; private `item` rows by holder, place and slot, read through `my_inventory` (ADR 0022); `move_item` (move, merge, swap), `split_item`, `destroy_item`, an all-or-nothing `items::grant` for gathering and dev `dev_grant_item`; a bag window with click-to-place, shift-click splits and confirmed destroys, its rules in xUnit; `--bag-demo`; `items` bot scenario; captures `docs/captures/2026-10-26-bag-*.png` (docs/design/items.md).
 - 2026-10-26 **M1: gathering**: seven node kinds in `content/gathering.toml` (plants, ores, trees); public `resource_node` rows in a new Static tier, regrowing from a `ready_at` timestamp; `gather` with every refusal from the spec, a private scheduled `gather_job` that spends labor and grants the rolled yield in one transaction when it finishes, cancelled for free by moving 0.5 m, `cancel_gather` or leaving; 11,920 placeholder placements in `world/nodes.tsv` from `worldtool nodes`, uploaded by `cargo xtask world`; `sim::gather` ported to C# against vectors; placeholder node views, F to gather, a prompt and a progress bar; `--gather-demo`; `gather` bot scenario (ADR 0023); captures `docs/captures/2026-10-26-gather-*.png` (docs/design/gathering.md).
 - 2026-10-26 **M1: crafting**: three stations and 20 recipes in `content/crafting.toml`, with 18 crafted items, checked by contentgen; public `station` rows in the Static tier, placed from `world/stations.tsv` by `worldtool stations` and `cargo xtask world`; `craft(station, recipe, count)` with every refusal from the spec, a private scheduled `craft_job` read through `my_craft` that makes one unit per run through an all-or-nothing `items::exchange` and reschedules itself, cancelled for free by moving, `cancel_craft`, leaving or the station's removal; `sim::craft` ported to C# against vectors; placeholder stations, F opens a craft window (`CraftModel` in xUnit), a progress bar; `--craft-demo`; `craft` bot scenario (ADR 0024); captures `docs/captures/2026-10-26-craft-*.png` (docs/design/crafting.md).
+- 2026-10-26 **M1: land**: Garden (8 × 8 m, 5 Levy Seals a week) and Farm (16 × 16 m, 10) plots in `content/land.toml`, claimed with crafted deeds and taxed in crafted Levy Seals with a heavy-tax multiplier and a limit of 5 per account; land use uploaded to a private `land_chunk` table with a land hash; `place_plot` with the site checks (housing texels, known dry ground, rise, no overlap), first call wins; public `plot` rows whose paid/overdue/demolished standing comes from `tax_paid_until`, demolition at 20:00 UTC a week after the tax runs out by a one-shot timer rescheduled on payment and by the dev clock; `pay_tax`, `set_plot_access`, `abandon_plot`; `sim::land` ported to C# against vectors; plot outlines and signs, a placement preview from the bag, a plot window; `--land-demo`; `land` bot scenario (ADR 0025); captures `docs/captures/2026-10-26-land-*.png` (docs/design/land.md).
