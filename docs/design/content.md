@@ -33,7 +33,7 @@ The values are the placeholders from docs/design/movement.md (walk 2.0, run 5.4,
 - `enter_world(char_id, content_hash)` refuses a hash that differs from the server's, with an error naming both. Nothing is spawned.
 
 ## 3. Deviations and not yet done
-- Only one table. Skills, items and the rest join as their systems arrive, along with reference checks between tables (PLAN §5.4) and CSV for large tables.
+- Items joined in M1 (`items.toml`, docs/design/items.md), with permanent wire numbers that may have gaps (ADR 0022). Skills and the rest join as their systems arrive, along with reference checks between tables (PLAN §5.4) and CSV for large tables.
 - The server's hash isn't published in a table, so a client finds out it is out of date only when `enter_world` fails. A public `server_info` row can come with the client's login screen if that's wanted.
 - Clients aren't checked on connect, only on entering the world, because nothing before that depends on content.
 

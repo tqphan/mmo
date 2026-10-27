@@ -16,7 +16,9 @@ pub mod character_public_type;
 pub mod combat_event_table;
 pub mod combat_event_type;
 pub mod create_character_reducer;
+pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
+pub mod dev_grant_item_reducer;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
@@ -32,17 +34,21 @@ pub mod fire_reducer;
 pub mod game_clock_table;
 pub mod game_clock_type;
 pub mod helm_reducer;
+pub mod item_type;
 pub mod labor_type;
 pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
 pub mod move_event_reducer;
+pub mod move_item_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
+pub mod my_inventory_table;
 pub mod my_labor_table;
 pub mod my_presence_table;
 pub mod owner_type;
 pub mod presence_type;
 pub mod ship_motion_type;
+pub mod split_item_reducer;
 pub mod suspicion_type;
 pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
@@ -65,7 +71,9 @@ pub use character_public_type::CharacterPublic;
 pub use combat_event_table::*;
 pub use combat_event_type::CombatEvent;
 pub use create_character_reducer::create_character;
+pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
+pub use dev_grant_item_reducer::dev_grant_item;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
@@ -81,17 +89,21 @@ pub use fire_reducer::fire;
 pub use game_clock_table::*;
 pub use game_clock_type::GameClock;
 pub use helm_reducer::helm;
+pub use item_type::Item;
 pub use labor_type::Labor;
 pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
 pub use move_event_reducer::move_event;
+pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
+pub use my_inventory_table::*;
 pub use my_labor_table::*;
 pub use my_presence_table::*;
 pub use owner_type::Owner;
 pub use presence_type::Presence;
 pub use ship_motion_type::ShipMotion;
+pub use split_item_reducer::split_item;
 pub use suspicion_type::Suspicion;
 pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
@@ -119,8 +131,16 @@ pub enum Reducer {
     CreateCharacter {
         name: String,
     },
+    DestroyItem {
+        item_id: u64,
+        count: u32,
+    },
     DevAdvanceClock {
         micros: i64,
+    },
+    DevGrantItem {
+        item: String,
+        count: u32,
     },
     DevRemoveShip {
         ship: u64,
@@ -173,6 +193,15 @@ pub enum Reducer {
         speed: i16,
         mode: u8,
     },
+    MoveItem {
+        item_id: u64,
+        to_slot: u16,
+    },
+    SplitItem {
+        item_id: u64,
+        count: u32,
+        to_slot: u16,
+    },
     TakeHelm,
 }
 
@@ -186,7 +215,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearTerrain => "admin_clear_terrain",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::CreateCharacter { .. } => "create_character",
+            Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevGrantItem { .. } => "dev_grant_item",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
@@ -200,6 +231,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
             Reducer::MoveEvent { .. } => "move_event",
+            Reducer::MoveItem { .. } => "move_item",
+            Reducer::SplitItem { .. } => "split_item",
             Reducer::TakeHelm => "take_helm",
             _ => unreachable!(),
         }
@@ -220,9 +253,21 @@ impl __sdk::Reducer for Reducer {
                     name: name.clone(),
                 })
             }
+            Reducer::DestroyItem { item_id, count } => {
+                __sats::bsatn::to_vec(&destroy_item_reducer::DestroyItemArgs {
+                    item_id: item_id.clone(),
+                    count: count.clone(),
+                })
+            }
             Reducer::DevAdvanceClock { micros } => {
                 __sats::bsatn::to_vec(&dev_advance_clock_reducer::DevAdvanceClockArgs {
                     micros: micros.clone(),
+                })
+            }
+            Reducer::DevGrantItem { item, count } => {
+                __sats::bsatn::to_vec(&dev_grant_item_reducer::DevGrantItemArgs {
+                    item: item.clone(),
+                    count: count.clone(),
                 })
             }
             Reducer::DevRemoveShip { ship } => {
@@ -303,6 +348,21 @@ impl __sdk::Reducer for Reducer {
                 speed: speed.clone(),
                 mode: mode.clone(),
             }),
+            Reducer::MoveItem { item_id, to_slot } => {
+                __sats::bsatn::to_vec(&move_item_reducer::MoveItemArgs {
+                    item_id: item_id.clone(),
+                    to_slot: to_slot.clone(),
+                })
+            }
+            Reducer::SplitItem {
+                item_id,
+                count,
+                to_slot,
+            } => __sats::bsatn::to_vec(&split_item_reducer::SplitItemArgs {
+                item_id: item_id.clone(),
+                count: count.clone(),
+                to_slot: to_slot.clone(),
+            }),
             Reducer::TakeHelm => __sats::bsatn::to_vec(&take_helm_reducer::TakeHelmArgs {}),
             _ => unreachable!(),
         }
@@ -319,6 +379,7 @@ pub struct DbUpdate {
     entity: __sdk::TableUpdate<Entity>,
     game_clock: __sdk::TableUpdate<GameClock>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
+    my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_presence: __sdk::TableUpdate<Presence>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
@@ -350,6 +411,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_characters" => db_update
                     .my_characters
                     .append(my_characters_table::parse_table_update(table_update)?),
+                "my_inventory" => db_update
+                    .my_inventory
+                    .append(my_inventory_table::parse_table_update(table_update)?),
                 "my_labor" => db_update
                     .my_labor
                     .append(my_labor_table::parse_table_update(table_update)?),
@@ -413,6 +477,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
+        diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
 
@@ -439,6 +504,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_inventory" => db_update
+                    .my_inventory
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_labor" => db_update
                     .my_labor
@@ -486,6 +554,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_characters" => db_update
                     .my_characters
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_inventory" => db_update
+                    .my_inventory
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_labor" => db_update
                     .my_labor
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -522,6 +593,7 @@ pub struct AppliedDiff<'r> {
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
+    my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
@@ -558,6 +630,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.my_characters,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
@@ -1233,6 +1306,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         entity_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
+        my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
@@ -1246,6 +1320,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "entity",
         "game_clock",
         "my_characters",
+        "my_inventory",
         "my_labor",
         "my_presence",
         "terrain_info",

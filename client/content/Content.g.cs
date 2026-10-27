@@ -5,6 +5,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Mmo.Content
 {
@@ -69,6 +70,19 @@ namespace Mmo.Content
     /// <param name="StartPoints">What a new account starts with.</param>
     public sealed record LaborRules(int Cap, int RegenPoints, int RegenPeriodS, int StartPoints);
 
+    /// <summary>Item kinds (content/items.toml, docs/design/items.md). The value is the wire value.</summary>
+    public enum ItemKind : byte
+    {
+        Material = 0,
+        Consumable = 1,
+        Gear = 2,
+    }
+
+    /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
+    /// <param name="Name">What players see.</param>
+    /// <param name="Stack">The most in one slot.</param>
+    public sealed record ItemData(ushort Wire, string Id, string Name, ItemKind Kind, uint Stack);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -86,7 +100,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xdb0daaaa592d3e4eUL;
+        public const ulong Hash = 0x0c241a0e7659eaedUL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -119,5 +133,27 @@ namespace Mmo.Content
         public static string Id(this Climate climate) => ClimateIds[(int)climate];
 
         public static readonly LaborRules Labor = new(5000, 10, 300, 5000);
+
+        /// <summary>Slots in every character's bag.</summary>
+        public const ushort BagSlots = 50;
+
+        /// <summary>Every item, sorted by wire.</summary>
+        public static readonly IReadOnlyList<ItemData> Items = new ItemData[]
+        {
+            new(1, "saltreed", "Saltreed", ItemKind.Material, 1000),
+            new(2, "emberleaf", "Emberleaf", ItemKind.Material, 1000),
+            new(3, "duskberry", "Duskberry", ItemKind.Material, 1000),
+            new(10, "tinstone", "Tinstone", ItemKind.Material, 1000),
+            new(11, "rustvein_ore", "Rustvein Ore", ItemKind.Material, 1000),
+            new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),
+            new(21, "hollowoak_log", "Hollowoak Log", ItemKind.Material, 1000),
+            new(100, "duskberry_tart", "Duskberry Tart", ItemKind.Consumable, 100),
+            new(200, "reedcutter_knife", "Reedcutter's Knife", ItemKind.Gear, 1),
+        };
+
+        private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
+
+        /// <summary>The item stored as <paramref name="wire"/>, if it still exists.</summary>
+        public static ItemData? Item(ushort wire) => ItemsByWire.TryGetValue(wire, out var d) ? d : null;
     }
 }

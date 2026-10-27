@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xdb0daaaa592d3e4e;
+pub const CONTENT_HASH: u64 = 0x0c241a0e7659eaed;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,3 +219,50 @@ pub struct LaborRules {
 }
 
 pub static LABOR: LaborRules = LaborRules { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 };
+
+/// Item kinds (`content/items.toml`, docs/design/items.md). The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ItemKind {
+    Material = 0,
+    Consumable = 1,
+    Gear = 2,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ItemData {
+    /// Stored in item rows. It never changes and is never reused.
+    pub wire: u16,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    pub kind: ItemKind,
+    /// The most in one slot.
+    pub stack: u32,
+}
+
+/// Every item, sorted by wire.
+pub static ITEMS: [ItemData; 9] = [
+    ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 10, id: "tinstone", name: "Tinstone", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 11, id: "rustvein_ore", name: "Rustvein Ore", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 20, id: "driftpine_log", name: "Driftpine Log", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 21, id: "hollowoak_log", name: "Hollowoak Log", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 100, id: "duskberry_tart", name: "Duskberry Tart", kind: ItemKind::Consumable, stack: 100 },
+    ItemData { wire: 200, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },
+];
+
+/// Slots in every character's bag.
+pub const BAG_SLOTS: u16 = 50;
+
+/// The item stored as `wire`, if it still exists.
+pub fn item(wire: u16) -> Option<&'static ItemData> {
+    ITEMS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &ITEMS[i])
+}
+
+/// The item with content id `id`.
+pub fn item_by_id(id: &str) -> Option<&'static ItemData> {
+    ITEMS.iter().find(|d| d.id == id)
+}

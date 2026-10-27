@@ -181,6 +181,15 @@ Fan wikis on Fandom sit behind a bot check, so these come from search extracts o
 
 What this means for us: the range cap matters more than the shell's speed. At 88 m/s a free ballistic shot would carry several hundred metres, so the original must have limited range (48–90 m) rather than letting gravity do it. Our placeholder cannon (40 m/s, −5° to 15° elevation, 25–90 m) covers the same band of engagement distances. Tuning is M1 work.
 
+### 2A.5 Bags and storage (searched 2026-10-26)
+From search extracts again (docs/design/items.md).
+
+| Fact | Value | Conf. | Source |
+|---|---|---|---|
+| Bag and warehouse size | Both start at 50 slots; each expansion adds 10, up to 150 | B | [Fandom: Expansion Scroll](https://archeage.fandom.com/wiki/Expansion_Scroll), [Saarith guide (2019)](https://saarith.com/archeage-expansion-scrolls-and-how-to-get-more-storage-space/) |
+| How expansions were bought | Scrolls from the cash shop, tradeable for gold (about 75 gold each in 2019); warehouses stopped expanding for gold after patch 1.2 | B | [Fandom: Warehouse](https://archeage.fandom.com/wiki/Warehouse), Saarith |
+| Stack sizes | Not found; common materials are remembered as stacking to 1,000 | C | — |
+
 ---
 
 ## 3. SpacetimeDB (current release v2.13.0, 21 Oct 2026)

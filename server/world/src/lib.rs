@@ -3,6 +3,7 @@
 mod combat;
 #[cfg(feature = "dev")]
 mod dev;
+mod items;
 mod labor;
 mod movement;
 mod session;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Mmo.Content;
@@ -49,6 +50,15 @@ namespace Mmo.Net
         /// <summary>Our account's labor pool as stored; settle it at <see cref="GameNowMicros"/> to show it.</summary>
         public Sim.LaborPool? Labor =>
             Conn?.Db.MyLabor.Iter().FirstOrDefault() is { } l ? new Sim.LaborPool(l.Points, l.At.MicrosecondsSinceUnixEpoch) : null;
+
+        /// <summary>The bag of the character we're in the world as, as the server has it (docs/design/items.md).</summary>
+        public IEnumerable<Gameplay.BagStack> Bag =>
+            Conn is { } c && Me is { } me
+                ? c.Db.MyInventory.Iter().Where(i => i.Holder == me.CharId && i.Place == BagPlace).Select(i => new Gameplay.BagStack(i.Id, i.Slot, i.Def, i.Count))
+                : Enumerable.Empty<Gameplay.BagStack>();
+
+        /// <summary><c>place::BAG</c> on the server.</summary>
+        public const byte BagPlace = 1;
 
         /// <summary>We're in the world: snap to this presence.</summary>
         public event Action<Presence>? Entered;
@@ -123,7 +133,7 @@ namespace Mmo.Net
                 .Subscribe(new[]
                 {
                     "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public",
-                    "SELECT * FROM my_labor", "SELECT * FROM game_clock",
+                    "SELECT * FROM my_labor", "SELECT * FROM game_clock", "SELECT * FROM my_inventory",
                 });
         }
 

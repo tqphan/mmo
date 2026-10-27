@@ -10,6 +10,7 @@
 #[allow(clippy::all, unused)]
 mod module_bindings;
 mod director;
+mod items;
 mod labor;
 mod metrics;
 mod ship;
@@ -100,6 +101,7 @@ fn main() {
         "ship" => ship::scenario(&args, &sh),
         "visitor" => visitor::scenario(&args, &va),
         "labor" => labor::scenario(&args),
+        "items" => items::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -114,7 +116,8 @@ fn main() {
                  world-upload     upload the world's files (world/, or --world) as an admin and check its terrain hash\n  \
                  ship             bots walk the deck of a turning ship, fire its cannon and try to cheat\n  \
                  visitor          a bot runs circles near spawn on the world's ground and lists who it sees (company for client playtests)\n  \
-                 labor            a new account's labor pool regenerates with the dev clock, fills, and refuses what it can't cover"
+                 labor            a new account's labor pool regenerates with the dev clock, fills, and refuses what it can't cover\n  \
+                 items            a bot fills its bag, then moves, merges, splits, swaps and destroys stacks, and has bad requests refused"
             );
             std::process::exit(2);
         }

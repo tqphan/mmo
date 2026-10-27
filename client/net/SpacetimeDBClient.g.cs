@@ -33,6 +33,7 @@ namespace SpacetimeDB.Types
             AddTable(Entity = new(conn));
             AddTable(GameClock = new(conn));
             AddTable(MyCharacters = new(conn));
+            AddTable(MyInventory = new(conn));
             AddTable(MyLabor = new(conn));
             AddTable(MyPresence = new(conn));
             AddTable(TerrainInfo = new(conn));
@@ -540,6 +541,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.GameClock().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
+            new QueryBuilder().From.MyInventory().ToSql(),
             new QueryBuilder().From.MyLabor().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
             new QueryBuilder().From.TerrainInfo().ToSql(),
@@ -557,6 +559,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
+        public global::SpacetimeDB.Table<Item, MyInventoryCols, MyInventoryIxCols> MyInventory() => new("my_inventory", new MyInventoryCols("my_inventory"), new MyInventoryIxCols("my_inventory"));
         public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
         public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
@@ -646,7 +649,9 @@ namespace SpacetimeDB.Types
                 Reducer.AdminClearTerrain args => Reducers.InvokeAdminClearTerrain(eventContext, args),
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
+                Reducer.DestroyItem args => Reducers.InvokeDestroyItem(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
+                Reducer.DevGrantItem args => Reducers.InvokeDevGrantItem(eventContext, args),
                 Reducer.DevRemoveShip args => Reducers.InvokeDevRemoveShip(eventContext, args),
                 Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
                 Reducer.DevSetLabor args => Reducers.InvokeDevSetLabor(eventContext, args),
@@ -660,6 +665,8 @@ namespace SpacetimeDB.Types
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
+                Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
+                Reducer.SplitItem args => Reducers.InvokeSplitItem(eventContext, args),
                 Reducer.TakeHelm args => Reducers.InvokeTakeHelm(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };

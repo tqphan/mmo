@@ -1,0 +1,75 @@
+# Items (docs/design/items.md). `wire` is the number stored in item rows: it never changes and is
+# never reused, even after an item is removed, so gaps are fine. 0 is reserved. Kinds are
+# `material`, `consumable` and `gear`; gear doesn't stack. Names come from docs/world/.
+
+[bag]
+# Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
+slots = 50
+
+# Plants
+[[item]]
+wire = 1
+id = "saltreed"
+name = "Saltreed"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 2
+id = "emberleaf"
+name = "Emberleaf"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 3
+id = "duskberry"
+name = "Duskberry"
+kind = "material"
+stack = 1000
+
+# Ore
+[[item]]
+wire = 10
+id = "tinstone"
+name = "Tinstone"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 11
+id = "rustvein_ore"
+name = "Rustvein Ore"
+kind = "material"
+stack = 1000
+
+# Trees
+[[item]]
+wire = 20
+id = "driftpine_log"
+name = "Driftpine Log"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 21
+id = "hollowoak_log"
+name = "Hollowoak Log"
+kind = "material"
+stack = 1000
+
+# Food
+[[item]]
+wire = 100
+id = "duskberry_tart"
+name = "Duskberry Tart"
+kind = "consumable"
+stack = 100
+
+# Tools
+[[item]]
+wire = 200
+id = "reedcutter_knife"
+name = "Reedcutter's Knife"
+kind = "gear"
+stack = 1

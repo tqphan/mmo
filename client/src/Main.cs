@@ -76,6 +76,10 @@ namespace Mmo
             var camera = new FollowCamera(player, options.CamYawDeg, map);
             AddChild(camera);
             AddChild(new Hud(session, player, entities, world.Land, controls));
+            var bag = new BagWindow(session);
+            AddChild(bag);
+            if (options.BagDemo)
+                AddChild(new BagDemo(session, bag));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -167,6 +171,7 @@ namespace Mmo
             Bind("dev_spawn_ship", Key.F9);
             Bind("dev_remove_ship", Key.F10);
             Bind("dev_spend_labor", Key.F8);
+            Bind("bag", Key.I, Key.B);
         }
     }
 }

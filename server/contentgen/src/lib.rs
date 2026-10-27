@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 4";
+const FORMAT: &str = "contentgen 5";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -20,6 +20,13 @@ const MAX_MOUNTS: usize = 16;
 /// The land-use raster packs a use class into 4 bits and a climate into 3 (docs/design/world.md).
 pub const MAX_LAND_USES: usize = 16;
 pub const MAX_CLIMATES: usize = 8;
+/// More in one slot than this is a typo.
+const MAX_STACK: u32 = 10_000;
+/// Bags may grow to 150 slots (docs/design/items.md); a bigger starting bag is a typo.
+const MAX_BAG_SLOTS: u16 = 150;
+const MAX_ITEM_NAME: usize = 40;
+/// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
+pub const ITEM_KINDS: [&str; 3] = ["material", "consumable", "gear"];
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -27,6 +34,7 @@ pub struct Sources {
     pub ships: String,
     pub land: String,
     pub labor: String,
+    pub items: String,
 }
 
 impl Sources {
@@ -39,6 +47,7 @@ impl Sources {
             ships: read("ships.toml")?,
             land: read("land.toml")?,
             labor: read("labor.toml")?,
+            items: read("items.toml")?,
         })
     }
 }
@@ -138,6 +147,31 @@ pub struct LaborDef {
     pub start_points: i32,
 }
 
+/// `items.toml`: item definitions and the bag (docs/design/items.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ItemsFile {
+    bag: BagDef,
+    item: Vec<ItemDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct BagDef {
+    pub slots: u16,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ItemDef {
+    /// Stored in item rows: permanent, never reused, gaps allowed, 0 reserved.
+    pub wire: u16,
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub stack: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -149,6 +183,9 @@ pub struct Content {
     pub land_uses: Vec<LandUseDef>,
     pub climates: Vec<ClimateDef>,
     pub labor: LaborDef,
+    pub bag: BagDef,
+    /// Sorted by `wire`, which may have gaps.
+    pub items: Vec<ItemDef>,
     pub hash: u64,
 }
 
@@ -159,24 +196,27 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let ships: Result<ShipsFile, _> = from_toml("ships.toml", &src.ships);
     let land: Result<LandFile, _> = from_toml("land.toml", &src.land);
     let labor: Result<LaborDef, _> = from_toml("labor.toml", &src.labor);
-    let (mut modes, mut hulls, mut land, labor) = match (movement, ships, land, labor) {
-        (Ok(m), Ok(s), Ok(l), Ok(b)) => (m.mode, s.hull, l, b),
-        (m, s, l, b) => {
-            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).flatten().collect());
+    let items: Result<ItemsFile, _> = from_toml("items.toml", &src.items);
+    let (mut modes, mut hulls, mut land, labor, mut items) = match (movement, ships, land, labor, items) {
+        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i)) => (m.mode, s.hull, l, b, i),
+        (m, s, l, b, i) => {
+            return Err(m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).flatten().collect());
         }
     };
     modes.sort_by_key(|m| m.wire);
     hulls.sort_by_key(|h| h.wire);
     land.land_use.sort_by_key(|u| u.wire);
     land.climate.sort_by_key(|c| c.wire);
+    items.item.sort_by_key(|i| i.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &mut errors);
     check_labor(&labor, &mut errors);
+    check_items(&items, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, hash: 0 };
+    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, labor, bag: items.bag, items: items.item, hash: 0 };
     c.hash = hash(&canonical(&c));
     Ok(c)
 }
@@ -299,6 +339,54 @@ fn check_labor(l: &LaborDef, errors: &mut Vec<String>) {
     }
 }
 
+fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
+    let file = "items.toml";
+    if !(1..=MAX_BAG_SLOTS).contains(&f.bag.slots) {
+        errors.push(format!("{file}: bag.slots must be from 1 to {MAX_BAG_SLOTS}"));
+    }
+    if f.item.is_empty() {
+        errors.push(format!("{file}: no items"));
+    }
+    let mut ids = std::collections::HashSet::new();
+    let mut names = std::collections::HashSet::new();
+    for (i, it) in f.item.iter().enumerate() {
+        let at = format!("{file}: item {:?}", it.id);
+        if it.wire == 0 {
+            errors.push(format!("{at}: wire 0 is reserved"));
+        }
+        if i > 0 && f.item[i - 1].wire == it.wire {
+            errors.push(format!("{at}: duplicate wire {}", it.wire));
+        }
+        if !is_id(&it.id) {
+            errors.push(format!("{at}: ids are lower-case letters, digits and _, starting with a letter"));
+        }
+        if !ids.insert(it.id.as_str()) {
+            errors.push(format!("{at}: duplicate id"));
+        }
+        if !is_item_name(&it.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(it.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", it.name));
+        }
+        if !ITEM_KINDS.contains(&it.kind.as_str()) {
+            errors.push(format!("{at}: kind must be one of {}", ITEM_KINDS.join(", ")));
+        }
+        if !(1..=MAX_STACK).contains(&it.stack) {
+            errors.push(format!("{at}: stack must be from 1 to {MAX_STACK}"));
+        } else if it.kind == "gear" && it.stack != 1 {
+            errors.push(format!("{at}: gear doesn't stack (stack = 1)"));
+        }
+    }
+}
+
+/// Safe to print as a string literal in both Rust and C# without escaping.
+fn is_item_name(s: &str) -> bool {
+    s.chars().count() <= MAX_ITEM_NAME
+        && s.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '\'' | '-'))
+}
+
 fn is_id(s: &str) -> bool {
     let mut chars = s.chars();
     chars.next().is_some_and(|c| c.is_ascii_lowercase())
@@ -336,6 +424,10 @@ fn canonical(c: &Content) -> String {
         write!(s, "\t{}", f.value.bits()).unwrap();
     }
     s += "\n";
+    writeln!(s, "bag\t{}", c.bag.slots).unwrap();
+    for i in &c.items {
+        writeln!(s, "item\t{}\t{}\t{}\t{}\t{}", i.wire, i.id, i.name, i.kind, i.stack).unwrap();
+    }
     s
 }
 
@@ -602,7 +694,41 @@ pub fn render_rust(c: &Content) -> String {
     s += "/// Labor rules (`content/labor.toml`, docs/design/labor.md).\n#[derive(Debug, PartialEq)]\npub struct LaborRules {\n";
     rust_struct_fields(&mut s, &labor);
     s += "}\n\n";
-    writeln!(s, "pub static LABOR: LaborRules = LaborRules {{ {} }};", rust_values(&labor)).unwrap();
+    writeln!(s, "pub static LABOR: LaborRules = LaborRules {{ {} }};\n", rust_values(&labor)).unwrap();
+
+    s += "/// Item kinds (`content/items.toml`, docs/design/items.md). The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum ItemKind {\n";
+    for (w, k) in ITEM_KINDS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct ItemData {\n";
+    s += "    /// Stored in item rows. It never changes and is never reused.\n    pub wire: u16,\n";
+    s += "    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    pub kind: ItemKind,\n    /// The most in one slot.\n    pub stack: u32,\n}\n\n";
+    s += "/// Every item, sorted by wire.\n";
+    writeln!(s, "pub static ITEMS: [ItemData; {}] = [", c.items.len()).unwrap();
+    for i in &c.items {
+        writeln!(
+            s,
+            "    ItemData {{ wire: {}, id: {:?}, name: {:?}, kind: ItemKind::{}, stack: {} }},",
+            i.wire,
+            i.id,
+            i.name,
+            pascal(&i.kind),
+            i.stack
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// Slots in every character's bag.\n";
+    writeln!(s, "pub const BAG_SLOTS: u16 = {};\n", c.bag.slots).unwrap();
+    s += "/// The item stored as `wire`, if it still exists.\n";
+    s += "pub fn item(wire: u16) -> Option<&'static ItemData> {\n";
+    s += "    ITEMS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &ITEMS[i])\n}\n\n";
+    s += "/// The item with content id `id`.\n";
+    s += "pub fn item_by_id(id: &str) -> Option<&'static ItemData> {\n";
+    s += "    ITEMS.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -611,7 +737,7 @@ pub fn render_csharp(c: &Content) -> String {
     s += "// <auto-generated>\n";
     s += "// Generated by contentgen from content/. Do not edit; run `cargo xtask content`.\n";
     s += "// </auto-generated>\n\n";
-    s += "#nullable enable\n\nusing System.Collections.Generic;\n\nnamespace Mmo.Content\n{\n";
+    s += "#nullable enable\n\nusing System.Collections.Generic;\nusing System.Linq;\n\nnamespace Mmo.Content\n{\n";
     s += "    /// <summary>Movement modes (content/movement.toml). The value is the wire value.</summary>\n";
     s += "    public enum MoveMode : byte\n    {\n";
     for m in &c.move_modes {
@@ -653,6 +779,16 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>\n";
     csharp_param_docs(&mut s, &labor);
     writeln!(s, "    public sealed record LaborRules({});\n", csharp_params(&labor)).unwrap();
+    s += "    /// <summary>Item kinds (content/items.toml, docs/design/items.md). The value is the wire value.</summary>\n";
+    s += "    public enum ItemKind : byte\n    {\n";
+    for (w, k) in ITEM_KINDS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <param name=\"Wire\">Stored in item rows. It never changes and is never reused.</param>\n";
+    s += "    /// <param name=\"Name\">What players see.</param>\n";
+    s += "    /// <param name=\"Stack\">The most in one slot.</param>\n";
+    s += "    public sealed record ItemData(ushort Wire, string Id, string Name, ItemKind Kind, uint Stack);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -698,7 +834,18 @@ pub fn render_csharp(c: &Content) -> String {
     s += &c.climates.iter().map(|cl| format!("{:?}", cl.id)).collect::<Vec<_>>().join(", ");
     s += " };\n\n";
     s += "        public static string Id(this Climate climate) => ClimateIds[(int)climate];\n\n";
-    writeln!(s, "        public static readonly LaborRules Labor = new({});", csharp_values(&labor)).unwrap();
+    writeln!(s, "        public static readonly LaborRules Labor = new({});\n", csharp_values(&labor)).unwrap();
+    s += "        /// <summary>Slots in every character's bag.</summary>\n";
+    writeln!(s, "        public const ushort BagSlots = {};\n", c.bag.slots).unwrap();
+    s += "        /// <summary>Every item, sorted by wire.</summary>\n";
+    s += "        public static readonly IReadOnlyList<ItemData> Items = new ItemData[]\n        {\n";
+    for i in &c.items {
+        writeln!(s, "            new({}, {:?}, {:?}, ItemKind.{}, {}),", i.wire, i.id, i.name, pascal(&i.kind), i.stack).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);\n\n";
+    s += "        /// <summary>The item stored as <paramref name=\"wire\"/>, if it still exists.</summary>\n";
+    s += "        public static ItemData? Item(ushort wire) => ItemsByWire.TryGetValue(wire, out var d) ? d : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -788,8 +935,35 @@ mod tests {
         start_points = 5000
     "#;
 
+    const ITEMS: &str = r#"
+        [bag]
+        slots = 50
+
+        [[item]]
+        wire = 20
+        id = "driftpine_log"
+        name = "Driftpine Log"
+        kind = "material"
+        stack = 1000
+
+        [[item]]
+        wire = 3
+        id = "reedcutter_knife"
+        name = "Reedcutter's Knife"
+        kind = "gear"
+        stack = 1
+    "#;
+
     fn sources() -> Sources {
-        Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: LAND.into(), labor: LABOR.into() }
+        Sources { movement: MOVEMENT.into(), ships: SHIPS.into(), land: LAND.into(), labor: LABOR.into(), items: ITEMS.into() }
+    }
+
+    fn parse_items(items: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { items: items.into(), ..sources() })
+    }
+
+    fn item_errors(items: &str) -> String {
+        parse_items(items).unwrap_err().join("\n")
     }
 
     fn parse_movement(movement: &str) -> Result<Content, Vec<String>> {
@@ -934,9 +1108,15 @@ mod tests {
 
     #[test]
     fn errors_in_both_files_are_reported() {
-        let bad = Sources { movement: "[[mode]\n".into(), ships: "[[hull]\n".into(), land: "[[x]\n".into(), labor: "cap =\n".into() };
+        let bad = Sources {
+            movement: "[[mode]\n".into(),
+            ships: "[[hull]\n".into(),
+            land: "[[x]\n".into(),
+            labor: "cap =\n".into(),
+            items: "[bag\n".into(),
+        };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -1025,6 +1205,59 @@ mod tests {
         assert!(parse_labor(&LABOR.replace("cap = 5000", "cap = 0")).unwrap_err().join("\n").contains("cap must be"));
         assert!(parse_labor(&format!("{LABOR}\nbonus = 1")).unwrap_err().join("\n").contains("unknown field `bonus`"));
         assert!(parse_labor("cap = 5000").unwrap_err().join("\n").contains("missing field"));
+    }
+
+    #[test]
+    fn items_parse_in_wire_order_and_reach_both_outputs() {
+        let c = parse_items(ITEMS).unwrap();
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20]);
+        assert_eq!(c.bag.slots, 50);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
+        assert!(rs.contains("pub static ITEMS: [ItemData; 2] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
+        assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
+        assert!(cs.contains("public const ushort BagSlots = 50;"));
+    }
+
+    #[test]
+    fn any_item_change_changes_the_hash() {
+        let a = parse_items(ITEMS).unwrap().hash;
+        for (from, to) in [
+            ("wire = 20", "wire = 21"),
+            ("\"driftpine_log\"", "\"driftwood\""),
+            ("\"Driftpine Log\"", "\"Driftwood\""),
+            ("\"material\"", "\"consumable\""),
+            ("stack = 1000", "stack = 999"),
+            ("slots = 50", "slots = 60"),
+        ] {
+            let changed = ITEMS.replace(from, to);
+            assert_ne!(parse_items(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_items_are_reported_together() {
+        let bad = ITEMS
+            .replace("wire = 3", "wire = 0")
+            .replace("\"material\"", "\"junk\"")
+            .replace("stack = 1\n", "stack = 5\n")
+            .replace("slots = 50", "slots = 151");
+        let e = item_errors(&bad);
+        for want in ["wire 0 is reserved", "kind must be one of material, consumable, gear", "gear doesn't stack", "bag.slots must be"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let twin = format!("{ITEMS}\n[[item]]\nwire = 20\nid = \"driftpine_log\"\nname = \"Driftpine Log\"\nkind = \"material\"\nstack = 1000\n");
+        let e = item_errors(&twin);
+        for want in ["duplicate wire 20", "duplicate id", "duplicate name"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(item_errors(&ITEMS.replace("stack = 1000", "stack = 0")).contains("stack must be from 1"));
+        assert!(item_errors(&ITEMS.replace("stack = 1000", "stack = 10001")).contains("stack must be from 1"));
+        assert!(item_errors(&ITEMS.replace("\"Driftpine Log\"", "\"driftpine \\\"log\\\"\"")).contains("names are"));
+        assert!(item_errors(&ITEMS.replace("\"driftpine_log\"", "\"Driftpine\"")).contains("ids are lower-case"));
+        assert!(item_errors("item = []\n[bag]\nslots = 50").contains("no items"));
+        assert!(item_errors(&ITEMS.replace("stack = 1000", "stack = 1000\nweight = 2")).contains("unknown field `weight`"));
     }
 
     #[test]

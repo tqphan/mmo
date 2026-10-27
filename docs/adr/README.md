@@ -25,3 +25,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0019](0019-client-ships-at-the-present-player-in-the-ships-frame.md) | The client draws ships at the present, and keeps a passenger in the ship's frame | Accepted |
 | [0020](0020-reconnect-and-connection-keyed-despawn.md) | The client reconnects through the SDK and enters again; only the entering connection despawns a character | Accepted |
 | [0021](0021-public-game-clock-and-account-labor.md) | A public `game_clock` gives clients game time; labor is one pool per account | Accepted |
+| [0022](0022-item-rows-by-holder-and-place.md) | Item rows are addressed by holder and place; item definitions have permanent wire numbers | Accepted |
