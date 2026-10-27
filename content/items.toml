@@ -1,6 +1,6 @@
 # Items (docs/design/items.md). `wire` is the number stored in item rows: it never changes and is
 # never reused, even after an item is removed, so gaps are fine. 0 is reserved. Kinds are
-# `material`, `consumable` and `gear`; gear doesn't stack. Names come from docs/world/.
+# `material`, `consumable`, `gear`, `deed` and `seed`; gear doesn't stack. Names come from docs/world/.
 
 [bag]
 # Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
@@ -225,4 +225,125 @@ wire = 301
 id = "farm_deed"
 name = "Farm Deed"
 kind = "deed"
+stack = 10
+
+# Farm produce (docs/design/farming.md)
+[[item]]
+wire = 80
+id = "hearthgrain"
+name = "Hearthgrain"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 81
+id = "whiteflax_fibre"
+name = "Whiteflax Fibre"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 82
+id = "sunroot"
+name = "Sunroot"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 83
+id = "cinderpepper"
+name = "Cinderpepper"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 84
+id = "dustbean"
+name = "Dustbean"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 85
+id = "frostkale"
+name = "Frostkale"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 86
+id = "amberpear"
+name = "Amberpear"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 87
+id = "woolback_fleece"
+name = "Woolback Fleece"
+kind = "material"
+stack = 1000
+
+# Seeds, saplings and young animals (docs/design/farming.md): each plants one crop kind.
+[[item]]
+wire = 400
+id = "hearthgrain_seed"
+name = "Hearthgrain Seed"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 401
+id = "whiteflax_seed"
+name = "Whiteflax Seed"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 402
+id = "sunroot_cutting"
+name = "Sunroot Cutting"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 403
+id = "cinderpepper_seed"
+name = "Cinderpepper Seed"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 404
+id = "dustbean_seed"
+name = "Dustbean Seed"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 405
+id = "frostkale_seed"
+name = "Frostkale Seed"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 406
+id = "amberpear_sapling"
+name = "Amberpear Sapling"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 407
+id = "driftpine_sapling"
+name = "Driftpine Sapling"
+kind = "seed"
+stack = 100
+
+[[item]]
+wire = 408
+id = "woolback_lamb"
+name = "Woolback Lamb"
+kind = "seed"
 stack = 10

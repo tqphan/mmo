@@ -43,7 +43,9 @@ They go through contentgen (docs/design/content.md) like other game data, so Rus
 | `town` | 2 | no | settlements and ports |
 | `road` | 3 | no | roads; nothing may be built on them |
 
-Climates: `temperate` 0, `tropical` 1, `arid` 2, `subarctic` 3. The climates' growth multipliers come with farming (M2), from research.
+Climates: `temperate` 0, `tropical` 1, `arid` 2, `subarctic` 3. A planting in its ideal climate grows in 70% of the time (docs/design/farming.md).
+
+Each use also says whether it's `plantable`: crops, trees and livestock may go on `wild` and `housing` land, not in towns or on roads (docs/design/farming.md).
 
 At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 

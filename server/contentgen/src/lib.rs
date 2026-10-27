@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 8";
+const FORMAT: &str = "contentgen 9";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -26,9 +26,11 @@ const MAX_STACK: u32 = 10_000;
 const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
-pub const ITEM_KINDS: [&str; 4] = ["material", "consumable", "gear", "deed"];
+pub const ITEM_KINDS: [&str; 5] = ["material", "consumable", "gear", "deed", "seed"];
 /// Resource node kinds, in wire order, fixed here like the item kinds.
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
+/// Crop kinds, in wire order, fixed here like the item kinds (docs/design/farming.md).
+pub const CROP_KINDS: [&str; 3] = ["crop", "tree", "animal"];
 /// Longer than a week to regrow is a typo.
 const MAX_REGROW_S: u32 = 7 * 86_400;
 /// More inputs than this to one recipe is a typo.
@@ -48,6 +50,7 @@ pub struct Sources {
     pub items: String,
     pub gathering: String,
     pub crafting: String,
+    pub farming: String,
 }
 
 impl Sources {
@@ -63,6 +66,7 @@ impl Sources {
             items: read("items.toml")?,
             gathering: read("gathering.toml")?,
             crafting: read("crafting.toml")?,
+            farming: read("farming.toml")?,
         })
     }
 }
@@ -175,6 +179,7 @@ pub struct LandUseDef {
     pub id: String,
     pub wire: u8,
     pub buildable: bool,
+    pub plantable: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -296,6 +301,45 @@ pub struct IngredientDef {
     pub count: u32,
 }
 
+/// `farming.toml`: what grows from each seed (docs/design/farming.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FarmingFile {
+    farming: FarmingRules,
+    crop: Vec<CropDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FarmingRules {
+    pub reach_m: f32,
+    pub ideal_pct: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CropDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    /// An item id from `items.toml`, of kind `seed`.
+    pub seed: String,
+    /// A climate id from `land.toml`.
+    pub climate: String,
+    pub grow_s: u32,
+    /// An item id from `items.toml`.
+    pub product: String,
+    pub yield_min: u32,
+    pub yield_max: u32,
+    pub labor: i32,
+    pub regrow_s: u32,
+    pub wither_s: u32,
+    pub space_m: f32,
+    pub plot_only: bool,
+    pub seed_pct: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -321,6 +365,9 @@ pub struct Content {
     pub stations: Vec<StationDef>,
     /// Sorted by `wire`, like the modes.
     pub recipes: Vec<RecipeDef>,
+    pub farming: FarmingRules,
+    /// Sorted by `wire`, like the modes.
+    pub crops: Vec<CropDef>,
     pub hash: u64,
 }
 
@@ -328,6 +375,11 @@ impl Content {
     /// The wire of the item a node yields; parsing checked it exists.
     fn item_wire(&self, id: &str) -> u16 {
         self.items.iter().find(|i| i.id == id).map_or(0, |i| i.wire)
+    }
+
+    /// The wire of a climate; parsing checked it exists.
+    fn climate_wire(&self, id: &str) -> u8 {
+        self.climates.iter().find(|c| c.id == id).map_or(0, |c| c.wire)
     }
 
     /// The wire of a station kind; parsing checked it exists.
@@ -346,13 +398,15 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let items: Result<ItemsFile, _> = from_toml("items.toml", &src.items);
     let gathering: Result<GatheringFile, _> = from_toml("gathering.toml", &src.gathering);
     let crafting: Result<CraftingFile, _> = from_toml("crafting.toml", &src.crafting);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting) = match (movement, ships, land, labor, items, gathering, crafting) {
-        (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c)) => (m.mode, s.hull, l, b, i, g, c),
-        (m, s, l, b, i, g, c) => {
-            let all = m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).chain(c.err());
-            return Err(all.flatten().collect());
-        }
-    };
+    let farming: Result<FarmingFile, _> = from_toml("farming.toml", &src.farming);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f)) => (m.mode, s.hull, l, b, i, g, c, f),
+            (m, s, l, b, i, g, c, f) => {
+                let all = m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).chain(c.err()).chain(f.err());
+                return Err(all.flatten().collect());
+            }
+        };
     modes.sort_by_key(|m| m.wire);
     hulls.sort_by_key(|h| h.wire);
     land.land_use.sort_by_key(|u| u.wire);
@@ -362,6 +416,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     gathering.node.sort_by_key(|n| n.wire);
     crafting.station.sort_by_key(|s| s.wire);
     crafting.recipe.sort_by_key(|r| r.wire);
+    farming.crop.sort_by_key(|c| c.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &items.item, &mut errors);
@@ -369,6 +424,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_items(&items, &mut errors);
     check_gathering(&gathering, &items.item, &mut errors);
     check_crafting(&crafting, &items.item, &mut errors);
+    check_farming(&farming, &items.item, &land.climate, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -380,6 +436,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         crafting: crafting.crafting,
         stations: crafting.station,
         recipes: crafting.recipe,
+        farming: farming.farming,
+        crops: farming.crop,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -692,6 +750,62 @@ fn check_crafting(c: &CraftingFile, items: &[ItemDef], errors: &mut Vec<String>)
     }
 }
 
+fn check_farming(f: &FarmingFile, items: &[ItemDef], climates: &[ClimateDef], errors: &mut Vec<String>) {
+    let file = "farming.toml";
+    check_range(file, "farming.reach_m", f.farming.reach_m, 1.0, 20.0, errors);
+    if !(10..=100).contains(&f.farming.ideal_pct) {
+        errors.push(format!("{file}: farming.ideal_pct must be from 10 to 100"));
+    }
+    check_ids(file, "crop", f.crop.iter().map(|c| (c.id.as_str(), usize::from(c.wire))), errors);
+    let mut names = std::collections::HashSet::new();
+    for (k, c) in f.crop.iter().enumerate() {
+        let at = format!("{file}: crop {:?}", c.id);
+        if !is_item_name(&c.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(c.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", c.name));
+        }
+        if !CROP_KINDS.contains(&c.kind.as_str()) {
+            errors.push(format!("{at}: kind must be one of {}", CROP_KINDS.join(", ")));
+        }
+        match items.iter().find(|i| i.id == c.seed) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", c.seed)),
+            Some(i) if i.kind != "seed" => errors.push(format!("{at}: {:?} isn't of kind \"seed\"", c.seed)),
+            Some(_) => {}
+        }
+        if f.crop[..k].iter().any(|o| o.seed == c.seed) {
+            errors.push(format!("{at}: seed {:?} plants another crop too", c.seed));
+        }
+        if !climates.iter().any(|cl| cl.id == c.climate) {
+            errors.push(format!("{at}: no climate {:?} in land.toml", c.climate));
+        }
+        match items.iter().find(|i| i.id == c.product) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", c.product)),
+            Some(i) if !(1..=c.yield_max).contains(&c.yield_min) || c.yield_max > i.stack => {
+                errors.push(format!("{at}: yields must be 1 ≤ yield_min ≤ yield_max ≤ the item's stack ({})", i.stack));
+            }
+            Some(_) => {}
+        }
+        if !(1..=1000).contains(&c.labor) {
+            errors.push(format!("{at}: labor must be from 1 to 1000"));
+        }
+        if !(60..=MAX_REGROW_S).contains(&c.grow_s) {
+            errors.push(format!("{at}: grow_s must be from 60 to {MAX_REGROW_S}"));
+        }
+        if c.regrow_s != 0 && !(60..=MAX_REGROW_S).contains(&c.regrow_s) {
+            errors.push(format!("{at}: regrow_s must be 0 or from 60 to {MAX_REGROW_S}"));
+        }
+        if c.wither_s != 0 && !(60..=30 * 86_400).contains(&c.wither_s) {
+            errors.push(format!("{at}: wither_s must be 0 or from 60 to 2592000"));
+        }
+        check_range(&at, "space_m", c.space_m, 0.25, 8.0, errors);
+        if c.seed_pct > 100 {
+            errors.push(format!("{at}: seed_pct must be from 0 to 100"));
+        }
+    }
+}
+
 /// Safe to print as a string literal in both Rust and C# without escaping.
 fn is_item_name(s: &str) -> bool {
     s.chars().count() <= MAX_ITEM_NAME
@@ -726,7 +840,7 @@ fn canonical(c: &Content) -> String {
         }
     }
     for u in &c.land_uses {
-        writeln!(s, "land_use\t{}\t{}\t{}", u.id, u.wire, u.buildable).unwrap();
+        writeln!(s, "land_use\t{}\t{}\t{}\t{}", u.id, u.wire, u.buildable, u.plantable).unwrap();
     }
     for cl in &c.climates {
         writeln!(s, "climate\t{}\t{}", cl.id, cl.wire).unwrap();
@@ -787,6 +901,30 @@ fn canonical(c: &Content) -> String {
             write!(s, "\t{}:{}", i.item, i.count).unwrap();
         }
         s += "\n";
+    }
+    writeln!(s, "farming\t{}\t{}", Value::F32(c.farming.reach_m).bits(), c.farming.ideal_pct).unwrap();
+    for cr in &c.crops {
+        writeln!(
+            s,
+            "crop\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            cr.wire,
+            cr.id,
+            cr.name,
+            cr.kind,
+            cr.seed,
+            cr.climate,
+            cr.grow_s,
+            cr.product,
+            cr.yield_min,
+            cr.yield_max,
+            cr.labor,
+            cr.regrow_s,
+            cr.wither_s,
+            Value::F32(cr.space_m).bits(),
+            cr.plot_only,
+            cr.seed_pct
+        )
+        .unwrap();
     }
     s
 }
@@ -1021,11 +1159,19 @@ pub fn render_rust(c: &Content) -> String {
     s += "}\n\n";
     s += "#[derive(Debug, PartialEq)]\npub struct LandUseData {\n";
     s += "    pub land_use: LandUse,\n    pub id: &'static str,\n";
-    s += "    /// Houses and farms may be placed here.\n    pub buildable: bool,\n}\n\n";
+    s += "    /// Houses and farms may be placed here.\n    pub buildable: bool,\n";
+    s += "    /// Crops, trees and livestock may be planted here.\n    pub plantable: bool,\n}\n\n";
     writeln!(s, "pub static LAND_USES: [LandUseData; {}] = [", c.land_uses.len()).unwrap();
     for u in &c.land_uses {
-        writeln!(s, "    LandUseData {{ land_use: LandUse::{}, id: {:?}, buildable: {} }},", pascal(&u.id), u.id, u.buildable)
-            .unwrap();
+        writeln!(
+            s,
+            "    LandUseData {{ land_use: LandUse::{}, id: {:?}, buildable: {}, plantable: {} }},",
+            pascal(&u.id),
+            u.id,
+            u.buildable,
+            u.plantable
+        )
+        .unwrap();
     }
     s += "];\n\n";
     s += "impl LandUse {\n";
@@ -1234,7 +1380,64 @@ pub fn render_rust(c: &Content) -> String {
     s += "pub fn recipe(wire: u16) -> Option<&'static RecipeData> {\n    RECIPES.get(usize::from(wire))\n}\n\n";
     s += "/// The recipe with content id `id`.\n";
     s += "pub fn recipe_by_id(id: &str) -> Option<&'static RecipeData> {\n";
-    s += "    RECIPES.iter().find(|d| d.id == id)\n}\n";
+    s += "    RECIPES.iter().find(|d| d.id == id)\n}\n\n";
+
+    s += "/// Crop kinds (`content/farming.toml`, docs/design/farming.md). The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum CropKind {\n";
+    for (w, k) in CROP_KINDS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "/// What grows from a seed: a crop, tree or animal (`content/farming.toml`, docs/design/farming.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct CropData {\n";
+    s += "    /// Stored in crop rows.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    pub kind: CropKind,\n    /// The wire of the seed item that plants it.\n    pub seed: u16,\n";
+    s += "    /// The wire of its ideal climate.\n    pub climate: u8,\n";
+    s += "    /// Seconds to mature outside its ideal climate.\n    pub grow_s: u32,\n";
+    s += "    /// The wire of the item a harvest gives, and how many, inclusive.\n    pub product: u16,\n    pub yield_min: u32,\n    pub yield_max: u32,\n";
+    s += "    /// Labor spent on each harvest.\n    pub labor: i32,\n";
+    s += "    /// Seconds until it's ripe again after a harvest; 0 if a harvest removes it.\n    pub regrow_s: u32,\n";
+    s += "    /// Seconds it stays ripe before it withers; 0 if it never does.\n    pub wither_s: u32,\n";
+    s += "    /// Its radius on the ground, m.\n    pub space_m: f32,\n";
+    s += "    /// It may only be planted on a plot.\n    pub plot_only: bool,\n";
+    s += "    /// The chance, in percent, that a harvest also gives one of its seed.\n    pub seed_pct: u32,\n}\n\n";
+    s += "/// Every crop kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static CROPS: [CropData; {}] = [", c.crops.len()).unwrap();
+    for cr in &c.crops {
+        writeln!(
+            s,
+            "    CropData {{ wire: {}, id: {:?}, name: {:?}, kind: CropKind::{}, seed: {}, climate: {}, grow_s: {}, product: {}, yield_min: {}, yield_max: {}, labor: {}, regrow_s: {}, wither_s: {}, space_m: {:?}, plot_only: {}, seed_pct: {} }},",
+            cr.wire,
+            cr.id,
+            cr.name,
+            pascal(&cr.kind),
+            c.item_wire(&cr.seed),
+            c.climate_wire(&cr.climate),
+            cr.grow_s,
+            c.item_wire(&cr.product),
+            cr.yield_min,
+            cr.yield_max,
+            cr.labor,
+            cr.regrow_s,
+            cr.wither_s,
+            cr.space_m,
+            cr.plot_only,
+            cr.seed_pct
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// How close a character must stand to plant, harvest or uproot, horizontally, in metres.\n";
+    writeln!(s, "pub const FARM_REACH_M: f32 = {:?};\n", c.farming.reach_m).unwrap();
+    s += "/// Growth time in a crop's ideal climate, in percent.\n";
+    writeln!(s, "pub const FARM_IDEAL_PCT: u32 = {};\n", c.farming.ideal_pct).unwrap();
+    s += "/// The crop kind stored as `wire`.\n";
+    s += "pub fn crop(wire: u8) -> Option<&'static CropData> {\n    CROPS.get(usize::from(wire))\n}\n\n";
+    s += "/// The crop kind with content id `id`.\n";
+    s += "pub fn crop_by_id(id: &str) -> Option<&'static CropData> {\n";
+    s += "    CROPS.iter().find(|d| d.id == id)\n}\n\n";
+    s += "/// The crop kind a seed item plants.\n";
+    s += "pub fn crop_by_seed(item: u16) -> Option<&'static CropData> {\n    CROPS.iter().find(|d| d.seed == item)\n}\n";
     s
 }
 
@@ -1274,7 +1477,8 @@ pub fn render_csharp(c: &Content) -> String {
     }
     s += "    }\n\n";
     s += "    /// <param name=\"Buildable\">Houses and farms may be placed here.</param>\n";
-    s += "    public sealed record LandUseData(LandUse Use, string Id, bool Buildable);\n\n";
+    s += "    /// <param name=\"Plantable\">Crops, trees and livestock may be planted here.</param>\n";
+    s += "    public sealed record LandUseData(LandUse Use, string Id, bool Buildable, bool Plantable);\n\n";
     s += "    /// <summary>Climates (content/land.toml): bits 4–6 of a land-use texel. The value is the wire value.</summary>\n";
     s += "    public enum Climate : byte\n    {\n";
     for cl in &c.climates {
@@ -1338,6 +1542,25 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"Labor\">Labor spent for each unit.</param>\n";
     s += "    /// <param name=\"CraftS\">How long one unit takes, in seconds.</param>\n";
     s += "    public sealed record RecipeData(ushort Wire, string Id, byte Station, IReadOnlyList<Ingredient> Inputs, ushort Output, uint OutputCount, int Labor, float CraftS);\n\n";
+    s += "    /// <summary>Crop kinds (content/farming.toml, docs/design/farming.md). The value is the wire value.</summary>\n";
+    s += "    public enum CropKind : byte\n    {\n";
+    for (w, k) in CROP_KINDS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <summary>What grows from a seed: a crop, tree or animal (content/farming.toml, docs/design/farming.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in crop rows.</param>\n";
+    s += "    /// <param name=\"Seed\">The wire of the seed item that plants it.</param>\n";
+    s += "    /// <param name=\"Climate\">Its ideal climate.</param>\n";
+    s += "    /// <param name=\"GrowS\">Seconds to mature outside its ideal climate.</param>\n";
+    s += "    /// <param name=\"Product\">The wire of the item a harvest gives.</param>\n";
+    s += "    /// <param name=\"Labor\">Labor spent on each harvest.</param>\n";
+    s += "    /// <param name=\"RegrowS\">Seconds until it's ripe again after a harvest; 0 if a harvest removes it.</param>\n";
+    s += "    /// <param name=\"WitherS\">Seconds it stays ripe before it withers; 0 if it never does.</param>\n";
+    s += "    /// <param name=\"SpaceM\">Its radius on the ground, m.</param>\n";
+    s += "    /// <param name=\"PlotOnly\">It may only be planted on a plot.</param>\n";
+    s += "    /// <param name=\"SeedPct\">The chance, in percent, that a harvest also gives one of its seed.</param>\n";
+    s += "    public sealed record CropData(byte Wire, string Id, string Name, CropKind Kind, ushort Seed, Climate Climate, uint GrowS, ushort Product, uint YieldMin, uint YieldMax, int Labor, uint RegrowS, uint WitherS, float SpaceM, bool PlotOnly, uint SeedPct);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -1375,7 +1598,7 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        public static HullData Data(this Hull hull) => Hulls[(int)hull];\n\n";
     s += "        public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]\n        {\n";
     for u in &c.land_uses {
-        writeln!(s, "            new(LandUse.{}, {:?}, {}),", pascal(&u.id), u.id, u.buildable).unwrap();
+        writeln!(s, "            new(LandUse.{}, {:?}, {}, {}),", pascal(&u.id), u.id, u.buildable, u.plantable).unwrap();
     }
     s += "        };\n\n";
     s += "        public static LandUseData Data(this LandUse use) => LandUses[(int)use];\n\n";
@@ -1486,7 +1709,42 @@ pub fn render_csharp(c: &Content) -> String {
     }
     s += "        };\n\n";
     s += "        /// <summary>The recipe stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
-    s += "        public static RecipeData? Recipe(ushort wire) => wire < Recipes.Count ? Recipes[wire] : null;\n";
+    s += "        public static RecipeData? Recipe(ushort wire) => wire < Recipes.Count ? Recipes[wire] : null;\n\n";
+    s += "        /// <summary>How close a character must stand to plant, harvest or uproot, horizontally, in metres.</summary>\n";
+    writeln!(s, "        public const float FarmReachM = {:?}f;\n", c.farming.reach_m).unwrap();
+    s += "        /// <summary>Growth time in a crop's ideal climate, in percent.</summary>\n";
+    writeln!(s, "        public const uint FarmIdealPct = {};\n", c.farming.ideal_pct).unwrap();
+    s += "        /// <summary>Every crop kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<CropData> Crops = new CropData[]\n        {\n";
+    for cr in &c.crops {
+        let climate = c.climates.iter().find(|cl| cl.id == cr.climate).map_or_else(String::new, |cl| pascal(&cl.id));
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, CropKind.{}, {}, Climate.{}, {}, {}, {}, {}, {}, {}, {}, {:?}f, {}, {}),",
+            cr.wire,
+            cr.id,
+            cr.name,
+            pascal(&cr.kind),
+            c.item_wire(&cr.seed),
+            climate,
+            cr.grow_s,
+            c.item_wire(&cr.product),
+            cr.yield_min,
+            cr.yield_max,
+            cr.labor,
+            cr.regrow_s,
+            cr.wither_s,
+            cr.space_m,
+            cr.plot_only,
+            cr.seed_pct
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The crop kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static CropData? Crop(byte wire) => wire < Crops.Count ? Crops[wire] : null;\n\n";
+    s += "        /// <summary>The crop kind a seed item plants, if it is a seed.</summary>\n";
+    s += "        public static CropData? CropBySeed(ushort item) => Crops.FirstOrDefault(c => c.Seed == item);\n";
     s += "    }\n}\n";
     s
 }
@@ -1554,11 +1812,13 @@ mod tests {
         id = "wild"
         wire = 0
         buildable = false
+        plantable = true
 
         [[land_use]]
         id = "housing"
         wire = 1
         buildable = true
+        plantable = true
 
         [[climate]]
         id = "temperate"
@@ -1634,6 +1894,62 @@ mod tests {
         name = "Farm Deed"
         kind = "deed"
         stack = 10
+
+        [[item]]
+        wire = 400
+        id = "pine_seed"
+        name = "Pine Seed"
+        kind = "seed"
+        stack = 100
+
+        [[item]]
+        wire = 401
+        id = "lamb"
+        name = "Lamb"
+        kind = "seed"
+        stack = 10
+    "#;
+
+    const FARMING: &str = r#"
+        [farming]
+        reach_m = 3.0
+        ideal_pct = 70
+
+        [[crop]]
+        wire = 1
+        id = "sheep"
+        name = "Sheep"
+        kind = "animal"
+        seed = "lamb"
+        climate = "arid"
+        grow_s = 14400
+        product = "driftpine_log"
+        yield_min = 2
+        yield_max = 3
+        labor = 5
+        regrow_s = 7200
+        wither_s = 0
+        space_m = 1.5
+        plot_only = true
+        seed_pct = 10
+
+        [[crop]]
+        wire = 0
+        id = "pine"
+        name = "Pine"
+        kind = "tree"
+        seed = "pine_seed"
+        climate = "temperate"
+        grow_s = 28800
+        product = "driftpine_log"
+        yield_min = 4
+        yield_max = 6
+        labor = 10
+        regrow_s = 0
+        wither_s = 86400
+        space_m = 2.0
+        plot_only = false
+        seed_pct = 0
     "#;
 
     const GATHERING: &str = r#"
@@ -1710,7 +2026,16 @@ mod tests {
             items: ITEMS.into(),
             gathering: GATHERING.into(),
             crafting: CRAFTING.into(),
+            farming: FARMING.into(),
         }
+    }
+
+    fn parse_farming(farming: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { farming: farming.into(), ..sources() })
+    }
+
+    fn farming_errors(farming: &str) -> String {
+        parse_farming(farming).unwrap_err().join("\n")
     }
 
     fn parse_crafting(crafting: &str) -> Result<Content, Vec<String>> {
@@ -1887,9 +2212,10 @@ mod tests {
             items: "[bag\n".into(),
             gathering: "[gathering\n".into(),
             crafting: "[crafting\n".into(),
+            farming: "[farming\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -1917,8 +2243,8 @@ mod tests {
         let c = parse_land(LAND).unwrap();
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains("Housing = 1,") && cs.contains("Housing = 1,"));
-        assert!(rs.contains(r#"LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true },"#));
-        assert!(cs.contains(r#"new(LandUse.Housing, "housing", true),"#));
+        assert!(rs.contains(r#"LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true, plantable: true },"#));
+        assert!(cs.contains(r#"new(LandUse.Housing, "housing", true, true),"#));
         assert!(rs.contains("Arid = 1,") && cs.contains("Arid = 1,"));
         assert!(rs.contains(r#"CLIMATE_IDS: [&str; 2] = ["temperate", "arid"];"#));
         assert!(cs.contains(r#"ClimateIds = new[] { "temperate", "arid" };"#));
@@ -1932,7 +2258,10 @@ mod tests {
             LAND.replace("\"arid\"", "\"dry\""),
             LAND.replace("\"housing\"", "\"farmland\""),
         ] {
-            assert_ne!(parse_land(&changed).unwrap().hash, a, "{changed}");
+            // Crops name climates by id, so a renamed climate is renamed there too.
+            let farming = if changed.contains("\"arid\"") { FARMING.to_string() } else { FARMING.replace("\"arid\"", "\"dry\"") };
+            let c = parse(&Sources { land: changed.clone(), farming, ..sources() });
+            assert_ne!(c.unwrap().hash, a, "{changed}");
         }
     }
 
@@ -1942,10 +2271,10 @@ mod tests {
         assert!(e(&LAND.replace("wire = 1\n        buildable", "wire = 2\n        buildable")).contains("no gaps"));
         assert!(e(&LAND.replace("\"arid\"", "\"temperate\"")).contains("duplicate id"));
         assert!(e("land_use = []\nclimate = []").contains("no land_uses"));
-        let many_uses: String = (0..17).map(|i| format!("[[land_use]]\nid = \"u{i}\"\nwire = {i}\nbuildable = false\n")).collect();
+        let many_uses: String = (0..17).map(|i| format!("[[land_use]]\nid = \"u{i}\"\nwire = {i}\nbuildable = false\nplantable = false\n")).collect();
         assert!(e(&format!("{many_uses}[[climate]]\nid = \"c\"\nwire = 0\n")).contains("at most 16 land uses"));
         let many_climates: String = (0..9).map(|i| format!("[[climate]]\nid = \"c{i}\"\nwire = {i}\n")).collect();
-        let one_use = "[[land_use]]\nid = \"wild\"\nwire = 0\nbuildable = false\n";
+        let one_use = "[[land_use]]\nid = \"wild\"\nwire = 0\nbuildable = false\nplantable = true\n";
         assert!(e(&format!("{one_use}{many_climates}")).contains("at most 8 climates"));
     }
 
@@ -2053,11 +2382,11 @@ mod tests {
     #[test]
     fn items_parse_in_wire_order_and_reach_both_outputs() {
         let c = parse_items(ITEMS).unwrap();
-        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301]);
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401]);
         assert_eq!(c.bag.slots, 50);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
-        assert!(rs.contains("pub static ITEMS: [ItemData; 4] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("pub static ITEMS: [ItemData; 6] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
         assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
@@ -2081,6 +2410,7 @@ mod tests {
                 gathering: GATHERING.replace(from, to),
                 crafting: CRAFTING.replace(from, to),
                 land: LAND.replace(from, to),
+                farming: FARMING.replace(from, to),
                 ..sources()
             });
             assert_ne!(c.unwrap().hash, a, "{changed}");
@@ -2249,6 +2579,91 @@ mod tests {
         }
         assert!(crafting_errors(&CRAFTING.replace("craft_s = 2.5", "craft_s = 2.5\nskill = 1")).contains("unknown field `skill`"));
         assert!(crafting_errors("station = []\nrecipe = []\n[crafting]\nreach_m = 4.0\nmax_count = 1").contains("no stations"));
+    }
+
+    #[test]
+    fn crops_parse_in_wire_order_and_reach_both_outputs() {
+        let c = parse_farming(FARMING).unwrap();
+        assert_eq!(c.crops.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(), ["pine", "sheep"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        let row = r#"CropData { wire: 1, id: "sheep", name: "Sheep", kind: CropKind::Animal, seed: 401, climate: 1, grow_s: 14400, product: 20, yield_min: 2, yield_max: 3, labor: 5, regrow_s: 7200, wither_s: 0, space_m: 1.5, plot_only: true, seed_pct: 10 },"#;
+        assert!(rs.contains(row), "{rs}");
+        assert!(rs.contains("pub const FARM_REACH_M: f32 = 3.0;") && rs.contains("pub const FARM_IDEAL_PCT: u32 = 70;"));
+        assert!(rs.contains("Seed = 4,") && cs.contains("Seed = 4,"), "the seed item kind");
+        assert!(cs.contains(r#"new(0, "pine", "Pine", CropKind.Tree, 400, Climate.Temperate, 28800, 20, 4, 6, 10, 0, 86400, 2.0f, false, 0),"#), "{cs}");
+        assert!(cs.contains("public const float FarmReachM = 3.0f;") && cs.contains("public const uint FarmIdealPct = 70;"));
+        assert!(rs.contains(r#"LandUseData { land_use: LandUse::Wild, id: "wild", buildable: false, plantable: true },"#));
+        assert!(cs.contains(r#"new(LandUse.Housing, "housing", true, true),"#));
+    }
+
+    #[test]
+    fn any_crop_change_changes_the_hash() {
+        let a = parse_farming(FARMING).unwrap().hash;
+        for (from, to) in [
+            ("reach_m = 3.0", "reach_m = 3.5"),
+            ("ideal_pct = 70", "ideal_pct = 71"),
+            ("\"Pine\"", "\"Old Pine\""),
+            ("kind = \"tree\"", "kind = \"crop\""),
+            ("climate = \"temperate\"", "climate = \"arid\""),
+            ("grow_s = 28800", "grow_s = 28801"),
+            ("yield_min = 4", "yield_min = 3"),
+            ("yield_max = 6", "yield_max = 7"),
+            ("labor = 10", "labor = 11"),
+            ("regrow_s = 0", "regrow_s = 600"),
+            ("wither_s = 86400", "wither_s = 0"),
+            ("space_m = 2.0", "space_m = 2.5"),
+            ("plot_only = false", "plot_only = true"),
+            ("seed_pct = 0", "seed_pct = 1"),
+        ] {
+            let changed = FARMING.replacen(from, to, 1);
+            assert_ne!(parse_farming(&changed).map(|c| c.hash), Ok(a), "{changed}");
+        }
+        let land = parse_land(&LAND.replacen("plantable = true", "plantable = false", 1)).unwrap().hash;
+        assert_ne!(land, a, "plantable is hashed");
+    }
+
+    #[test]
+    fn bad_crops_are_reported_together() {
+        let bad = FARMING
+            .replace("kind = \"tree\"", "kind = \"fungus\"")
+            .replace("seed = \"pine_seed\"", "seed = \"farm_deed\"")
+            .replace("seed = \"lamb\"", "seed = \"acorn\"")
+            .replace("climate = \"arid\"", "climate = \"lunar\"")
+            .replace("product = \"driftpine_log\"\n        yield_min = 4", "product = \"pearl\"\n        yield_min = 4")
+            .replace("yield_min = 2", "yield_min = 4")
+            .replace("labor = 5", "labor = 0")
+            .replace("grow_s = 28800", "grow_s = 10")
+            .replace("regrow_s = 7200", "regrow_s = 5")
+            .replace("wither_s = 86400", "wither_s = 30")
+            .replace("space_m = 1.5", "space_m = 0.1")
+            .replace("seed_pct = 10", "seed_pct = 101")
+            .replace("reach_m = 3.0", "reach_m = 50.0")
+            .replace("ideal_pct = 70", "ideal_pct = 5");
+        let e = farming_errors(&bad);
+        for want in [
+            "kind must be one of crop, tree, animal",
+            "\"farm_deed\" isn't of kind \"seed\"",
+            "no item \"acorn\"",
+            "no climate \"lunar\"",
+            "no item \"pearl\"",
+            "yields must be 1 ≤ yield_min ≤ yield_max",
+            "labor must be from 1",
+            "grow_s must be from 60",
+            "regrow_s must be 0 or from 60",
+            "wither_s must be 0 or from 60",
+            "space_m must be from",
+            "seed_pct must be from 0 to 100",
+            "reach_m must be from",
+            "ideal_pct must be from 10",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = farming_errors(&FARMING.replace("seed = \"lamb\"", "seed = \"pine_seed\"").replace("wire = 1", "wire = 0").replace("\"Sheep\"", "\"Pine\""));
+        for want in ["plants another crop too", "wire values must run", "duplicate name"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(farming_errors(&FARMING.replace("seed_pct = 0", "seed_pct = 0\nwater = 1")).contains("unknown field `water`"));
+        assert!(farming_errors("crop = []\n[farming]\nreach_m = 3.0\nideal_pct = 70").contains("no crops"));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x2887382dded4f650;
+pub const CONTENT_HASH: u64 = 0xc38b8f4f431cd8cd;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -158,13 +158,15 @@ pub struct LandUseData {
     pub id: &'static str,
     /// Houses and farms may be placed here.
     pub buildable: bool,
+    /// Crops, trees and livestock may be planted here.
+    pub plantable: bool,
 }
 
 pub static LAND_USES: [LandUseData; 4] = [
-    LandUseData { land_use: LandUse::Wild, id: "wild", buildable: false },
-    LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true },
-    LandUseData { land_use: LandUse::Town, id: "town", buildable: false },
-    LandUseData { land_use: LandUse::Road, id: "road", buildable: false },
+    LandUseData { land_use: LandUse::Wild, id: "wild", buildable: false, plantable: true },
+    LandUseData { land_use: LandUse::Housing, id: "housing", buildable: true, plantable: true },
+    LandUseData { land_use: LandUse::Town, id: "town", buildable: false, plantable: false },
+    LandUseData { land_use: LandUse::Road, id: "road", buildable: false, plantable: false },
 ];
 
 impl LandUse {
@@ -284,6 +286,7 @@ pub enum ItemKind {
     Consumable = 1,
     Gear = 2,
     Deed = 3,
+    Seed = 4,
 }
 
 #[derive(Debug, PartialEq)]
@@ -299,7 +302,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 30] = [
+pub static ITEMS: [ItemData; 47] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -320,6 +323,14 @@ pub static ITEMS: [ItemData; 30] = [
     ItemData { wire: 53, id: "rustiron_fittings", name: "Rustiron Fittings", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 60, id: "charcoal", name: "Charcoal", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 70, id: "levy_seal", name: "Levy Seal", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 80, id: "hearthgrain", name: "Hearthgrain", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 81, id: "whiteflax_fibre", name: "Whiteflax Fibre", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 82, id: "sunroot", name: "Sunroot", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 83, id: "cinderpepper", name: "Cinderpepper", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 84, id: "dustbean", name: "Dustbean", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 85, id: "frostkale", name: "Frostkale", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 86, id: "amberpear", name: "Amberpear", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 87, id: "woolback_fleece", name: "Woolback Fleece", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 100, id: "duskberry_tart", name: "Duskberry Tart", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 101, id: "duskberry_preserve", name: "Duskberry Preserve", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 102, id: "emberleaf_salve", name: "Emberleaf Salve", kind: ItemKind::Consumable, stack: 100 },
@@ -330,6 +341,15 @@ pub static ITEMS: [ItemData; 30] = [
     ItemData { wire: 203, id: "tin_lantern", name: "Tin Lantern", kind: ItemKind::Gear, stack: 1 },
     ItemData { wire: 300, id: "garden_deed", name: "Garden Deed", kind: ItemKind::Deed, stack: 10 },
     ItemData { wire: 301, id: "farm_deed", name: "Farm Deed", kind: ItemKind::Deed, stack: 10 },
+    ItemData { wire: 400, id: "hearthgrain_seed", name: "Hearthgrain Seed", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 401, id: "whiteflax_seed", name: "Whiteflax Seed", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 402, id: "sunroot_cutting", name: "Sunroot Cutting", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 403, id: "cinderpepper_seed", name: "Cinderpepper Seed", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 404, id: "dustbean_seed", name: "Dustbean Seed", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 405, id: "frostkale_seed", name: "Frostkale Seed", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 406, id: "amberpear_sapling", name: "Amberpear Sapling", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 407, id: "driftpine_sapling", name: "Driftpine Sapling", kind: ItemKind::Seed, stack: 100 },
+    ItemData { wire: 408, id: "woolback_lamb", name: "Woolback Lamb", kind: ItemKind::Seed, stack: 10 },
 ];
 
 /// Slots in every character's bag.
@@ -444,7 +464,7 @@ pub struct RecipeData {
 }
 
 /// Every recipe, sorted by wire, which is the index.
-pub static RECIPES: [RecipeData; 23] = [
+pub static RECIPES: [RecipeData; 31] = [
     RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
     RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
@@ -468,6 +488,14 @@ pub static RECIPES: [RecipeData; 23] = [
     RecipeData { wire: 20, id: "levy_seal", station: 1, inputs: &[Ingredient { item: 50, count: 1 }, Ingredient { item: 60, count: 1 }], output: 70, output_count: 5, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 21, id: "garden_deed", station: 0, inputs: &[Ingredient { item: 40, count: 6 }, Ingredient { item: 30, count: 4 }], output: 300, output_count: 1, labor: 25, craft_s: 8.0 },
     RecipeData { wire: 22, id: "farm_deed", station: 0, inputs: &[Ingredient { item: 41, count: 8 }, Ingredient { item: 42, count: 2 }, Ingredient { item: 32, count: 2 }], output: 301, output_count: 1, labor: 50, craft_s: 12.0 },
+    RecipeData { wire: 23, id: "hearthgrain_seed", station: 2, inputs: &[Ingredient { item: 80, count: 1 }], output: 400, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 24, id: "whiteflax_seed", station: 2, inputs: &[Ingredient { item: 81, count: 1 }], output: 401, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 25, id: "sunroot_cutting", station: 2, inputs: &[Ingredient { item: 82, count: 1 }], output: 402, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 26, id: "cinderpepper_seed", station: 2, inputs: &[Ingredient { item: 83, count: 1 }], output: 403, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 27, id: "dustbean_seed", station: 2, inputs: &[Ingredient { item: 84, count: 1 }], output: 404, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 28, id: "frostkale_seed", station: 2, inputs: &[Ingredient { item: 85, count: 1 }], output: 405, output_count: 2, labor: 2, craft_s: 2.0 },
+    RecipeData { wire: 29, id: "amberpear_sapling", station: 0, inputs: &[Ingredient { item: 86, count: 2 }, Ingredient { item: 30, count: 1 }], output: 406, output_count: 1, labor: 5, craft_s: 4.0 },
+    RecipeData { wire: 30, id: "driftpine_sapling", station: 0, inputs: &[Ingredient { item: 20, count: 1 }, Ingredient { item: 30, count: 1 }], output: 407, output_count: 1, labor: 5, craft_s: 4.0 },
 ];
 
 /// How close a character must stand to a station, horizontally and vertically, in metres.
@@ -494,4 +522,80 @@ pub fn recipe(wire: u16) -> Option<&'static RecipeData> {
 /// The recipe with content id `id`.
 pub fn recipe_by_id(id: &str) -> Option<&'static RecipeData> {
     RECIPES.iter().find(|d| d.id == id)
+}
+
+/// Crop kinds (`content/farming.toml`, docs/design/farming.md). The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CropKind {
+    Crop = 0,
+    Tree = 1,
+    Animal = 2,
+}
+
+/// What grows from a seed: a crop, tree or animal (`content/farming.toml`, docs/design/farming.md).
+#[derive(Debug, PartialEq)]
+pub struct CropData {
+    /// Stored in crop rows.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    pub kind: CropKind,
+    /// The wire of the seed item that plants it.
+    pub seed: u16,
+    /// The wire of its ideal climate.
+    pub climate: u8,
+    /// Seconds to mature outside its ideal climate.
+    pub grow_s: u32,
+    /// The wire of the item a harvest gives, and how many, inclusive.
+    pub product: u16,
+    pub yield_min: u32,
+    pub yield_max: u32,
+    /// Labor spent on each harvest.
+    pub labor: i32,
+    /// Seconds until it's ripe again after a harvest; 0 if a harvest removes it.
+    pub regrow_s: u32,
+    /// Seconds it stays ripe before it withers; 0 if it never does.
+    pub wither_s: u32,
+    /// Its radius on the ground, m.
+    pub space_m: f32,
+    /// It may only be planted on a plot.
+    pub plot_only: bool,
+    /// The chance, in percent, that a harvest also gives one of its seed.
+    pub seed_pct: u32,
+}
+
+/// Every crop kind, sorted by wire, which is the index.
+pub static CROPS: [CropData; 9] = [
+    CropData { wire: 0, id: "hearthgrain", name: "Hearthgrain", kind: CropKind::Crop, seed: 400, climate: 0, grow_s: 2580, product: 80, yield_min: 3, yield_max: 5, labor: 3, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 1, id: "whiteflax", name: "Whiteflax", kind: CropKind::Crop, seed: 401, climate: 0, grow_s: 3600, product: 81, yield_min: 2, yield_max: 4, labor: 3, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 2, id: "sunroot", name: "Sunroot", kind: CropKind::Crop, seed: 402, climate: 1, grow_s: 5400, product: 82, yield_min: 2, yield_max: 4, labor: 4, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 3, id: "cinderpepper", name: "Cinderpepper", kind: CropKind::Crop, seed: 403, climate: 2, grow_s: 3600, product: 83, yield_min: 2, yield_max: 4, labor: 3, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 4, id: "dustbean", name: "Dustbean", kind: CropKind::Crop, seed: 404, climate: 2, grow_s: 2580, product: 84, yield_min: 3, yield_max: 5, labor: 3, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 5, id: "frostkale", name: "Frostkale", kind: CropKind::Crop, seed: 405, climate: 3, grow_s: 5400, product: 85, yield_min: 2, yield_max: 4, labor: 4, regrow_s: 0, wither_s: 86400, space_m: 0.5, plot_only: false, seed_pct: 0 },
+    CropData { wire: 6, id: "amberpear_tree", name: "Amberpear Tree", kind: CropKind::Tree, seed: 406, climate: 0, grow_s: 21600, product: 86, yield_min: 3, yield_max: 6, labor: 5, regrow_s: 14400, wither_s: 0, space_m: 2.0, plot_only: false, seed_pct: 0 },
+    CropData { wire: 7, id: "driftpine_tree", name: "Driftpine Tree", kind: CropKind::Tree, seed: 407, climate: 3, grow_s: 28800, product: 20, yield_min: 4, yield_max: 6, labor: 10, regrow_s: 0, wither_s: 0, space_m: 2.0, plot_only: false, seed_pct: 0 },
+    CropData { wire: 8, id: "woolback", name: "Woolback", kind: CropKind::Animal, seed: 408, climate: 0, grow_s: 14400, product: 87, yield_min: 2, yield_max: 3, labor: 5, regrow_s: 7200, wither_s: 0, space_m: 1.5, plot_only: true, seed_pct: 10 },
+];
+
+/// How close a character must stand to plant, harvest or uproot, horizontally, in metres.
+pub const FARM_REACH_M: f32 = 3.0;
+
+/// Growth time in a crop's ideal climate, in percent.
+pub const FARM_IDEAL_PCT: u32 = 70;
+
+/// The crop kind stored as `wire`.
+pub fn crop(wire: u8) -> Option<&'static CropData> {
+    CROPS.get(usize::from(wire))
+}
+
+/// The crop kind with content id `id`.
+pub fn crop_by_id(id: &str) -> Option<&'static CropData> {
+    CROPS.iter().find(|d| d.id == id)
+}
+
+/// The crop kind a seed item plants.
+pub fn crop_by_seed(item: u16) -> Option<&'static CropData> {
+    CROPS.iter().find(|d| d.seed == item)
 }

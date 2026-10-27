@@ -8,6 +8,7 @@ use crate::session::*;
 use sim::content::CONTENT_HASH;
 
 mod crafting;
+mod farming;
 mod gathering;
 mod items;
 mod labor;

@@ -349,6 +349,70 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void FarmGrowthAndStages()
+        {
+            long? Opt(string s) => s == "none" ? null : long.Parse(s);
+            int n = 0;
+            foreach (var v in Lines("farm_growth"))
+            {
+                var kind = GameContent.Crop(byte.Parse(v[1]))!;
+                bool ideal = v[2] == "1";
+                long from = long.Parse(v[3]), ripe = long.Parse(v[4]);
+                Assert.Equal(ripe, Farm.RipeAt(kind, from, ideal));
+                Assert.Equal(Opt(v[5]), Farm.RegrownAt(kind, from, ideal));
+                Assert.Equal(Opt(v[6]), Farm.WithersAt(kind, ripe));
+                n++;
+            }
+            foreach (var v in Lines("farm_stage"))
+            {
+                var kind = GameContent.Crop(byte.Parse(v[1]))!;
+                long from = long.Parse(v[2]), ripe = long.Parse(v[3]), now = long.Parse(v[4]);
+                Assert.Equal((Stage)byte.Parse(v[5]), Farm.StageOf(kind, ripe, now));
+                Assert.Equal(F(v[6]), Farm.Progress(from, ripe, now));
+                n++;
+            }
+            Assert.True(n >= 80, $"{n} vectors");
+        }
+
+        [Fact]
+        public void FarmSpot()
+        {
+            var map = Mmo.World.HeightMap.Parse(Hex(Lines("land_mmoh").Single()[1]));
+            var chunks = Lines("land_chunk").ToDictionary(v => ulong.Parse(v[1]), v => Hex(v[2]));
+            byte Texel(int i, int j)
+            {
+                ulong cell = ((ulong)(uint)(j / 16) << 16) | (uint)(i / 16);
+                return chunks.TryGetValue(cell, out var t) ? t[j % 16 * 16 + i % 16] : (byte)0;
+            }
+            int n = 0;
+            var seen = new HashSet<string>();
+            foreach (var v in Lines("farm_spot"))
+            {
+                var kind = GameContent.Crop(byte.Parse(v[1]))!;
+                var plots = v[4] == "-"
+                    ? new List<PlotSpot>()
+                    : v[4].Split(',').Select(o => o.Split(':')).Select(o => new PlotSpot(new Rect(F(o[0]), F(o[1]), F(o[2]), F(o[3])), o[4] == "1")).ToList();
+                var others = v[5] == "-"
+                    ? new List<Planting>()
+                    : v[5].Split(',').Select(o => o.Split(':')).Select(o => new Planting(F(o[0]), F(o[1]), F(o[2]))).ToList();
+                var (spot, error) = Farm.CheckSpot(Texel, map.GridSample, kind, F(v[2]), F(v[3]), plots, others);
+                if (v[6].StartsWith("ok:"))
+                {
+                    var ok = v[6].Split(':');
+                    Assert.Null(error);
+                    Assert.Equal(F(ok[1]), spot.Y);
+                    Assert.Equal(ok[2] == "-" ? null : int.Parse(ok[2]), spot.Plot);
+                    Assert.Equal(ok[3] == "1", spot.Ideal);
+                }
+                else
+                    Assert.Equal(v[6], error is SpotError e ? ((byte)e).ToString(CultureInfo.InvariantCulture) : "ok");
+                seen.Add(v[6].StartsWith("ok:") ? "ok" : v[6]);
+                n++;
+            }
+            Assert.True(n >= 300 && seen.Count == 8, $"{n} vectors, results {string.Join(",", seen)}");
+        }
+
+        [Fact]
         public void YawFacingRoundTrips()
         {
             for (float yaw = -3.1f; yaw < 3.1f; yaw += 0.1f)

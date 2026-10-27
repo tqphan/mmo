@@ -1,0 +1,176 @@
+# Farming (docs/design/farming.md): what grows from each seed. `wire` is stored in crop rows and runs
+# 0, 1, 2, … like nodes. `kind` is `crop`, `tree` or `animal`; `seed` is an item of kind `seed`,
+# `product` any item, and `climate` an id from land.toml. Times are outside the ideal climate.
+# Hearthgrain's times follow the original's barley (30 min ideal, 43 elsewhere; C); the other
+# numbers are ours, for the M1 playtest to tune.
+
+[farming]
+# How close a character must stand to plant, harvest or uproot, horizontally.
+reach_m = 3.0
+# Growth time in the ideal climate, in percent (barley: 30 of 43 minutes; C).
+ideal_pct = 70
+
+# Crops: one harvest, then gone; left ripe for a day, they wither.
+[[crop]]
+wire = 0
+id = "hearthgrain"
+name = "Hearthgrain"
+kind = "crop"
+seed = "hearthgrain_seed"
+climate = "temperate"
+grow_s = 2580
+product = "hearthgrain"
+yield_min = 3
+yield_max = 5
+labor = 3
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 1
+id = "whiteflax"
+name = "Whiteflax"
+kind = "crop"
+seed = "whiteflax_seed"
+climate = "temperate"
+grow_s = 3600
+product = "whiteflax_fibre"
+yield_min = 2
+yield_max = 4
+labor = 3
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 2
+id = "sunroot"
+name = "Sunroot"
+kind = "crop"
+seed = "sunroot_cutting"
+climate = "tropical"
+grow_s = 5400
+product = "sunroot"
+yield_min = 2
+yield_max = 4
+labor = 4
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 3
+id = "cinderpepper"
+name = "Cinderpepper"
+kind = "crop"
+seed = "cinderpepper_seed"
+climate = "arid"
+grow_s = 3600
+product = "cinderpepper"
+yield_min = 2
+yield_max = 4
+labor = 3
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 4
+id = "dustbean"
+name = "Dustbean"
+kind = "crop"
+seed = "dustbean_seed"
+climate = "arid"
+grow_s = 2580
+product = "dustbean"
+yield_min = 3
+yield_max = 5
+labor = 3
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 5
+id = "frostkale"
+name = "Frostkale"
+kind = "crop"
+seed = "frostkale_seed"
+climate = "subarctic"
+grow_s = 5400
+product = "frostkale"
+yield_min = 2
+yield_max = 4
+labor = 4
+regrow_s = 0
+wither_s = 86400
+space_m = 0.5
+plot_only = false
+seed_pct = 0
+
+# Trees: hours to grow. The amberpear fruits again; the driftpine is felled for logs.
+[[crop]]
+wire = 6
+id = "amberpear_tree"
+name = "Amberpear Tree"
+kind = "tree"
+seed = "amberpear_sapling"
+climate = "temperate"
+grow_s = 21600
+product = "amberpear"
+yield_min = 3
+yield_max = 6
+labor = 5
+regrow_s = 14400
+wither_s = 0
+space_m = 2.0
+plot_only = false
+seed_pct = 0
+
+[[crop]]
+wire = 7
+id = "driftpine_tree"
+name = "Driftpine Tree"
+kind = "tree"
+seed = "driftpine_sapling"
+climate = "subarctic"
+grow_s = 28800
+product = "driftpine_log"
+yield_min = 4
+yield_max = 6
+labor = 10
+regrow_s = 0
+wither_s = 0
+space_m = 2.0
+plot_only = false
+seed_pct = 0
+
+# Livestock: kept on plots (C), shorn again and again, now and then with a lamb (B: offspring).
+[[crop]]
+wire = 8
+id = "woolback"
+name = "Woolback"
+kind = "animal"
+seed = "woolback_lamb"
+climate = "temperate"
+grow_s = 14400
+product = "woolback_fleece"
+yield_min = 2
+yield_max = 3
+labor = 5
+regrow_s = 7200
+wither_s = 0
+space_m = 1.5
+plot_only = true
+seed_pct = 10

@@ -29,3 +29,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0023](0023-resource-nodes-public-rows-timed-by-a-scheduled-job.md) | Resource nodes are public rows with a regrowth timestamp; a gather is a scheduled job | Accepted |
 | [0024](0024-crafting-one-unit-per-scheduled-run.md) | A craft is a private scheduled job that makes one unit per run and reschedules itself | Accepted |
 | [0025](0025-plot-standing-from-tax-timestamp.md) | A plot's standing comes from its tax timestamp; demolition is one timer per plot; land use goes to the server | Accepted |
+| [0026](0026-plantings-staged-from-timestamps-with-instant-harvest.md) | Crops, trees and livestock are public rows staged from timestamps; harvests are instant; gone plantings are cleared lazily | Accepted |

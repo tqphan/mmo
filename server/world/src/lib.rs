@@ -4,6 +4,7 @@ mod combat;
 mod crafting;
 #[cfg(feature = "dev")]
 mod dev;
+mod farming;
 mod gathering;
 mod items;
 mod labor;

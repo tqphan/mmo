@@ -21,8 +21,8 @@ namespace Mmo.Net
         /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP.</summary>
         public static readonly string[] NearTables = { "entity", "transform", "vehicle" };
         public const ushort NearRadius = 2;
-        /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md) and plots (docs/design/land.md).</summary>
-        public static readonly string[] StaticTables = { "resource_node", "station", "plot" };
+        /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md), plots (docs/design/land.md) and crops (docs/design/farming.md).</summary>
+        public static readonly string[] StaticTables = { "resource_node", "station", "plot", "crop" };
         public const ushort StaticRadius = 4;
 
         private readonly ClientOptions options;

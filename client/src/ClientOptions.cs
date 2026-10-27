@@ -14,6 +14,7 @@ namespace Mmo
     /// <item><c>--labor N</c>: dev builds; on entering, set our account's labor pool to N (docs/design/labor.md). F8 spends 100.</item>
     /// <item><c>--bag-demo</c>: dev builds; on entering, empty the bag, grant some items and work through a move, a merge, a split, a swap and a destroy with the bag window open (docs/design/items.md).</item>
     /// <item><c>--gather-demo</c>: dev builds; on entering, teleport beside the nearest ready plant and gather it, then the nearest tree (docs/design/gathering.md).</item>
+    /// <item><c>--farm-demo</c>: dev builds; on entering, place a farm on the nearest housing site, plant a row of Hearthgrain, a Woolback and an Amberpear Tree on it and Hearthgrain beside it, ripen them with the dev clock, harvest, then let the crop beside it wither (docs/design/farming.md).</item>
     /// <item><c>--land-demo</c>: dev builds; on entering, teleport beside the nearest housing site, place a garden through the placement mode, pay its tax, make it public, then move the dev clock past its demolition (docs/design/land.md).</item>
     /// <item><c>--craft-demo</c>: dev builds; on entering, teleport to the Cookhearth, grant logs and ore, craft Charcoal, then a Rustiron Bar at the Bloomery (docs/design/crafting.md).</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
@@ -42,6 +43,7 @@ namespace Mmo
         public bool GatherDemo;
         public bool CraftDemo;
         public bool LandDemo;
+        public bool FarmDemo;
         public bool Walk;
         public float CamYawDeg;
         public bool Trace;
@@ -85,6 +87,7 @@ namespace Mmo
                     case "--gather-demo": o.GatherDemo = true; break;
                     case "--craft-demo": o.CraftDemo = true; break;
                     case "--land-demo": o.LandDemo = true; break;
+                    case "--farm-demo": o.FarmDemo = true; break;
                     case "--labor": o.Labor = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--spawn-ship": o.SpawnShip = Triple(Next()); break;
                     case "--trace": o.Trace = true; break;

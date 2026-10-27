@@ -256,3 +256,84 @@ output = "farm_deed"
 output_count = 1
 labor = 50
 craft_s = 12.0
+
+# Seeds (docs/design/farming.md): sorted and dried from the crop until merchants sell them. Ours.
+[[recipe]]
+wire = 23
+id = "hearthgrain_seed"
+station = "cookhearth"
+inputs = [{ item = "hearthgrain", count = 1 }]
+output = "hearthgrain_seed"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 24
+id = "whiteflax_seed"
+station = "cookhearth"
+inputs = [{ item = "whiteflax_fibre", count = 1 }]
+output = "whiteflax_seed"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 25
+id = "sunroot_cutting"
+station = "cookhearth"
+inputs = [{ item = "sunroot", count = 1 }]
+output = "sunroot_cutting"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 26
+id = "cinderpepper_seed"
+station = "cookhearth"
+inputs = [{ item = "cinderpepper", count = 1 }]
+output = "cinderpepper_seed"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 27
+id = "dustbean_seed"
+station = "cookhearth"
+inputs = [{ item = "dustbean", count = 1 }]
+output = "dustbean_seed"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 28
+id = "frostkale_seed"
+station = "cookhearth"
+inputs = [{ item = "frostkale", count = 1 }]
+output = "frostkale_seed"
+output_count = 2
+labor = 2
+craft_s = 2.0
+
+[[recipe]]
+wire = 29
+id = "amberpear_sapling"
+station = "joiners_bench"
+inputs = [{ item = "amberpear", count = 2 }, { item = "saltreed_twine", count = 1 }]
+output = "amberpear_sapling"
+output_count = 1
+labor = 5
+craft_s = 4.0
+
+[[recipe]]
+wire = 30
+id = "driftpine_sapling"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_log", count = 1 }, { item = "saltreed_twine", count = 1 }]
+output = "driftpine_sapling"
+output_count = 1
+labor = 5
+craft_s = 4.0

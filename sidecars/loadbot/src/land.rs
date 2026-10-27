@@ -18,7 +18,7 @@ use crate::{Args, Bot, Check, WAIT, wait_for};
 use spacetimedb_sdk::{DbContext, Table};
 
 /// Our own ground when the world's isn't there: 2 × 2 cells, 10 m up, all housing.
-const OWN_CELLS: [(f32, f32); 4] = [(6420.0, 6420.0), (6484.0, 6420.0), (6420.0, 6484.0), (6484.0, 6484.0)];
+pub(crate) const OWN_CELLS: [(f32, f32); 4] = [(6420.0, 6420.0), (6484.0, 6420.0), (6420.0, 6484.0), (6484.0, 6484.0)];
 const OWN_SITE: (f32, f32) = (6464.0, 6464.0);
 
 pub fn scenario(args: &Args) -> Check {
@@ -125,7 +125,7 @@ pub fn scenario(args: &Args) -> Check {
 }
 
 /// Upload flat housing ground for our own cells; returns the site.
-fn upload_own(admin: &Bot) -> Result<(f32, f32), String> {
+pub(crate) fn upload_own(admin: &Bot) -> Result<(f32, f32), String> {
     let cells: Vec<u64> = OWN_CELLS.iter().map(|&(x, z)| cell_of(OPEN_WORLD, x, z)).collect();
     let chunks: Vec<TerrainChunk> = cells.iter().map(|&cell| TerrainChunk { cell, samples: vec![encode(10.0); CHUNK_LEN] }).collect();
     call(admin, |tx| admin.conn.reducers.admin_put_terrain_then(chunks, tx))?;
@@ -150,7 +150,7 @@ impl LandChunks for WorldLand<'_> {
 
 /// A site on the world's housing land, nearest spawn first, where a garden fits with room for one
 /// more beside it.
-fn world_site(kind: &sim::land::PlotData) -> Result<(f32, f32), String> {
+pub(crate) fn world_site(kind: &sim::land::PlotData) -> Result<(f32, f32), String> {
     let world = worldtool::World::load(std::path::Path::new(worldtool::DEFAULT_DIR))?;
     let mut land = WorldLand { world: &world, cut: Default::default() };
     let mut heights = sim::terrain::FileChunks::new(&world.heights);
@@ -173,7 +173,7 @@ fn world_site(kind: &sim::land::PlotData) -> Result<(f32, f32), String> {
     best.map(|(_, s)| s).ok_or_else(|| "no housing site in the world".into())
 }
 
-fn grant(bot: &Bot, item: &str, count: u32) -> Check {
+pub(crate) fn grant(bot: &Bot, item: &str, count: u32) -> Check {
     call(bot, |tx| bot.conn.reducers.dev_grant_item_then(item.to_string(), count, tx))
 }
 
@@ -184,7 +184,7 @@ fn deed(bot: &Bot, char_id: u64) -> Result<u64, String> {
     bot.conn.db.my_inventory().iter().find(|i| i.holder == char_id && i.def == wire).map(|i| i.id).ok_or_else(|| "no deed".into())
 }
 
-fn refused(bot: &Bot, what: &str, want: &str, send: impl FnOnce(crate::gather::Then) -> spacetimedb_sdk::Result<()>) -> Check {
+pub(crate) fn refused(bot: &Bot, what: &str, want: &str, send: impl FnOnce(crate::gather::Then) -> spacetimedb_sdk::Result<()>) -> Check {
     match call(bot, send) {
         Ok(()) => Err(format!("{what} was accepted")),
         Err(e) if e.contains(want) => {

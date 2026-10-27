@@ -14,6 +14,7 @@ mod director;
 mod gather;
 mod items;
 mod labor;
+mod farm;
 mod land;
 mod metrics;
 mod ship;
@@ -108,6 +109,7 @@ fn main() {
         "gather" => gather::scenario(&args),
         "craft" => craft::scenario(&args),
         "land" => land::scenario(&args),
+        "farm" => farm::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -126,7 +128,8 @@ fn main() {
                  items            a bot fills its bag, then moves, merges, splits, swaps and destroys stacks, and has bad requests refused\n  \
                  gather           two bots by a node: refusals, a gather that pays out, regrowth by the dev clock, cancelling\n  \
                  craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling\n  \
-                 land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock"
+                 land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock\n  \
+                 farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot"
             );
             std::process::exit(2);
         }

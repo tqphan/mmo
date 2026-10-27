@@ -92,6 +92,11 @@ namespace Mmo
             var placement = new Placement(session, player, map, world.Land, plotRegistry);
             AddChild(placement);
             player.Placement = placement;
+            var crops = new CropRegistry(session, plotRegistry);
+            AddChild(crops);
+            var farming = new Farming(session, player, map, world.Land, plotRegistry, crops);
+            AddChild(farming);
+            player.Farming = farming;
             var plots = new Plots(session, player, plotRegistry);
             AddChild(plots);
             player.Plots = plots;
@@ -102,9 +107,21 @@ namespace Mmo
             AddChild(camera);
             var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
-            hud.Prompts.Add(() => placement.Active is null ? plots.Prompt : "");
+            hud.Prompts.Add(() => farming.Prompt);
+            hud.Prompts.Add(() => placement.Active is null && farming.Active is null ? plots.Prompt : "");
             AddChild(hud);
-            var bag = new BagWindow(session) { Use = placement.Begin };
+            // Right-clicking a stack uses it: deeds place plots, seeds plant.
+            bool Use(BagStack s)
+            {
+                if (placement.Begin(s))
+                    farming.Cancel();
+                else if (farming.Begin(s))
+                    placement.Cancel();
+                else
+                    return false;
+                return true;
+            }
+            var bag = new BagWindow(session) { Use = Use };
             AddChild(bag);
             if (options.BagDemo)
                 AddChild(new BagDemo(session, bag));
@@ -114,6 +131,8 @@ namespace Mmo
                 AddChild(new CraftDemo(session, player, stations, crafting, craftWindow));
             if (options.LandDemo)
                 AddChild(new LandDemo(session, player, map, world.Land, bag, placement, plots, plotWindow));
+            if (options.FarmDemo)
+                AddChild(new FarmDemo(session, player, map, world.Land, bag, placement, plotRegistry, farming));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -207,6 +226,7 @@ namespace Mmo
             Bind("dev_spend_labor", Key.F8);
             Bind("bag", Key.I, Key.B);
             Bind("rotate", Key.R);
+            Bind("uproot", Key.G);
         }
     }
 }

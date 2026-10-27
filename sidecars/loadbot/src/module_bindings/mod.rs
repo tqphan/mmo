@@ -16,6 +16,7 @@ pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
 pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
+pub mod admin_remove_crops_reducer;
 pub mod admin_remove_land_reducer;
 pub mod admin_remove_nodes_reducer;
 pub mod admin_remove_plots_reducer;
@@ -32,6 +33,8 @@ pub mod combat_event_type;
 pub mod craft_job_type;
 pub mod craft_reducer;
 pub mod create_character_reducer;
+pub mod crop_table;
+pub mod crop_type;
 pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_grant_item_reducer;
@@ -51,6 +54,7 @@ pub mod game_clock_table;
 pub mod game_clock_type;
 pub mod gather_job_type;
 pub mod gather_reducer;
+pub mod harvest_reducer;
 pub mod helm_reducer;
 pub mod item_type;
 pub mod labor_type;
@@ -69,6 +73,7 @@ pub mod node_placement_type;
 pub mod owner_type;
 pub mod pay_tax_reducer;
 pub mod place_plot_reducer;
+pub mod plant_reducer;
 pub mod plot_demolition_type;
 pub mod plot_table;
 pub mod plot_type;
@@ -89,6 +94,7 @@ pub mod terrain_info_type;
 pub mod tick_state_type;
 pub mod transform_table;
 pub mod transform_type;
+pub mod uproot_reducer;
 pub mod vehicle_table;
 pub mod vehicle_type;
 pub mod world_tick_timer_type;
@@ -103,6 +109,7 @@ pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
+pub use admin_remove_crops_reducer::admin_remove_crops;
 pub use admin_remove_land_reducer::admin_remove_land;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
 pub use admin_remove_plots_reducer::admin_remove_plots;
@@ -119,6 +126,8 @@ pub use combat_event_type::CombatEvent;
 pub use craft_job_type::CraftJob;
 pub use craft_reducer::craft;
 pub use create_character_reducer::create_character;
+pub use crop_table::*;
+pub use crop_type::Crop;
 pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_grant_item_reducer::dev_grant_item;
@@ -138,6 +147,7 @@ pub use game_clock_table::*;
 pub use game_clock_type::GameClock;
 pub use gather_job_type::GatherJob;
 pub use gather_reducer::gather;
+pub use harvest_reducer::harvest;
 pub use helm_reducer::helm;
 pub use item_type::Item;
 pub use labor_type::Labor;
@@ -156,6 +166,7 @@ pub use node_placement_type::NodePlacement;
 pub use owner_type::Owner;
 pub use pay_tax_reducer::pay_tax;
 pub use place_plot_reducer::place_plot;
+pub use plant_reducer::plant;
 pub use plot_demolition_type::PlotDemolition;
 pub use plot_table::*;
 pub use plot_type::Plot;
@@ -176,6 +187,7 @@ pub use terrain_info_type::TerrainInfo;
 pub use tick_state_type::TickState;
 pub use transform_table::*;
 pub use transform_type::Transform;
+pub use uproot_reducer::uproot;
 pub use vehicle_table::*;
 pub use vehicle_type::Vehicle;
 pub use world_tick_timer_type::WorldTickTimer;
@@ -206,6 +218,9 @@ pub enum Reducer {
     },
     AdminPutTerrain {
         chunks: Vec<TerrainChunk>,
+    },
+    AdminRemoveCrops {
+        ids: Vec<u64>,
     },
     AdminRemoveLand {
         cells: Vec<u64>,
@@ -281,6 +296,9 @@ pub enum Reducer {
     Gather {
         node_id: u64,
     },
+    Harvest {
+        crop_id: u64,
+    },
     Helm {
         throttle: i8,
         rudder: i8,
@@ -310,6 +328,11 @@ pub enum Reducer {
         z: f32,
         yaw: u8,
     },
+    Plant {
+        item_id: u64,
+        x: f32,
+        z: f32,
+    },
     SetPlotAccess {
         plot_id: u64,
         access: u8,
@@ -320,6 +343,9 @@ pub enum Reducer {
         to_slot: u16,
     },
     TakeHelm,
+    Uproot {
+        crop_id: u64,
+    },
 }
 
 impl __sdk::InModule for Reducer {
@@ -338,6 +364,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
+            Reducer::AdminRemoveCrops { .. } => "admin_remove_crops",
             Reducer::AdminRemoveLand { .. } => "admin_remove_land",
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
             Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
@@ -360,6 +387,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::EnterWorld { .. } => "enter_world",
             Reducer::Fire { .. } => "fire",
             Reducer::Gather { .. } => "gather",
+            Reducer::Harvest { .. } => "harvest",
             Reducer::Helm { .. } => "helm",
             Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
@@ -367,9 +395,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::MoveItem { .. } => "move_item",
             Reducer::PayTax { .. } => "pay_tax",
             Reducer::PlacePlot { .. } => "place_plot",
+            Reducer::Plant { .. } => "plant",
             Reducer::SetPlotAccess { .. } => "set_plot_access",
             Reducer::SplitItem { .. } => "split_item",
             Reducer::TakeHelm => "take_helm",
+            Reducer::Uproot { .. } => "uproot",
             _ => unreachable!(),
         }
     }
@@ -411,6 +441,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutTerrain { chunks } => {
                 __sats::bsatn::to_vec(&admin_put_terrain_reducer::AdminPutTerrainArgs {
                     chunks: chunks.clone(),
+                })
+            }
+            Reducer::AdminRemoveCrops { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_crops_reducer::AdminRemoveCropsArgs {
+                    ids: ids.clone(),
                 })
             }
             Reducer::AdminRemoveLand { cells } => {
@@ -531,6 +566,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::Gather { node_id } => __sats::bsatn::to_vec(&gather_reducer::GatherArgs {
                 node_id: node_id.clone(),
             }),
+            Reducer::Harvest { crop_id } => __sats::bsatn::to_vec(&harvest_reducer::HarvestArgs {
+                crop_id: crop_id.clone(),
+            }),
             Reducer::Helm { throttle, rudder } => __sats::bsatn::to_vec(&helm_reducer::HelmArgs {
                 throttle: throttle.clone(),
                 rudder: rudder.clone(),
@@ -573,6 +611,11 @@ impl __sdk::Reducer for Reducer {
                     yaw: yaw.clone(),
                 })
             }
+            Reducer::Plant { item_id, x, z } => __sats::bsatn::to_vec(&plant_reducer::PlantArgs {
+                item_id: item_id.clone(),
+                x: x.clone(),
+                z: z.clone(),
+            }),
             Reducer::SetPlotAccess { plot_id, access } => {
                 __sats::bsatn::to_vec(&set_plot_access_reducer::SetPlotAccessArgs {
                     plot_id: plot_id.clone(),
@@ -589,6 +632,9 @@ impl __sdk::Reducer for Reducer {
                 to_slot: to_slot.clone(),
             }),
             Reducer::TakeHelm => __sats::bsatn::to_vec(&take_helm_reducer::TakeHelmArgs {}),
+            Reducer::Uproot { crop_id } => __sats::bsatn::to_vec(&uproot_reducer::UprootArgs {
+                crop_id: crop_id.clone(),
+            }),
             _ => unreachable!(),
         }
     }
@@ -600,6 +646,7 @@ impl __sdk::Reducer for Reducer {
 pub struct DbUpdate {
     character_public: __sdk::TableUpdate<CharacterPublic>,
     combat_event: __sdk::TableUpdate<CombatEvent>,
+    crop: __sdk::TableUpdate<Crop>,
     dev_tick: __sdk::TableUpdate<TickState>,
     entity: __sdk::TableUpdate<Entity>,
     game_clock: __sdk::TableUpdate<GameClock>,
@@ -628,6 +675,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "combat_event" => db_update
                     .combat_event
                     .append(combat_event_table::parse_table_update(table_update)?),
+                "crop" => db_update
+                    .crop
+                    .append(crop_table::parse_table_update(table_update)?),
                 "dev_tick" => db_update
                     .dev_tick
                     .append(dev_tick_table::parse_table_update(table_update)?),
@@ -700,6 +750,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<CharacterPublic>("character_public", &self.character_public)
             .with_updates_by_pk(|row| &row.char_id);
         diff.combat_event = self.combat_event.into_event_diff();
+        diff.crop = cache
+            .apply_diff_to_table::<Crop>("crop", &self.crop)
+            .with_updates_by_pk(|row| &row.id);
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
@@ -743,6 +796,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "combat_event" => db_update
                     .combat_event
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crop" => db_update
+                    .crop
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "dev_tick" => db_update
                     .dev_tick
@@ -805,6 +861,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "combat_event" => db_update
                     .combat_event
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crop" => db_update
+                    .crop
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "dev_tick" => db_update
                     .dev_tick
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -864,6 +923,7 @@ impl __sdk::DbUpdate for DbUpdate {
 pub struct AppliedDiff<'r> {
     character_public: __sdk::TableAppliedDiff<'r, CharacterPublic>,
     combat_event: __sdk::TableAppliedDiff<'r, CombatEvent>,
+    crop: __sdk::TableAppliedDiff<'r, Crop>,
     dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
@@ -901,6 +961,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.combat_event,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Crop>("crop", &self.crop, event);
         callbacks.invoke_table_row_callbacks::<TickState>("dev_tick", &self.dev_tick, event);
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
         callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
@@ -1589,6 +1650,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         character_public_table::register_table(client_cache);
         combat_event_table::register_table(client_cache);
+        crop_table::register_table(client_cache);
         dev_tick_table::register_table(client_cache);
         entity_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
@@ -1607,6 +1669,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "character_public",
         "combat_event",
+        "crop",
         "dev_tick",
         "entity",
         "game_clock",

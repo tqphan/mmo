@@ -29,6 +29,7 @@ namespace SpacetimeDB.Types
         {
             AddTable(CharacterPublic = new(conn));
             AddTable(CombatEvent = new(conn));
+            AddTable(Crop = new(conn));
             AddTable(DevTick = new(conn));
             AddTable(Entity = new(conn));
             AddTable(GameClock = new(conn));
@@ -541,6 +542,7 @@ namespace SpacetimeDB.Types
         {
             new QueryBuilder().From.CharacterPublic().ToSql(),
             new QueryBuilder().From.CombatEvent().ToSql(),
+            new QueryBuilder().From.Crop().ToSql(),
             new QueryBuilder().From.DevTick().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.GameClock().ToSql(),
@@ -563,6 +565,7 @@ namespace SpacetimeDB.Types
     {
         public global::SpacetimeDB.Table<CharacterPublic, CharacterPublicCols, CharacterPublicIxCols> CharacterPublic() => new("character_public", new CharacterPublicCols("character_public"), new CharacterPublicIxCols("character_public"));
         public global::SpacetimeDB.Table<CombatEvent, CombatEventCols, CombatEventIxCols> CombatEvent() => new("combat_event", new CombatEventCols("combat_event"), new CombatEventIxCols("combat_event"));
+        public global::SpacetimeDB.Table<Crop, CropCols, CropIxCols> Crop() => new("crop", new CropCols("crop"), new CropIxCols("crop"));
         public global::SpacetimeDB.Table<TickState, DevTickCols, DevTickIxCols> DevTick() => new("dev_tick", new DevTickCols("dev_tick"), new DevTickIxCols("dev_tick"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
@@ -667,6 +670,7 @@ namespace SpacetimeDB.Types
                 Reducer.AdminPutNodes args => Reducers.InvokeAdminPutNodes(eventContext, args),
                 Reducer.AdminPutStations args => Reducers.InvokeAdminPutStations(eventContext, args),
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
+                Reducer.AdminRemoveCrops args => Reducers.InvokeAdminRemoveCrops(eventContext, args),
                 Reducer.AdminRemoveLand args => Reducers.InvokeAdminRemoveLand(eventContext, args),
                 Reducer.AdminRemoveNodes args => Reducers.InvokeAdminRemoveNodes(eventContext, args),
                 Reducer.AdminRemovePlots args => Reducers.InvokeAdminRemovePlots(eventContext, args),
@@ -689,6 +693,7 @@ namespace SpacetimeDB.Types
                 Reducer.EnterWorld args => Reducers.InvokeEnterWorld(eventContext, args),
                 Reducer.Fire args => Reducers.InvokeFire(eventContext, args),
                 Reducer.Gather args => Reducers.InvokeGather(eventContext, args),
+                Reducer.Harvest args => Reducers.InvokeHarvest(eventContext, args),
                 Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
@@ -696,9 +701,11 @@ namespace SpacetimeDB.Types
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
                 Reducer.PayTax args => Reducers.InvokePayTax(eventContext, args),
                 Reducer.PlacePlot args => Reducers.InvokePlacePlot(eventContext, args),
+                Reducer.Plant args => Reducers.InvokePlant(eventContext, args),
                 Reducer.SetPlotAccess args => Reducers.InvokeSetPlotAccess(eventContext, args),
                 Reducer.SplitItem args => Reducers.InvokeSplitItem(eventContext, args),
                 Reducer.TakeHelm args => Reducers.InvokeTakeHelm(eventContext, args),
+                Reducer.Uproot args => Reducers.InvokeUproot(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

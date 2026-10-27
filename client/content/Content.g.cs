@@ -52,7 +52,8 @@ namespace Mmo.Content
     }
 
     /// <param name="Buildable">Houses and farms may be placed here.</param>
-    public sealed record LandUseData(LandUse Use, string Id, bool Buildable);
+    /// <param name="Plantable">Crops, trees and livestock may be planted here.</param>
+    public sealed record LandUseData(LandUse Use, string Id, bool Buildable, bool Plantable);
 
     /// <summary>Climates (content/land.toml): bits 4–6 of a land-use texel. The value is the wire value.</summary>
     public enum Climate : byte
@@ -95,6 +96,7 @@ namespace Mmo.Content
         Consumable = 1,
         Gear = 2,
         Deed = 3,
+        Seed = 4,
     }
 
     /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
@@ -135,6 +137,28 @@ namespace Mmo.Content
     /// <param name="CraftS">How long one unit takes, in seconds.</param>
     public sealed record RecipeData(ushort Wire, string Id, byte Station, IReadOnlyList<Ingredient> Inputs, ushort Output, uint OutputCount, int Labor, float CraftS);
 
+    /// <summary>Crop kinds (content/farming.toml, docs/design/farming.md). The value is the wire value.</summary>
+    public enum CropKind : byte
+    {
+        Crop = 0,
+        Tree = 1,
+        Animal = 2,
+    }
+
+    /// <summary>What grows from a seed: a crop, tree or animal (content/farming.toml, docs/design/farming.md).</summary>
+    /// <param name="Wire">Stored in crop rows.</param>
+    /// <param name="Seed">The wire of the seed item that plants it.</param>
+    /// <param name="Climate">Its ideal climate.</param>
+    /// <param name="GrowS">Seconds to mature outside its ideal climate.</param>
+    /// <param name="Product">The wire of the item a harvest gives.</param>
+    /// <param name="Labor">Labor spent on each harvest.</param>
+    /// <param name="RegrowS">Seconds until it's ripe again after a harvest; 0 if a harvest removes it.</param>
+    /// <param name="WitherS">Seconds it stays ripe before it withers; 0 if it never does.</param>
+    /// <param name="SpaceM">Its radius on the ground, m.</param>
+    /// <param name="PlotOnly">It may only be planted on a plot.</param>
+    /// <param name="SeedPct">The chance, in percent, that a harvest also gives one of its seed.</param>
+    public sealed record CropData(byte Wire, string Id, string Name, CropKind Kind, ushort Seed, Climate Climate, uint GrowS, ushort Product, uint YieldMin, uint YieldMax, int Labor, uint RegrowS, uint WitherS, float SpaceM, bool PlotOnly, uint SeedPct);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -152,7 +176,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x2887382dded4f650UL;
+        public const ulong Hash = 0xc38b8f4f431cd8cdUL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -172,10 +196,10 @@ namespace Mmo.Content
 
         public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]
         {
-            new(LandUse.Wild, "wild", false),
-            new(LandUse.Housing, "housing", true),
-            new(LandUse.Town, "town", false),
-            new(LandUse.Road, "road", false),
+            new(LandUse.Wild, "wild", false, true),
+            new(LandUse.Housing, "housing", true, true),
+            new(LandUse.Town, "town", false, false),
+            new(LandUse.Road, "road", false, false),
         };
 
         public static LandUseData Data(this LandUse use) => LandUses[(int)use];
@@ -227,6 +251,14 @@ namespace Mmo.Content
             new(53, "rustiron_fittings", "Rustiron Fittings", ItemKind.Material, 1000),
             new(60, "charcoal", "Charcoal", ItemKind.Material, 1000),
             new(70, "levy_seal", "Levy Seal", ItemKind.Material, 1000),
+            new(80, "hearthgrain", "Hearthgrain", ItemKind.Material, 1000),
+            new(81, "whiteflax_fibre", "Whiteflax Fibre", ItemKind.Material, 1000),
+            new(82, "sunroot", "Sunroot", ItemKind.Material, 1000),
+            new(83, "cinderpepper", "Cinderpepper", ItemKind.Material, 1000),
+            new(84, "dustbean", "Dustbean", ItemKind.Material, 1000),
+            new(85, "frostkale", "Frostkale", ItemKind.Material, 1000),
+            new(86, "amberpear", "Amberpear", ItemKind.Material, 1000),
+            new(87, "woolback_fleece", "Woolback Fleece", ItemKind.Material, 1000),
             new(100, "duskberry_tart", "Duskberry Tart", ItemKind.Consumable, 100),
             new(101, "duskberry_preserve", "Duskberry Preserve", ItemKind.Consumable, 100),
             new(102, "emberleaf_salve", "Emberleaf Salve", ItemKind.Consumable, 100),
@@ -237,6 +269,15 @@ namespace Mmo.Content
             new(203, "tin_lantern", "Tin Lantern", ItemKind.Gear, 1),
             new(300, "garden_deed", "Garden Deed", ItemKind.Deed, 10),
             new(301, "farm_deed", "Farm Deed", ItemKind.Deed, 10),
+            new(400, "hearthgrain_seed", "Hearthgrain Seed", ItemKind.Seed, 100),
+            new(401, "whiteflax_seed", "Whiteflax Seed", ItemKind.Seed, 100),
+            new(402, "sunroot_cutting", "Sunroot Cutting", ItemKind.Seed, 100),
+            new(403, "cinderpepper_seed", "Cinderpepper Seed", ItemKind.Seed, 100),
+            new(404, "dustbean_seed", "Dustbean Seed", ItemKind.Seed, 100),
+            new(405, "frostkale_seed", "Frostkale Seed", ItemKind.Seed, 100),
+            new(406, "amberpear_sapling", "Amberpear Sapling", ItemKind.Seed, 100),
+            new(407, "driftpine_sapling", "Driftpine Sapling", ItemKind.Seed, 100),
+            new(408, "woolback_lamb", "Woolback Lamb", ItemKind.Seed, 10),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -305,9 +346,43 @@ namespace Mmo.Content
             new(20, "levy_seal", 1, new Ingredient[] { new(50, 1), new(60, 1) }, 70, 5, 10, 4.0f),
             new(21, "garden_deed", 0, new Ingredient[] { new(40, 6), new(30, 4) }, 300, 1, 25, 8.0f),
             new(22, "farm_deed", 0, new Ingredient[] { new(41, 8), new(42, 2), new(32, 2) }, 301, 1, 50, 12.0f),
+            new(23, "hearthgrain_seed", 2, new Ingredient[] { new(80, 1) }, 400, 2, 2, 2.0f),
+            new(24, "whiteflax_seed", 2, new Ingredient[] { new(81, 1) }, 401, 2, 2, 2.0f),
+            new(25, "sunroot_cutting", 2, new Ingredient[] { new(82, 1) }, 402, 2, 2, 2.0f),
+            new(26, "cinderpepper_seed", 2, new Ingredient[] { new(83, 1) }, 403, 2, 2, 2.0f),
+            new(27, "dustbean_seed", 2, new Ingredient[] { new(84, 1) }, 404, 2, 2, 2.0f),
+            new(28, "frostkale_seed", 2, new Ingredient[] { new(85, 1) }, 405, 2, 2, 2.0f),
+            new(29, "amberpear_sapling", 0, new Ingredient[] { new(86, 2), new(30, 1) }, 406, 1, 5, 4.0f),
+            new(30, "driftpine_sapling", 0, new Ingredient[] { new(20, 1), new(30, 1) }, 407, 1, 5, 4.0f),
         };
 
         /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>
         public static RecipeData? Recipe(ushort wire) => wire < Recipes.Count ? Recipes[wire] : null;
+
+        /// <summary>How close a character must stand to plant, harvest or uproot, horizontally, in metres.</summary>
+        public const float FarmReachM = 3.0f;
+
+        /// <summary>Growth time in a crop's ideal climate, in percent.</summary>
+        public const uint FarmIdealPct = 70;
+
+        /// <summary>Every crop kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<CropData> Crops = new CropData[]
+        {
+            new(0, "hearthgrain", "Hearthgrain", CropKind.Crop, 400, Climate.Temperate, 2580, 80, 3, 5, 3, 0, 86400, 0.5f, false, 0),
+            new(1, "whiteflax", "Whiteflax", CropKind.Crop, 401, Climate.Temperate, 3600, 81, 2, 4, 3, 0, 86400, 0.5f, false, 0),
+            new(2, "sunroot", "Sunroot", CropKind.Crop, 402, Climate.Tropical, 5400, 82, 2, 4, 4, 0, 86400, 0.5f, false, 0),
+            new(3, "cinderpepper", "Cinderpepper", CropKind.Crop, 403, Climate.Arid, 3600, 83, 2, 4, 3, 0, 86400, 0.5f, false, 0),
+            new(4, "dustbean", "Dustbean", CropKind.Crop, 404, Climate.Arid, 2580, 84, 3, 5, 3, 0, 86400, 0.5f, false, 0),
+            new(5, "frostkale", "Frostkale", CropKind.Crop, 405, Climate.Subarctic, 5400, 85, 2, 4, 4, 0, 86400, 0.5f, false, 0),
+            new(6, "amberpear_tree", "Amberpear Tree", CropKind.Tree, 406, Climate.Temperate, 21600, 86, 3, 6, 5, 14400, 0, 2.0f, false, 0),
+            new(7, "driftpine_tree", "Driftpine Tree", CropKind.Tree, 407, Climate.Subarctic, 28800, 20, 4, 6, 10, 0, 0, 2.0f, false, 0),
+            new(8, "woolback", "Woolback", CropKind.Animal, 408, Climate.Temperate, 14400, 87, 2, 3, 5, 7200, 0, 1.5f, true, 10),
+        };
+
+        /// <summary>The crop kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static CropData? Crop(byte wire) => wire < Crops.Count ? Crops[wire] : null;
+
+        /// <summary>The crop kind a seed item plants, if it is a seed.</summary>
+        public static CropData? CropBySeed(ushort item) => Crops.FirstOrDefault(c => c.Seed == item);
     }
 }

@@ -16,11 +16,11 @@ const ADMIN: u128 = 99;
 const HOUSING: u8 = 1;
 const TOWN: u8 = 2;
 
-fn wire(id: &str) -> u16 {
+pub(super) fn wire(id: &str) -> u16 {
     item_by_id(id).unwrap().wire
 }
 
-fn as_admin(t: &TestContext) {
+pub(super) fn as_admin(t: &TestContext) {
     call(t, ADMIN, |ctx| {
         on_connect(ctx);
         crate::session::record_owner(ctx);
@@ -30,7 +30,7 @@ fn as_admin(t: &TestContext) {
 }
 
 /// Flat ground 10 m up over the 3 × 3 cells round spawn, all housing except a town texel at (20, 20).
-fn ground(t: &TestContext) {
+pub(super) fn ground(t: &TestContext) {
     as_admin(t);
     let mut chunks = Vec::new();
     let mut land = Vec::new();
@@ -49,27 +49,27 @@ fn ground(t: &TestContext) {
     call(t, ADMIN, |ctx| admin_put_land(ctx, land)).unwrap();
 }
 
-fn give(t: &TestContext, char_id: u64, id: &str, count: u32) {
+pub(super) fn give(t: &TestContext, char_id: u64, id: &str, count: u32) {
     read(t, |ctx| grant(ctx, char_id, wire(id), count)).unwrap();
 }
 
-fn held(t: &TestContext, char_id: u64, id: &str) -> u32 {
+pub(super) fn held(t: &TestContext, char_id: u64, id: &str) -> u32 {
     let w = wire(id);
     read(t, |ctx| ctx.db.item().by_slot().filter((char_id, place::BAG)).filter(|i| i.def == w).map(|i| i.count).sum())
 }
 
 /// The id of a stack of `id` in the bag.
-fn stack(t: &TestContext, char_id: u64, id: &str) -> u64 {
+pub(super) fn stack(t: &TestContext, char_id: u64, id: &str) -> u64 {
     let w = wire(id);
     read(t, |ctx| ctx.db.item().by_slot().filter((char_id, place::BAG)).find(|i| i.def == w).unwrap().id)
 }
 
-fn plots(t: &TestContext) -> Vec<Plot> {
+pub(super) fn plots(t: &TestContext) -> Vec<Plot> {
     read(t, |ctx| ctx.db.plot().iter().collect())
 }
 
 /// Arrive with a garden deed, a farm deed and 100 seals.
-fn settler(t: &TestContext, player: u128, name: &str) -> Presence {
+pub(super) fn settler(t: &TestContext, player: u128, name: &str) -> Presence {
     let p = arrive(t, player, name);
     give(t, p.char_id, "garden_deed", 3);
     give(t, p.char_id, "farm_deed", 1);
@@ -77,24 +77,24 @@ fn settler(t: &TestContext, player: u128, name: &str) -> Presence {
     p
 }
 
-fn place(t: &TestContext, player: u128, deed: &str, x: f32, z: f32) -> Result<(), String> {
+pub(super) fn place(t: &TestContext, player: u128, deed: &str, x: f32, z: f32) -> Result<(), String> {
     let char_id = presence_of(t, player).char_id;
     let item_id = stack(t, char_id, deed);
     call(t, player, |ctx| place_plot(ctx, item_id, x, z, 1))
 }
 
-fn set_position(t: &TestContext, player: u128, x: f32, z: f32) {
+pub(super) fn set_position(t: &TestContext, player: u128, x: f32, z: f32) {
     read(t, |ctx| {
         let p = ctx.db.presence().identity().find(identity(player)).unwrap();
         ctx.db.presence().identity().update(Presence { x, z, ..p });
     });
 }
 
-fn advance_us(t: &TestContext, us: i64) {
+pub(super) fn advance_us(t: &TestContext, us: i64) {
     t.clock.advance(TimeDuration::from_micros(us));
 }
 
-fn now_us(t: &TestContext) -> i64 {
+pub(super) fn now_us(t: &TestContext) -> i64 {
     read(t, |ctx| crate::time::now(ctx).to_micros_since_unix_epoch())
 }
 
@@ -103,7 +103,7 @@ fn job_of(t: &TestContext, plot_id: u64) -> PlotDemolition {
 }
 
 /// Run a plot's demolition job as the scheduler would.
-fn run_job(t: &TestContext, plot_id: u64) {
+pub(super) fn run_job(t: &TestContext, plot_id: u64) {
     let job = job_of(t, plot_id);
     let id = job.scheduled_id;
     t.with_reducer_tx::<_, String>(TestAuth::internal(), |ctx| demolish_plot(ctx, job)).unwrap();

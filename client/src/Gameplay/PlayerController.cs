@@ -84,6 +84,9 @@ namespace Mmo.Gameplay
         /// <summary>Placing a plot; set by <see cref="Main"/>. While placing, F places and does nothing else.</summary>
         public Placement? Placement { get; set; }
 
+        /// <summary>Farming; set by <see cref="Main"/>. F on land plants while planting, and otherwise harvests before gathering.</summary>
+        public Farming? Farming { get; set; }
+
         /// <summary>Plots; set by <see cref="Main"/>. F on land opens a plot's window when there's nothing else to use.</summary>
         public Plots? Plots { get; set; }
 
@@ -163,7 +166,7 @@ namespace Mmo.Gameplay
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
             if (interact && Parent == 0
-                && (Placement?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
+                && (Placement?.Interact() == true || Farming?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;

@@ -63,7 +63,10 @@ pub fn generate() -> String {
          # land_site <plot wire> <x> <z> <other plots as wire:x:z, comma-separated, or -> <ok:lowest, or the error code>\n\
          # land_demolish_at <paid until> <demolish at>\n\
          # land_standing <paid until> <now> <standing: 0 paid, 1 overdue, 2 demolished> <can pay: 1 or 0>\n\
-         # land_tax <plot wire> <plots owned> <seals a week, or none>\n",
+         # land_tax <plot wire> <plots owned> <seals a week, or none>\n\
+         # farm_growth <crop wire> <ideal: 1 or 0> <from> <ripe at> <regrown at, or none> <withers at, or none>\n\
+         # farm_stage <crop wire> <grown from> <ripe at> <now> <stage: 0 growing, 1 ripe, 2 withered> <progress>\n\
+         # farm_spot <crop wire> <x> <z> <plots as x0:z0:x1:z1:tend, comma-separated, or -> <plantings as x:z:space, or -> <ok:y:plot index or -:ideal, or the error code>, on the land_ vectors' ground\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -241,6 +244,65 @@ fn land(out: &mut String, rng: &mut Lcg) {
             out.push_str(&format!("land_tax {} {owned} {tax}\n", kind.wire));
         }
     }
+    farm(out, rng, &mut land, &mut heights);
+}
+
+/// `sim::farm`'s growth, stages and spot checks, for the client's port, on the land vectors' ground.
+fn farm(out: &mut String, rng: &mut Lcg, land: &mut std::collections::HashMap<u64, Vec<u8>>, heights: &mut terrain::FileChunks) {
+    use crate::farm::{CROPS, Planting, PlotSpot, check_spot, progress, regrown_at, ripe_at, stage, withers_at};
+    use crate::land::Rect;
+    let none = |v: Option<i64>| v.map_or("none".to_string(), |v| v.to_string());
+    let t0: i64 = 1_800_000_000_000_000;
+    for k in &CROPS {
+        for ideal in [false, true] {
+            let from = t0 + (rng.next() * 86_400e6) as i64;
+            let ripe = ripe_at(k, from, ideal);
+            out.push_str(&format!(
+                "farm_growth {} {} {from} {ripe} {} {}\n",
+                k.wire,
+                u8::from(ideal),
+                none(regrown_at(k, from, ideal)),
+                none(withers_at(k, ripe))
+            ));
+            for _ in 0..4 {
+                let span = (ripe - from) as f32 + k.wither_s as f32 * 1e6;
+                let now = from + ((rng.next() * 1.4 - 0.1) * span) as i64;
+                out.push_str(&format!("farm_stage {} {from} {ripe} {now} {} {}\n", k.wire, stage(k, ripe, now) as u8, f(progress(from, ripe, now))));
+            }
+        }
+    }
+    let mut codes = [0usize; 8];
+    for n in 0..300 {
+        let kind = &CROPS[n % CROPS.len()];
+        let (x, z) = match n {
+            0 => (WORLD_HALF_M, 0.0),
+            _ => (rng.range(1.0, 140.0), rng.range(1.0, 127.0)),
+        };
+        // A plot that may cover the spot, and plantings around it.
+        let plots: Vec<PlotSpot> = (0..(n % 3))
+            .map(|_| {
+                let (px, pz, h) = (x + rng.range(-12.0, 12.0), z + rng.range(-12.0, 12.0), [4.0, 8.0][(rng.next() * 2.0) as usize % 2]);
+                PlotSpot { rect: Rect { x0: px - h, z0: pz - h, x1: px + h, z1: pz + h }, may_tend: rng.next() < 0.5 }
+            })
+            .collect();
+        let others: Vec<Planting> =
+            (0..(n % 4)).map(|_| Planting { x: x + rng.range(-4.0, 4.0), z: z + rng.range(-4.0, 4.0), space_m: [0.5, 1.5, 2.0][(rng.next() * 3.0) as usize % 3] }).collect();
+        let text = match check_spot(land, heights, kind, x, z, &plots, others.iter().copied()) {
+            Ok(s) => {
+                codes[0] += 1;
+                format!("ok:{}:{}:{}", f(s.y), s.plot.map_or("-".to_string(), |p| p.to_string()), u8::from(s.ideal))
+            }
+            Err(e) => {
+                codes[e as usize] += 1;
+                (e as u8).to_string()
+            }
+        };
+        let list = |v: Vec<String>| if v.is_empty() { "-".to_string() } else { v.join(",") };
+        let plots_text = list(plots.iter().map(|p| format!("{}:{}:{}:{}:{}", f(p.rect.x0), f(p.rect.z0), f(p.rect.x1), f(p.rect.z1), u8::from(p.may_tend))).collect());
+        let others_text = list(others.iter().map(|o| format!("{}:{}:{}", f(o.x), f(o.z), f(o.space_m))).collect());
+        out.push_str(&format!("farm_spot {} {} {} {plots_text} {others_text} {text}\n", kind.wire, f(x), f(z)));
+    }
+    assert!(codes.iter().all(|&n| n > 0), "every spot result is covered: {codes:?}");
 }
 
 /// `sim::craft`'s reach, progress and affordability, for the client's port.

@@ -105,13 +105,13 @@ pub fn standing(ctx: &ReducerContext, p: &Plot) -> Standing {
 
 /// Plots with their centres in the 3 × 3 cells around `(x, z)`: every plot that can reach a plot
 /// centred there, since no plot is wider than a cell.
-fn plots_near(ctx: &ReducerContext, x: f32, z: f32) -> Vec<Plot> {
+pub fn plots_near(ctx: &ReducerContext, x: f32, z: f32) -> Vec<Plot> {
     let centre = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
     sim::cell::window_cells(centre, 1).into_iter().flat_map(|c| ctx.db.plot().cell().filter(c).collect::<Vec<_>>()).collect()
 }
 
 /// The account's characters.
-fn characters_of(ctx: &ReducerContext, identity: Identity) -> Vec<u64> {
+pub fn characters_of(ctx: &ReducerContext, identity: Identity) -> Vec<u64> {
     ctx.db.character_private().owner().filter(identity).map(|c| c.char_id).collect()
 }
 
@@ -155,10 +155,12 @@ pub fn clock_moved(ctx: &ReducerContext) {
     }
 }
 
-/// Remove a plot and give its deed back: to the owner's bag, or held for mail if it doesn't fit.
+/// Remove a plot, and what grew on it, and give its deed back: to the owner's bag, or held for
+/// mail if it doesn't fit.
 fn demolish(ctx: &ReducerContext, p: &Plot) {
     ctx.db.plot_demolition().plot().delete(p.id);
     ctx.db.plot().id().delete(p.id);
+    crate::farming::clear_plot(ctx, p.id);
     if let Some(k) = plot(p.kind)
         && items::grant(ctx, p.owner, k.deed, 1).is_err()
     {
@@ -251,7 +253,7 @@ pub fn set_plot_access(ctx: &ReducerContext, plot_id: u64, access: u8) -> Result
     Ok(())
 }
 
-/// Give a plot up. The deed goes back to the bag; paid tax isn't refunded.
+/// Give a plot up, and what grows on it. The deed goes back to the bag; paid tax isn't refunded.
 #[spacetimedb::reducer]
 pub fn abandon_plot(ctx: &ReducerContext, plot_id: u64) -> Result<(), String> {
     let (pl, char_id) = my_plot_in_reach(ctx, plot_id)?;
@@ -259,6 +261,7 @@ pub fn abandon_plot(ctx: &ReducerContext, plot_id: u64) -> Result<(), String> {
     items::grant(ctx, char_id, kind.deed, 1)?;
     ctx.db.plot_demolition().plot().delete(pl.id);
     ctx.db.plot().id().delete(pl.id);
+    crate::farming::clear_plot(ctx, pl.id);
     Ok(())
 }
 
