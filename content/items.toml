@@ -1,6 +1,6 @@
 # Items (docs/design/items.md). `wire` is the number stored in item rows: it never changes and is
 # never reused, even after an item is removed, so gaps are fine. 0 is reserved. Kinds are
-# `material`, `consumable`, `gear`, `deed` and `seed`; gear doesn't stack. Names come from docs/world/.
+# `material`, `consumable`, `gear`, `deed`, `seed` and `pack`; gear and packs don't stack. Names come from docs/world/.
 
 [bag]
 # Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
@@ -347,3 +347,18 @@ id = "woolback_lamb"
 name = "Woolback Lamb"
 kind = "seed"
 stack = 10
+
+# Trade packs (docs/design/trade.md): carried on the back, never in a bag.
+[[item]]
+wire = 500
+id = "grain_bale"
+name = "Grain Bale"
+kind = "pack"
+stack = 1
+
+[[item]]
+wire = 501
+id = "preserves_crate"
+name = "Preserves Crate"
+kind = "pack"
+stack = 1

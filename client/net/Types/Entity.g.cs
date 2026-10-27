@@ -21,18 +21,22 @@ namespace SpacetimeDB.Types
         public byte Kind;
         [DataMember(Name = "ref_id")]
         public ulong RefId;
+        [DataMember(Name = "pack")]
+        public ushort Pack;
 
         public Entity(
             ulong Id,
             ulong Cell,
             byte Kind,
-            ulong RefId
+            ulong RefId,
+            ushort Pack
         )
         {
             this.Id = Id;
             this.Cell = Cell;
             this.Kind = Kind;
             this.RefId = RefId;
+            this.Pack = Pack;
         }
 
         public Entity()

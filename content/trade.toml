@@ -1,0 +1,57 @@
+# Trade packs and posts (docs/design/trade.md). Pack items are in items.toml (kind `pack`) and
+# their recipes in crafting.toml. Post `wire`s are stored in post rows and demand keys and run 0,
+# 1, 2, … like hulls. Names come from docs/world/. Every number is ours, for the M1 playtest to tune.
+
+[trade]
+# Every movement mode's speed limit while carrying a pack, in percent. The original "greatly"
+# slowed carriers without a published number (RESEARCH §2A.4).
+carry_speed_pct = 60
+# How close a character must stand to a post to sell, or to a dropped pack to pick it up:
+# horizontally, and up or down.
+reach_m = 4.0
+# A post closer than this to where a pack was made won't buy it.
+min_km = 0.5
+# The route factor: 100% plus this much per km from where the pack was made, up to the cap; each
+# post adds its own bonus on top.
+per_km_pct = 25
+max_route_pct = 250
+# Full value this long after a pack is made; then falling in a straight line to `stale_pct` at
+# `expire_s`, when it spoils. About six days (B).
+fresh_s = 86400
+expire_s = 518400
+stale_pct = 80
+# Each post's demand for each pack kind starts at 100%, drops this much per sale down to the
+# minimum, and recovers this much per hour.
+demand_min_pct = 40
+sale_drop_pct = 4
+recover_pct_per_h = 10
+
+# What each pack is worth before route, demand and freshness, in copper (100 to a silver, 100
+# silver to a gold).
+[[pack]]
+item = "grain_bale"
+value = 15000
+
+[[pack]]
+item = "preserves_crate"
+value = 18000
+
+# Post kinds. Each is placed once, from world/posts.tsv. `bonus_pct` is added to the route
+# factor: overseas posts pay more.
+[[post]]
+wire = 0
+id = "cairnwick_post"
+name = "Cairnwick Post"
+bonus_pct = 0
+
+[[post]]
+wire = 1
+id = "redfen_post"
+name = "Redfen Post"
+bonus_pct = 0
+
+[[post]]
+wire = 2
+id = "gullhaven_post"
+name = "Gullhaven Post"
+bonus_pct = 20

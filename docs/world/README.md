@@ -63,5 +63,14 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Station | Joiner's Bench | Woodwork, cordage and tool-making (`joiners_bench`) |
 | Station | Bloomery | A clay furnace for smelting and smithing (`bloomery`) |
 | Station | Cookhearth | An open hearth for cooking, remedies and charcoal (`cookhearth`) |
+| Station | Packwright's Bench | A heavy bench for baling and crating trade packs (`packwright_bench`) |
+| Item: pack | Grain Bale | Hearthgrain bound in reedcloth, carried on the back (`grain_bale`) |
+| Item: pack | Preserves Crate | A nailed crate of Duskberry Preserve jars (`preserves_crate`) |
+| Currency | gold, silver and copper | Coins: 100 copper to a silver, 100 silver to a gold; stored as copper |
+| Place | Gullhaven | The town on the trade island round spawn, with Gullhaven Post |
+| Place | Furrowdale | A farming hamlet on the west continent's coast, with the Packwright's Bench |
+| Place | Cairnwick | An inland hamlet north-west of Furrowdale, with Cairnwick Post |
+| Place | Redfen | A hamlet south of Furrowdale, with Redfen Post |
+| Trade post | Cairnwick Post, Redfen Post, Gullhaven Post | Where packs are sold (`content/trade.toml`) |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

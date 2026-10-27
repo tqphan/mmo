@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 9";
+const FORMAT: &str = "contentgen 10";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -26,7 +26,7 @@ const MAX_STACK: u32 = 10_000;
 const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
-pub const ITEM_KINDS: [&str; 5] = ["material", "consumable", "gear", "deed", "seed"];
+pub const ITEM_KINDS: [&str; 6] = ["material", "consumable", "gear", "deed", "seed", "pack"];
 /// Resource node kinds, in wire order, fixed here like the item kinds.
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
 /// Crop kinds, in wire order, fixed here like the item kinds (docs/design/farming.md).
@@ -40,6 +40,8 @@ const TEXEL_M: u32 = 4;
 const MAX_PLOT_M: u32 = 64;
 /// More steps of heavy tax than this is a typo.
 const MAX_HEAVY_TAX_STEPS: usize = 10;
+/// A pack worth more than this many copper (1,000 gold) is a typo.
+const MAX_PACK_VALUE: u32 = 10_000_000;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -51,6 +53,7 @@ pub struct Sources {
     pub gathering: String,
     pub crafting: String,
     pub farming: String,
+    pub trade: String,
 }
 
 impl Sources {
@@ -67,6 +70,7 @@ impl Sources {
             gathering: read("gathering.toml")?,
             crafting: read("crafting.toml")?,
             farming: read("farming.toml")?,
+            trade: read("trade.toml")?,
         })
     }
 }
@@ -340,6 +344,49 @@ pub struct CropDef {
     pub seed_pct: u32,
 }
 
+/// `trade.toml`: trade rules, pack values and post kinds (docs/design/trade.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TradeFile {
+    trade: TradeRules,
+    pack: Vec<PackDef>,
+    post: Vec<PostDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TradeRules {
+    pub carry_speed_pct: u32,
+    pub reach_m: f32,
+    pub min_km: f32,
+    pub per_km_pct: u32,
+    pub max_route_pct: u32,
+    pub fresh_s: u32,
+    pub expire_s: u32,
+    pub stale_pct: u32,
+    pub demand_min_pct: u32,
+    pub sale_drop_pct: u32,
+    pub recover_pct_per_h: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PackDef {
+    /// An item id from `items.toml`, of kind `pack`.
+    pub item: String,
+    /// In copper.
+    pub value: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PostDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub bonus_pct: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -368,6 +415,11 @@ pub struct Content {
     pub farming: FarmingRules,
     /// Sorted by `wire`, like the modes.
     pub crops: Vec<CropDef>,
+    pub trade: TradeRules,
+    /// Sorted by item wire.
+    pub packs: Vec<PackDef>,
+    /// Sorted by `wire`, like the modes.
+    pub posts: Vec<PostDef>,
     pub hash: u64,
 }
 
@@ -399,11 +451,22 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let gathering: Result<GatheringFile, _> = from_toml("gathering.toml", &src.gathering);
     let crafting: Result<CraftingFile, _> = from_toml("crafting.toml", &src.crafting);
     let farming: Result<FarmingFile, _> = from_toml("farming.toml", &src.farming);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming) =
-        match (movement, ships, land, labor, items, gathering, crafting, farming) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f)) => (m.mode, s.hull, l, b, i, g, c, f),
-            (m, s, l, b, i, g, c, f) => {
-                let all = m.err().into_iter().chain(s.err()).chain(l.err()).chain(b.err()).chain(i.err()).chain(g.err()).chain(c.err()).chain(f.err());
+    let trade: Result<TradeFile, _> = from_toml("trade.toml", &src.trade);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming, trade) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t)) => (m.mode, s.hull, l, b, i, g, c, f, t),
+            (m, s, l, b, i, g, c, f, t) => {
+                let all = m
+                    .err()
+                    .into_iter()
+                    .chain(s.err())
+                    .chain(l.err())
+                    .chain(b.err())
+                    .chain(i.err())
+                    .chain(g.err())
+                    .chain(c.err())
+                    .chain(f.err())
+                    .chain(t.err());
                 return Err(all.flatten().collect());
             }
         };
@@ -417,6 +480,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     crafting.station.sort_by_key(|s| s.wire);
     crafting.recipe.sort_by_key(|r| r.wire);
     farming.crop.sort_by_key(|c| c.wire);
+    let wire_of = |id: &str| items.item.iter().find(|i| i.id == id).map_or(0, |i| i.wire);
+    trade.pack.sort_by_key(|p| wire_of(&p.item));
+    trade.post.sort_by_key(|p| p.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &items.item, &mut errors);
@@ -425,6 +491,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_gathering(&gathering, &items.item, &mut errors);
     check_crafting(&crafting, &items.item, &mut errors);
     check_farming(&farming, &items.item, &land.climate, &mut errors);
+    check_trade(&trade, &items.item, &crafting.recipe, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -438,6 +505,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         recipes: crafting.recipe,
         farming: farming.farming,
         crops: farming.crop,
+        trade: trade.trade,
+        packs: trade.pack,
+        posts: trade.post,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -806,6 +876,71 @@ fn check_farming(f: &FarmingFile, items: &[ItemDef], climates: &[ClimateDef], er
     }
 }
 
+fn check_trade(t: &TradeFile, items: &[ItemDef], recipes: &[RecipeDef], errors: &mut Vec<String>) {
+    let file = "trade.toml";
+    let r = &t.trade;
+    let mut pct = |name: &str, v: u32, lo: u32, hi: u32| {
+        if !(lo..=hi).contains(&v) {
+            errors.push(format!("{file}: trade.{name} must be from {lo} to {hi}"));
+        }
+    };
+    pct("carry_speed_pct", r.carry_speed_pct, 10, 100);
+    pct("per_km_pct", r.per_km_pct, 0, 1000);
+    pct("max_route_pct", r.max_route_pct, 100, 1000);
+    pct("stale_pct", r.stale_pct, 1, 100);
+    pct("demand_min_pct", r.demand_min_pct, 1, 100);
+    pct("sale_drop_pct", r.sale_drop_pct, 0, 100);
+    pct("recover_pct_per_h", r.recover_pct_per_h, 1, 1000);
+    pct("fresh_s", r.fresh_s, 0, 30 * 86_400);
+    pct("expire_s", r.expire_s, 3600, 30 * 86_400);
+    check_range(file, "trade.reach_m", r.reach_m, 0.5, 20.0, errors);
+    check_range(file, "trade.min_km", r.min_km, 0.0, 16.0, errors);
+    if r.fresh_s >= r.expire_s {
+        errors.push(format!("{file}: trade.fresh_s must be less than expire_s"));
+    }
+    for (k, p) in t.pack.iter().enumerate() {
+        let at = format!("{file}: pack {:?}", p.item);
+        match items.iter().find(|i| i.id == p.item) {
+            None => errors.push(format!("{at}: no item {:?} in items.toml", p.item)),
+            Some(i) if i.kind != "pack" => errors.push(format!("{at}: {:?} isn't of kind \"pack\"", p.item)),
+            Some(_) => {}
+        }
+        if t.pack[..k].iter().any(|o| o.item == p.item) {
+            errors.push(format!("{at}: valued twice"));
+        }
+        if !(1..=MAX_PACK_VALUE).contains(&p.value) {
+            errors.push(format!("{at}: value must be from 1 to {MAX_PACK_VALUE}"));
+        }
+    }
+    for i in items.iter().filter(|i| i.kind == "pack") {
+        if !t.pack.iter().any(|p| p.item == i.id) {
+            errors.push(format!("{file}: pack item {:?} has no [[pack]] value", i.id));
+        }
+        if i.stack != 1 {
+            errors.push(format!("items.toml: item {:?}: packs don't stack (stack = 1)", i.id));
+        }
+    }
+    for rc in recipes.iter().filter(|rc| items.iter().any(|i| i.id == rc.output && i.kind == "pack")) {
+        if rc.output_count != 1 {
+            errors.push(format!("crafting.toml: recipe {:?}: a pack recipe makes one (output_count = 1)", rc.id));
+        }
+    }
+    check_ids(file, "post", t.post.iter().map(|p| (p.id.as_str(), usize::from(p.wire))), errors);
+    let mut names = std::collections::HashSet::new();
+    for p in &t.post {
+        let at = format!("{file}: post {:?}", p.id);
+        if !is_item_name(&p.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(p.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", p.name));
+        }
+        if p.bonus_pct > 1000 {
+            errors.push(format!("{at}: bonus_pct must be from 0 to 1000"));
+        }
+    }
+}
+
 /// Safe to print as a string literal in both Rust and C# without escaping.
 fn is_item_name(s: &str) -> bool {
     s.chars().count() <= MAX_ITEM_NAME
@@ -926,6 +1061,17 @@ fn canonical(c: &Content) -> String {
         )
         .unwrap();
     }
+    s += "trade";
+    for f in trade_fields(&c.trade) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
+    for p in &c.packs {
+        writeln!(s, "pack\t{}\t{}", p.item, p.value).unwrap();
+    }
+    for p in &c.posts {
+        writeln!(s, "post\t{}\t{}\t{}\t{}", p.wire, p.id, p.name, p.bonus_pct).unwrap();
+    }
     s
 }
 
@@ -1034,6 +1180,26 @@ fn labor_fields(l: &LaborDef) -> Vec<Field> {
         f("regen_points", "Points added at the end of each period.", I32(l.regen_points)),
         f("regen_period_s", "The regeneration period, s.", I32(l.regen_period_s)),
         f("start_points", "What a new account starts with.", I32(l.start_points)),
+    ]
+}
+
+fn trade_fields(t: &TradeRules) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    // Every whole number is checked to fit an i32 with room to spare.
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("carry_speed_pct", "Every movement mode's speed limit while carrying a pack, in percent.", i(t.carry_speed_pct)),
+        f("reach_m", "How close a character must stand to a post or a dropped pack, horizontally and vertically, m.", F32(t.reach_m)),
+        f("min_km", "A post closer than this to where a pack was made won't buy it, km.", F32(t.min_km)),
+        f("per_km_pct", "Route factor added per km from where the pack was made, in percent.", i(t.per_km_pct)),
+        f("max_route_pct", "The route factor's cap before a post's bonus, in percent.", i(t.max_route_pct)),
+        f("fresh_s", "A pack keeps its full value this long after it's made, s.", i(t.fresh_s)),
+        f("expire_s", "A pack spoils this long after it's made, s.", i(t.expire_s)),
+        f("stale_pct", "Its value just before it spoils, in percent.", i(t.stale_pct)),
+        f("demand_min_pct", "The lowest a post's demand falls, in percent.", i(t.demand_min_pct)),
+        f("sale_drop_pct", "How much each sale lowers demand, in percent.", i(t.sale_drop_pct)),
+        f("recover_pct_per_h", "How fast demand recovers, in percent per hour.", i(t.recover_pct_per_h)),
     ]
 }
 
@@ -1437,7 +1603,38 @@ pub fn render_rust(c: &Content) -> String {
     s += "pub fn crop_by_id(id: &str) -> Option<&'static CropData> {\n";
     s += "    CROPS.iter().find(|d| d.id == id)\n}\n\n";
     s += "/// The crop kind a seed item plants.\n";
-    s += "pub fn crop_by_seed(item: u16) -> Option<&'static CropData> {\n    CROPS.iter().find(|d| d.seed == item)\n}\n";
+    s += "pub fn crop_by_seed(item: u16) -> Option<&'static CropData> {\n    CROPS.iter().find(|d| d.seed == item)\n}\n\n";
+
+    let trade = trade_fields(&c.trade);
+    s += "/// Trade rules (`content/trade.toml`, docs/design/trade.md).\n#[derive(Debug, PartialEq)]\npub struct TradeRules {\n";
+    rust_struct_fields(&mut s, &trade);
+    s += "}\n\n";
+    writeln!(s, "pub static TRADE: TradeRules = TradeRules {{ {} }};\n", rust_values(&trade)).unwrap();
+    s += "/// What a pack item is worth (`content/trade.toml`, docs/design/trade.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct PackData {\n    /// The pack item's wire.\n    pub item: u16,\n    /// Its value before route, demand and freshness, in copper.\n    pub value: u32,\n}\n\n";
+    s += "/// Every pack, sorted by item wire.\n";
+    writeln!(s, "pub static PACKS: [PackData; {}] = [", c.packs.len()).unwrap();
+    for p in &c.packs {
+        writeln!(s, "    PackData {{ item: {}, value: {} }},", c.item_wire(&p.item), p.value).unwrap();
+    }
+    s += "];\n\n";
+    s += "/// Trade post kinds (`content/trade.toml`, docs/design/trade.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct PostData {\n";
+    s += "    /// Stored in post rows and demand keys.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    /// Added to the route factor, in percent.\n    pub bonus_pct: u32,\n}\n\n";
+    s += "/// Every post kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static POSTS: [PostData; {}] = [", c.posts.len()).unwrap();
+    for p in &c.posts {
+        writeln!(s, "    PostData {{ wire: {}, id: {:?}, name: {:?}, bonus_pct: {} }},", p.wire, p.id, p.name, p.bonus_pct).unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The value of the pack item `item`, if it is a pack.\n";
+    s += "pub fn pack(item: u16) -> Option<&'static PackData> {\n    PACKS.binary_search_by_key(&item, |d| d.item).ok().map(|i| &PACKS[i])\n}\n\n";
+    s += "/// The post kind stored as `wire`.\n";
+    s += "pub fn post(wire: u8) -> Option<&'static PostData> {\n    POSTS.get(usize::from(wire))\n}\n\n";
+    s += "/// The post kind with content id `id`.\n";
+    s += "pub fn post_by_id(id: &str) -> Option<&'static PostData> {\n";
+    s += "    POSTS.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -1561,6 +1758,18 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"PlotOnly\">It may only be planted on a plot.</param>\n";
     s += "    /// <param name=\"SeedPct\">The chance, in percent, that a harvest also gives one of its seed.</param>\n";
     s += "    public sealed record CropData(byte Wire, string Id, string Name, CropKind Kind, ushort Seed, Climate Climate, uint GrowS, ushort Product, uint YieldMin, uint YieldMax, int Labor, uint RegrowS, uint WitherS, float SpaceM, bool PlotOnly, uint SeedPct);\n\n";
+    let trade = trade_fields(&c.trade);
+    s += "    /// <summary>Trade rules (content/trade.toml, docs/design/trade.md).</summary>\n";
+    csharp_param_docs(&mut s, &trade);
+    writeln!(s, "    public sealed record TradeRules({});\n", csharp_params(&trade)).unwrap();
+    s += "    /// <summary>What a pack item is worth (content/trade.toml, docs/design/trade.md).</summary>\n";
+    s += "    /// <param name=\"Item\">The pack item's wire.</param>\n";
+    s += "    /// <param name=\"Value\">Its value before route, demand and freshness, in copper.</param>\n";
+    s += "    public sealed record PackData(ushort Item, uint Value);\n\n";
+    s += "    /// <summary>Trade post kinds (content/trade.toml, docs/design/trade.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in post rows and demand keys.</param>\n";
+    s += "    /// <param name=\"BonusPct\">Added to the route factor, in percent.</param>\n";
+    s += "    public sealed record PostData(byte Wire, string Id, string Name, uint BonusPct);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -1744,7 +1953,24 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        /// <summary>The crop kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
     s += "        public static CropData? Crop(byte wire) => wire < Crops.Count ? Crops[wire] : null;\n\n";
     s += "        /// <summary>The crop kind a seed item plants, if it is a seed.</summary>\n";
-    s += "        public static CropData? CropBySeed(ushort item) => Crops.FirstOrDefault(c => c.Seed == item);\n";
+    s += "        public static CropData? CropBySeed(ushort item) => Crops.FirstOrDefault(c => c.Seed == item);\n\n";
+    writeln!(s, "        public static readonly TradeRules Trade = new({});\n", csharp_values(&trade)).unwrap();
+    s += "        /// <summary>Every pack, sorted by item wire.</summary>\n";
+    s += "        public static readonly IReadOnlyList<PackData> Packs = new PackData[]\n        {\n";
+    for p in &c.packs {
+        writeln!(s, "            new({}, {}),", c.item_wire(&p.item), p.value).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The value of the pack item <paramref name=\"item\"/>, if it is a pack.</summary>\n";
+    s += "        public static PackData? Pack(ushort item) => Packs.FirstOrDefault(p => p.Item == item);\n\n";
+    s += "        /// <summary>Every post kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<PostData> Posts = new PostData[]\n        {\n";
+    for p in &c.posts {
+        writeln!(s, "            new({}, {:?}, {:?}, {}),", p.wire, p.id, p.name, p.bonus_pct).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The post kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static PostData? Post(byte wire) => wire < Posts.Count ? Posts[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -1908,6 +2134,55 @@ mod tests {
         name = "Lamb"
         kind = "seed"
         stack = 10
+
+        [[item]]
+        wire = 501
+        id = "crate"
+        name = "Crate"
+        kind = "pack"
+        stack = 1
+
+        [[item]]
+        wire = 500
+        id = "bale"
+        name = "Bale"
+        kind = "pack"
+        stack = 1
+    "#;
+
+    const TRADE: &str = r#"
+        [trade]
+        carry_speed_pct = 60
+        reach_m = 4.0
+        min_km = 0.5
+        per_km_pct = 25
+        max_route_pct = 250
+        fresh_s = 86400
+        expire_s = 518400
+        stale_pct = 80
+        demand_min_pct = 40
+        sale_drop_pct = 4
+        recover_pct_per_h = 10
+
+        [[pack]]
+        item = "crate"
+        value = 18000
+
+        [[pack]]
+        item = "bale"
+        value = 15000
+
+        [[post]]
+        wire = 1
+        id = "isle_post"
+        name = "Isle Post"
+        bonus_pct = 20
+
+        [[post]]
+        wire = 0
+        id = "hill_post"
+        name = "Hill Post"
+        bonus_pct = 0
     "#;
 
     const FARMING: &str = r#"
@@ -2027,7 +2302,16 @@ mod tests {
             gathering: GATHERING.into(),
             crafting: CRAFTING.into(),
             farming: FARMING.into(),
+            trade: TRADE.into(),
         }
+    }
+
+    fn parse_trade(trade: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { trade: trade.into(), ..sources() })
+    }
+
+    fn trade_errors(trade: &str) -> String {
+        parse_trade(trade).unwrap_err().join("\n")
     }
 
     fn parse_farming(farming: &str) -> Result<Content, Vec<String>> {
@@ -2213,9 +2497,10 @@ mod tests {
             gathering: "[gathering\n".into(),
             crafting: "[crafting\n".into(),
             farming: "[farming\n".into(),
+            trade: "[trade\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -2382,11 +2667,11 @@ mod tests {
     #[test]
     fn items_parse_in_wire_order_and_reach_both_outputs() {
         let c = parse_items(ITEMS).unwrap();
-        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401]);
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401, 500, 501]);
         assert_eq!(c.bag.slots, 50);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
-        assert!(rs.contains("pub static ITEMS: [ItemData; 6] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("pub static ITEMS: [ItemData; 8] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
         assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
@@ -2664,6 +2949,87 @@ mod tests {
         }
         assert!(farming_errors(&FARMING.replace("seed_pct = 0", "seed_pct = 0\nwater = 1")).contains("unknown field `water`"));
         assert!(farming_errors("crop = []\n[farming]\nreach_m = 3.0\nideal_pct = 70").contains("no crops"));
+    }
+
+    #[test]
+    fn trade_parses_in_order_and_reaches_both_outputs() {
+        let c = parse_trade(TRADE).unwrap();
+        assert_eq!(c.packs.iter().map(|p| p.item.as_str()).collect::<Vec<_>>(), ["bale", "crate"]);
+        assert_eq!(c.posts.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["hill_post", "isle_post"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("Pack = 5,") && cs.contains("Pack = 5,"), "the pack item kind");
+        assert!(rs.contains("pub static TRADE: TradeRules = TradeRules { carry_speed_pct: 60, reach_m: 4.0, min_km: 0.5, per_km_pct: 25, max_route_pct: 250, fresh_s: 86400, expire_s: 518400, stale_pct: 80, demand_min_pct: 40, sale_drop_pct: 4, recover_pct_per_h: 10 };"), "{rs}");
+        assert!(rs.contains("PackData { item: 500, value: 15000 },") && rs.contains("PackData { item: 501, value: 18000 },"), "{rs}");
+        assert!(rs.contains(r#"PostData { wire: 1, id: "isle_post", name: "Isle Post", bonus_pct: 20 },"#), "{rs}");
+        assert!(cs.contains("public static readonly TradeRules Trade = new(60, 4.0f, 0.5f, 25, 250, 86400, 518400, 80, 40, 4, 10);"), "{cs}");
+        assert!(cs.contains("new(500, 15000),") && cs.contains(r#"new(0, "hill_post", "Hill Post", 0),"#), "{cs}");
+    }
+
+    #[test]
+    fn any_trade_change_changes_the_hash() {
+        let a = parse_trade(TRADE).unwrap().hash;
+        for (from, to) in [
+            ("carry_speed_pct = 60", "carry_speed_pct = 61"),
+            ("reach_m = 4.0", "reach_m = 4.5"),
+            ("min_km = 0.5", "min_km = 0.6"),
+            ("per_km_pct = 25", "per_km_pct = 26"),
+            ("max_route_pct = 250", "max_route_pct = 251"),
+            ("fresh_s = 86400", "fresh_s = 86401"),
+            ("expire_s = 518400", "expire_s = 518401"),
+            ("stale_pct = 80", "stale_pct = 81"),
+            ("demand_min_pct = 40", "demand_min_pct = 41"),
+            ("sale_drop_pct = 4", "sale_drop_pct = 5"),
+            ("recover_pct_per_h = 10", "recover_pct_per_h = 11"),
+            ("value = 15000", "value = 15001"),
+            ("\"Hill Post\"", "\"Old Hill Post\""),
+            ("bonus_pct = 20", "bonus_pct = 21"),
+        ] {
+            let changed = TRADE.replacen(from, to, 1);
+            assert_ne!(parse_trade(&changed).map(|c| c.hash), Ok(a), "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_trade_is_reported_together() {
+        let bad = TRADE
+            .replace("carry_speed_pct = 60", "carry_speed_pct = 5")
+            .replace("reach_m = 4.0", "reach_m = 40.0")
+            .replace("max_route_pct = 250", "max_route_pct = 50")
+            .replace("fresh_s = 86400", "fresh_s = 600000")
+            .replace("stale_pct = 80", "stale_pct = 0")
+            .replace("demand_min_pct = 40", "demand_min_pct = 0")
+            .replace("item = \"crate\"", "item = \"bale\"")
+            .replace("value = 15000", "value = 0")
+            .replace("bonus_pct = 20", "bonus_pct = 2000");
+        let e = trade_errors(&bad);
+        for want in [
+            "carry_speed_pct must be from 10",
+            "reach_m must be from",
+            "max_route_pct must be from 100",
+            "fresh_s must be less than expire_s",
+            "stale_pct must be from 1",
+            "demand_min_pct must be from 1",
+            "valued twice",
+            "value must be from 1",
+            "pack item \"crate\" has no [[pack]] value",
+            "bonus_pct must be from 0 to 1000",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = trade_errors(&TRADE.replace("item = \"crate\"", "item = \"lamb\"").replace("item = \"bale\"", "item = \"pearl\""));
+        for want in ["\"lamb\" isn't of kind \"pack\"", "no item \"pearl\""] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = trade_errors(&TRADE.replace("wire = 1", "wire = 0").replace("\"Isle Post\"", "\"Hill Post\""));
+        for want in ["wire values must run", "duplicate name"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(trade_errors(&TRADE.replace("bonus_pct = 0", "bonus_pct = 0\ntax = 1")).contains("unknown field `tax`"));
+        let stacked = parse_items(&ITEMS.replacen("kind = \"pack\"\n        stack = 1", "kind = \"pack\"\n        stack = 2", 1)).unwrap_err().join("\n");
+        assert!(stacked.contains("packs don't stack"), "{stacked}");
+        let crafting = CRAFTING.replace("output = \"reedcutter_knife\"\n        output_count = 1", "output = \"bale\"\n        output_count = 2");
+        let two = parse(&Sources { crafting, ..sources() }).unwrap_err().join("\n");
+        assert!(two.contains("a pack recipe makes one"), "{two}");
     }
 
     #[test]

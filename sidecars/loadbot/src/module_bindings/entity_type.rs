@@ -11,6 +11,7 @@ pub struct Entity {
     pub cell: u64,
     pub kind: u8,
     pub ref_id: u64,
+    pub pack: u16,
 }
 
 impl __sdk::InModule for Entity {
@@ -25,6 +26,7 @@ pub struct EntityCols {
     pub cell: __sdk::__query_builder::Col<Entity, u64>,
     pub kind: __sdk::__query_builder::Col<Entity, u8>,
     pub ref_id: __sdk::__query_builder::Col<Entity, u64>,
+    pub pack: __sdk::__query_builder::Col<Entity, u16>,
 }
 
 impl __sdk::__query_builder::HasCols for Entity {
@@ -35,6 +37,7 @@ impl __sdk::__query_builder::HasCols for Entity {
             cell: __sdk::__query_builder::Col::new(table_name, "cell"),
             kind: __sdk::__query_builder::Col::new(table_name, "kind"),
             ref_id: __sdk::__query_builder::Col::new(table_name, "ref_id"),
+            pack: __sdk::__query_builder::Col::new(table_name, "pack"),
         }
     }
 }

@@ -24,6 +24,12 @@ wire = 2
 id = "cookhearth"
 name = "Cookhearth"
 
+# Makes trade packs (docs/design/trade.md), one at a time, onto the crafter's back.
+[[station]]
+wire = 3
+id = "packwright_bench"
+name = "Packwright's Bench"
+
 # Joiner's Bench: fibre, timber and tools
 [[recipe]]
 wire = 0
@@ -337,3 +343,24 @@ output = "driftpine_sapling"
 output_count = 1
 labor = 5
 craft_s = 4.0
+
+# Packwright's Bench: trade packs (docs/design/trade.md). A pack recipe makes one, onto the back.
+[[recipe]]
+wire = 31
+id = "grain_bale"
+station = "packwright_bench"
+inputs = [{ item = "hearthgrain", count = 20 }, { item = "reedcloth", count = 2 }]
+output = "grain_bale"
+output_count = 1
+labor = 40
+craft_s = 6.0
+
+[[recipe]]
+wire = 32
+id = "preserves_crate"
+station = "packwright_bench"
+inputs = [{ item = "duskberry_preserve", count = 6 }, { item = "driftpine_plank", count = 4 }, { item = "rustiron_nails", count = 10 }]
+output = "preserves_crate"
+output_count = 1
+labor = 40
+craft_s = 6.0

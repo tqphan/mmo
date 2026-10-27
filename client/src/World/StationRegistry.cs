@@ -128,6 +128,19 @@ namespace Mmo.World
                     root.AddChild(Box(new Vector3(0.45f, 0.4f, 0.2f), new Vector3(0, 0.35f, 0.75f), glow));
                     root.AddChild(new OmniLight3D { Position = new Vector3(0, 0.5f, 1.1f), LightColor = new Color(1.0f, 0.5f, 0.2f), LightEnergy = 1.5f, OmniRange = 4 });
                     break;
+                case "packwright_bench":
+                    // A low, heavy table with a crate and a coil of rope on it, and a stack of sacks beside.
+                    root.AddChild(Box(new Vector3(2.4f, 0.16f, 1.2f), new Vector3(0, 0.7f, 0), wood));
+                    foreach (var (x, z) in new[] { (-1.05f, -0.45f), (1.05f, -0.45f), (-1.05f, 0.45f), (1.05f, 0.45f) })
+                        root.AddChild(Box(new Vector3(0.18f, 0.7f, 0.18f), new Vector3(x, 0.35f, z), wood));
+                    root.AddChild(Box(new Vector3(0.6f, 0.5f, 0.5f), new Vector3(-0.5f, 1.03f, 0), Flat(new Color(0.65f, 0.45f, 0.26f))));
+                    root.AddChild(new MeshInstance3D
+                    {
+                        Mesh = new TorusMesh { InnerRadius = 0.12f, OuterRadius = 0.25f, Material = Flat(new Color(0.75f, 0.65f, 0.4f)) },
+                        Position = new Vector3(0.55f, 0.82f, 0),
+                    });
+                    root.AddChild(Box(new Vector3(0.7f, 0.45f, 0.5f), new Vector3(1.7f, 0.22f, 0), Flat(new Color(0.85f, 0.75f, 0.5f))));
+                    break;
                 default:
                     // A ring of stones round an ember.
                     for (int i = 0; i < 8; i++)

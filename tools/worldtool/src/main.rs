@@ -1,6 +1,6 @@
-//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes and
-//! crafting stations included; `worldtool nodes [--dir D]` and `worldtool stations [--dir D]`
-//! rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
+//! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes,
+//! crafting stations and trade posts included; `worldtool nodes`, `worldtool stations` and
+//! `worldtool posts` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
 //! prints what's in it. Paths are relative to the repo root,
 //! which `cargo xtask` runs from (docs/design/world.md).
 
@@ -18,9 +18,10 @@ fn main() -> ExitCode {
         Some("gen") => generate(&dir),
         Some("nodes") => World::load(&dir).and_then(|w| write_nodes(&dir, &w)),
         Some("stations") => World::load(&dir).and_then(|w| write_stations(&dir, &w)),
+        Some("posts") => World::load(&dir).and_then(|w| write_posts(&dir, &w)),
         Some("info") => info(&dir),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|info [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -40,7 +41,16 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     println!("wrote the placeholder world to {} in {:.1} s, terrain hash {hash:016x}", dir.display(), started.elapsed().as_secs_f32());
     summary(&world);
     write_nodes(dir, &world)?;
-    write_stations(dir, &world)
+    write_stations(dir, &world)?;
+    write_posts(dir, &world)
+}
+
+/// Place trade posts on `world` and write them to `dir` (docs/design/trade.md).
+fn write_posts(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let posts = worldtool::posts::place(world);
+    worldtool::posts::save(dir, &posts)?;
+    println!("wrote {} trade posts to {}", posts.len(), dir.join(worldtool::posts::FILE).display());
+    Ok(())
 }
 
 /// Place crafting stations on `world` and write them to `dir` (docs/design/crafting.md).
@@ -77,7 +87,12 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     let stations = worldtool::stations::load(dir)?;
     println!("{} crafting stations", stations.len());
     for s in &stations {
-        println!("  {:<14} ({:.1}, {:.1}, {:.1})", s.kind.id, s.x, s.y, s.z);
+        println!("  {:<16} ({:.1}, {:.1}, {:.1})", s.kind.id, s.x, s.y, s.z);
+    }
+    let posts = worldtool::posts::load(dir)?;
+    println!("{} trade posts", posts.len());
+    for p in &posts {
+        println!("  {:<16} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
     }
     Ok(())
 }

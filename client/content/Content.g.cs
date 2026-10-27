@@ -97,6 +97,7 @@ namespace Mmo.Content
         Gear = 2,
         Deed = 3,
         Seed = 4,
+        Pack = 5,
     }
 
     /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
@@ -159,6 +160,30 @@ namespace Mmo.Content
     /// <param name="SeedPct">The chance, in percent, that a harvest also gives one of its seed.</param>
     public sealed record CropData(byte Wire, string Id, string Name, CropKind Kind, ushort Seed, Climate Climate, uint GrowS, ushort Product, uint YieldMin, uint YieldMax, int Labor, uint RegrowS, uint WitherS, float SpaceM, bool PlotOnly, uint SeedPct);
 
+    /// <summary>Trade rules (content/trade.toml, docs/design/trade.md).</summary>
+    /// <param name="CarrySpeedPct">Every movement mode's speed limit while carrying a pack, in percent.</param>
+    /// <param name="ReachM">How close a character must stand to a post or a dropped pack, horizontally and vertically, m.</param>
+    /// <param name="MinKm">A post closer than this to where a pack was made won't buy it, km.</param>
+    /// <param name="PerKmPct">Route factor added per km from where the pack was made, in percent.</param>
+    /// <param name="MaxRoutePct">The route factor's cap before a post's bonus, in percent.</param>
+    /// <param name="FreshS">A pack keeps its full value this long after it's made, s.</param>
+    /// <param name="ExpireS">A pack spoils this long after it's made, s.</param>
+    /// <param name="StalePct">Its value just before it spoils, in percent.</param>
+    /// <param name="DemandMinPct">The lowest a post's demand falls, in percent.</param>
+    /// <param name="SaleDropPct">How much each sale lowers demand, in percent.</param>
+    /// <param name="RecoverPctPerH">How fast demand recovers, in percent per hour.</param>
+    public sealed record TradeRules(int CarrySpeedPct, float ReachM, float MinKm, int PerKmPct, int MaxRoutePct, int FreshS, int ExpireS, int StalePct, int DemandMinPct, int SaleDropPct, int RecoverPctPerH);
+
+    /// <summary>What a pack item is worth (content/trade.toml, docs/design/trade.md).</summary>
+    /// <param name="Item">The pack item's wire.</param>
+    /// <param name="Value">Its value before route, demand and freshness, in copper.</param>
+    public sealed record PackData(ushort Item, uint Value);
+
+    /// <summary>Trade post kinds (content/trade.toml, docs/design/trade.md).</summary>
+    /// <param name="Wire">Stored in post rows and demand keys.</param>
+    /// <param name="BonusPct">Added to the route factor, in percent.</param>
+    public sealed record PostData(byte Wire, string Id, string Name, uint BonusPct);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -176,7 +201,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xc38b8f4f431cd8cdUL;
+        public const ulong Hash = 0x0fff855d37a26c54UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -278,6 +303,8 @@ namespace Mmo.Content
             new(406, "amberpear_sapling", "Amberpear Sapling", ItemKind.Seed, 100),
             new(407, "driftpine_sapling", "Driftpine Sapling", ItemKind.Seed, 100),
             new(408, "woolback_lamb", "Woolback Lamb", ItemKind.Seed, 10),
+            new(500, "grain_bale", "Grain Bale", ItemKind.Pack, 1),
+            new(501, "preserves_crate", "Preserves Crate", ItemKind.Pack, 1),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -315,6 +342,7 @@ namespace Mmo.Content
             new(0, "joiners_bench", "Joiner's Bench"),
             new(1, "bloomery", "Bloomery"),
             new(2, "cookhearth", "Cookhearth"),
+            new(3, "packwright_bench", "Packwright's Bench"),
         };
 
         /// <summary>The station kind stored as <paramref name="wire"/>, if it exists.</summary>
@@ -354,6 +382,8 @@ namespace Mmo.Content
             new(28, "frostkale_seed", 2, new Ingredient[] { new(85, 1) }, 405, 2, 2, 2.0f),
             new(29, "amberpear_sapling", 0, new Ingredient[] { new(86, 2), new(30, 1) }, 406, 1, 5, 4.0f),
             new(30, "driftpine_sapling", 0, new Ingredient[] { new(20, 1), new(30, 1) }, 407, 1, 5, 4.0f),
+            new(31, "grain_bale", 3, new Ingredient[] { new(80, 20), new(31, 2) }, 500, 1, 40, 6.0f),
+            new(32, "preserves_crate", 3, new Ingredient[] { new(101, 6), new(40, 4), new(52, 10) }, 501, 1, 40, 6.0f),
         };
 
         /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>
@@ -384,5 +414,28 @@ namespace Mmo.Content
 
         /// <summary>The crop kind a seed item plants, if it is a seed.</summary>
         public static CropData? CropBySeed(ushort item) => Crops.FirstOrDefault(c => c.Seed == item);
+
+        public static readonly TradeRules Trade = new(60, 4.0f, 0.5f, 25, 250, 86400, 518400, 80, 40, 4, 10);
+
+        /// <summary>Every pack, sorted by item wire.</summary>
+        public static readonly IReadOnlyList<PackData> Packs = new PackData[]
+        {
+            new(500, 15000),
+            new(501, 18000),
+        };
+
+        /// <summary>The value of the pack item <paramref name="item"/>, if it is a pack.</summary>
+        public static PackData? Pack(ushort item) => Packs.FirstOrDefault(p => p.Item == item);
+
+        /// <summary>Every post kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<PostData> Posts = new PostData[]
+        {
+            new(0, "cairnwick_post", "Cairnwick Post", 0),
+            new(1, "redfen_post", "Redfen Post", 0),
+            new(2, "gullhaven_post", "Gullhaven Post", 20),
+        };
+
+        /// <summary>The post kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static PostData? Post(byte wire) => wire < Posts.Count ? Posts[wire] : null;
     }
 }

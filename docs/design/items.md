@@ -17,7 +17,7 @@ Status: v0.1, 2026-10-26. M1 task 2. Code: `content/items.toml`, `server/world/s
 ### Definitions
 - Items are content, in `content/items.toml`: `wire` (the number stored in item rows), `id`, `name`, `kind` and `stack` (the most in one slot).
 - **`wire` values are permanent.** A row in the database refers to its definition by `wire`, so a wire value never changes and is never reused, even after its item is removed. Gaps are allowed, unlike the other content tables. Wire 0 is reserved.
-- Kinds are `material`, `consumable` and `gear`. Gear has a stack of 1. Stacks run from 1 to 10,000.
+- Kinds are `material`, `consumable` and `gear`, then `deed` (docs/design/land.md), `seed` (docs/design/farming.md) and `pack` (docs/design/trade.md). Gear and packs have a stack of 1. Stacks run from 1 to 10,000. Packs are never in a bag: they're carried in their own table with their origin and age (ADR 0027).
 - Names are original and come from `docs/world/` (CLAUDE.md).
 - Contentgen checks the ids, unique names and wires, the kinds and the stack limits. The definitions are part of the content hash.
 - The bag's size is content too (`[bag] slots`, 50, the original's starting size).
@@ -64,7 +64,7 @@ All of these act on the caller's character in the world (its `presence`); otherw
 ## 3. Deviations and not yet done
 - **No bag expansion yet.** All bags have 50 slots. Expansion (to 150, 10 at a time) comes with gold in M2. Expansion was sold for money in the original, and here it won't be (PLAN §1.2).
 - No warehouse, equipment, chests, mail or ship holds yet; each is a new `place`.
-- No item properties beyond the definition: grade, durability, binding, crafter and the rest come with gear (M2). Packs carry their origin and craft time in M1 task 6 and will need per-item data then.
+- No item properties beyond the definition: grade, durability, binding, crafter and the rest come with gear (M2). Packs carry their origin and craft time in their own tables (docs/design/trade.md), not as item data.
 - No sorting button, no dragging, no count dialog for splits (half only), and no dropping items on the ground.
 - Stack sizes are ours (1,000 for materials, 100 for consumables); the original's exact sizes weren't found.
 

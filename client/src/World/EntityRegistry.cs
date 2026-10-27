@@ -48,6 +48,8 @@ namespace Mmo.World
             db.Transform.OnDelete += (_, t) => gone.Add(t.EntityId);
             db.Vehicle.OnInsert += (_, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
             db.Vehicle.OnUpdate += (_, _, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
+            db.Entity.OnInsert += (_, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
+            db.Entity.OnUpdate += (_, _, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
             db.CharacterPublic.OnInsert += (_, c) =>
             {
                 foreach (var v in views.Values)
@@ -86,6 +88,7 @@ namespace Mmo.World
                 AddChild(view);
                 if (view.Kind == EntityKind.Character)
                     view.SetLabel(session.Conn.Db.CharacterPublic.CharId.Find(view.RefId)?.Name ?? $"#{t.EntityId}");
+                view.SetPack(e?.Pack ?? 0);
                 session.Log($"sees entity {t.EntityId} ({view.Label}) at ({t.X:F1}, {t.Z:F1})");
             }
             view.Push(t, Clock.Now);
@@ -163,6 +166,7 @@ namespace Mmo.World
         private float drawnYaw;
         private double lastPlaced;
         private readonly Label3D label;
+        private ushort pack;
 
         public RemoteView(ulong id, byte kind, ulong refId)
         {
@@ -191,6 +195,9 @@ namespace Mmo.World
         public string Label => label.Text;
 
         public void SetLabel(string text) => label.Text = text;
+
+        /// <summary>Show the trade pack on its back, or none (docs/design/trade.md).</summary>
+        public void SetPack(ushort def) => Views.SetBackPack(body, def, ref pack);
 
         public void Push(Transform t, double now)
         {

@@ -45,6 +45,7 @@ namespace Mmo.Gameplay
         private float worstGap;
         private int boardings, landings;
         private bool swimming;
+        private ushort packShown;
 
         public PlayerController(Session session, ClientOptions options, TerrainCollision ground, EntityRegistry entities)
         {
@@ -89,6 +90,12 @@ namespace Mmo.Gameplay
 
         /// <summary>Plots; set by <see cref="Main"/>. F on land opens a plot's window when there's nothing else to use.</summary>
         public Plots? Plots { get; set; }
+
+        /// <summary>Trade packs; set by <see cref="Main"/>. Carrying one slows us; F on land sells at a post or picks one up before gathering.</summary>
+        public Trade? Trade { get; set; }
+
+        /// <summary>Dev demos: walk this way (world x, z, length up to 1) instead of reading the keyboard, while set.</summary>
+        public Vector2? DemoWish { get; set; }
 
         /// <summary>Which way the body faces in the world.</summary>
         public float Facing => FrameYaw + heading;
@@ -166,12 +173,15 @@ namespace Mmo.Gameplay
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
             if (interact && Parent == 0
-                && (Placement?.Interact() == true || Farming?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
+                && (Placement?.Interact() == true || Farming?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true
+                    || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;
-            var wish = Controls?.Manning is not null ? Vector2.Zero : Wish(order, ship);
-            float maxSpeed = Mode.Data().MaxSpeedMps;
+            // A pick-up on its way holds us still, so our next move is already at the carrier's speed.
+            var wish = Controls?.Manning is not null || Trade?.Halted == true ? Vector2.Zero : DemoWish ?? Wish(order, ship);
+            float maxSpeed = Mode.Data().MaxSpeedMps * (Trade?.SpeedScale ?? 1.0f);
+            Views.SetBackPack(body, Trade?.Carried?.Def ?? 0, ref packShown);
             var v = Velocity;
             v.X = wish.X * maxSpeed;
             v.Z = wish.Y * maxSpeed;

@@ -66,7 +66,11 @@ pub fn generate() -> String {
          # land_tax <plot wire> <plots owned> <seals a week, or none>\n\
          # farm_growth <crop wire> <ideal: 1 or 0> <from> <ripe at> <regrown at, or none> <withers at, or none>\n\
          # farm_stage <crop wire> <grown from> <ripe at> <now> <stage: 0 growing, 1 ripe, 2 withered> <progress>\n\
-         # farm_spot <crop wire> <x> <z> <plots as x0:z0:x1:z1:tend, comma-separated, or -> <plantings as x:z:space, or -> <ok:y:plot index or -:ideal, or the error code>, on the land_ vectors' ground\n",
+         # farm_spot <crop wire> <x> <z> <plots as x0:z0:x1:z1:tend, comma-separated, or -> <plantings as x:z:space, or -> <ok:y:plot index or -:ideal, or the error code>, on the land_ vectors' ground\n\
+         # trade_reach <thing x y z> <at x y z> <1 or 0>\n\
+         # trade_demand <permille> <at> <now> <demand now> <after a sale>\n\
+         # trade_fresh <made at> <now> <permille, or spoiled>\n\
+         # trade_quote <pack item wire> <origin x> <origin z> <made at> <post x> <post z> <bonus pct> <demand> <now> <route:demand:fresh:copper, or the error code>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -162,7 +166,68 @@ pub fn generate() -> String {
     gather(&mut out, &mut rng);
     craft(&mut out, &mut rng);
     land(&mut out, &mut rng);
+    trade(&mut out, &mut rng);
     out
+}
+
+/// `sim::trade`'s reach, demand, freshness and quotes, for the client's port.
+fn trade(out: &mut String, rng: &mut Lcg) {
+    use crate::trade::{PACKS, TRADE, after_sale, demand_now, fresh_permille, in_reach, quote};
+    let h: i64 = 3_600_000_000;
+    for k in 0..40 {
+        let at = [rng.range(-8000.0, 8000.0), rng.range(-5.0, 200.0), rng.range(-8000.0, 8000.0)];
+        let spread = if k % 2 == 0 { TRADE.reach_m * 1.05 } else { TRADE.reach_m * 3.0 };
+        let me = [at[0] + rng.range(-spread, spread), at[1] + rng.range(-spread, spread), at[2] + rng.range(-spread, spread)];
+        let hit = u8::from(in_reach(at, me));
+        out.push_str(&format!("trade_reach {} {} {} {} {} {} {hit}\n", f(at[0]), f(at[1]), f(at[2]), f(me[0]), f(me[1]), f(me[2])));
+    }
+    let t0: i64 = 1_800_000_000_000_000;
+    for _ in 0..40 {
+        let permille = (rng.next() * 1000.0) as u32;
+        let now = t0 + ((rng.next() - 0.1) * 12.0 * h as f32) as i64;
+        let d = demand_now(permille, t0, now);
+        out.push_str(&format!("trade_demand {permille} {t0} {now} {d} {}\n", after_sale(d)));
+    }
+    let life = i64::from(TRADE.expire_s) * 1_000_000;
+    for k in 0..40 {
+        let now = match k {
+            0 => t0,
+            1 => t0 + i64::from(TRADE.fresh_s) * 1_000_000,
+            2 => t0 + life,
+            3 => t0 + life - 1,
+            _ => t0 + ((rng.next() * 1.1 - 0.02) as f64 * life as f64) as i64,
+        };
+        let text = fresh_permille(t0, now).map_or("spoiled".to_string(), |p| p.to_string());
+        out.push_str(&format!("trade_fresh {t0} {now} {text}\n"));
+    }
+    let mut codes = [0usize; 4];
+    for k in 0..120 {
+        let def = if k % 17 == 0 { 1 } else { PACKS[k % PACKS.len()].item };
+        let origin = [rng.range(-8000.0, 8000.0), rng.range(-8000.0, 8000.0)];
+        let reach = [0.6, 3.0, 12.0][k % 3] * 1000.0;
+        let post = [origin[0] + rng.range(-reach, reach), origin[1] + rng.range(-reach, reach)];
+        let bonus = [0, 20, 35][k % 3];
+        let demand = 400 + (rng.next() * 600.0) as u32;
+        let now = t0 + ((rng.next() * 1.2) as f64 * life as f64) as i64;
+        let text = match quote(def, origin, t0, post, bonus, demand, now) {
+            Ok(q) => {
+                codes[0] += 1;
+                format!("{}:{}:{}:{}", q.route_pct, q.demand, q.fresh, q.copper)
+            }
+            Err(e) => {
+                codes[e as usize] += 1;
+                (e as u8).to_string()
+            }
+        };
+        out.push_str(&format!(
+            "trade_quote {def} {} {} {t0} {} {} {bonus} {demand} {now} {text}\n",
+            f(origin[0]),
+            f(origin[1]),
+            f(post[0]),
+            f(post[1])
+        ));
+    }
+    assert!(codes.iter().all(|&n| n > 0), "every quote result is covered: {codes:?}");
 }
 
 /// `sim::land`'s site checks, demolition time, standing and tax, for the client's port.

@@ -20,6 +20,7 @@ mod metrics;
 mod ship;
 mod swarm;
 mod terrain;
+mod trade;
 mod visitor;
 
 use std::time::{Duration, Instant};
@@ -110,6 +111,7 @@ fn main() {
         "craft" => craft::scenario(&args),
         "land" => land::scenario(&args),
         "farm" => farm::scenario(&args),
+        "trade" => trade::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -129,7 +131,8 @@ fn main() {
                  gather           two bots by a node: refusals, a gather that pays out, regrowth by the dev clock, cancelling\n  \
                  craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling\n  \
                  land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock\n  \
-                 farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot"
+                 farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot\n  \
+                 trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock"
             );
             std::process::exit(2);
         }

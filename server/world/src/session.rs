@@ -77,6 +77,8 @@ pub struct Entity {
     pub kind: u8,
     /// For characters, the `char_id`; for ships, the hull.
     pub ref_id: u64,
+    /// For characters, the wire of the trade pack on their back, or 0 (docs/design/trade.md).
+    pub pack: u16,
 }
 
 /// Hot: where it is, as others see it. Public, keyed by cell. Kept small. For characters this
@@ -258,7 +260,8 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64, terrai
     // Saved before the terrain there existed, or under it since: start on the ground.
     let y = sim::movement::settle(Terrain::new(ctx).ground(c.x, c.z), [c.x, c.y, c.z], mode);
     let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, c.x, c.z);
-    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::CHARACTER, ref_id: char_id });
+    let pack = crate::trade::carried(ctx, char_id).map_or(0, |pk| pk.def);
+    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::CHARACTER, ref_id: char_id, pack });
     ctx.db.transform().insert(Transform {
         entity_id: e.id,
         cell,

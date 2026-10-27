@@ -6,7 +6,7 @@
 //! `transform`, one transaction per tick instead of one per move (docs/spikes/mass-fight.md).
 
 use spacetimedb::{ReducerContext, Table, Timestamp};
-use sim::movement::{Anchor, Footing, MoveMode, Verdict, Vertical, check_distance, check_move, check_vertical, settle};
+use sim::movement::{Anchor, Footing, MoveMode, Verdict, Vertical, allowed_distance, check_distance, check_vertical, settle};
 use sim::terrain::Ground;
 
 use crate::session::{Entity, Presence, Transform, entity, presence, transform};
@@ -60,7 +60,8 @@ pub fn move_event(
     // A ship that has gone takes its frame with it; its passengers were moved off already.
     let from = Frame::of(ctx, p.parent).unwrap_or(Frame::World);
     let to = [x, y, z];
-    let move_ = Move { p: &p, to, dt: secs_between(p.last_move_at, at), since_contact: secs_between(p.contact_at, at), mode };
+    let scale = crate::trade::speed_scale(ctx, p.char_id, p.last_move_at);
+    let move_ = Move { p: &p, to, dt: secs_between(p.last_move_at, at), since_contact: secs_between(p.contact_at, at), mode, scale };
 
     match Frame::of(ctx, parent).ok_or_else(|| "no such ship".to_string()).and_then(|f| judge(&mut terrain, &move_, from, f)) {
         Ok((footing, anchor)) => {
@@ -175,6 +176,8 @@ struct Move<'a> {
     dt: f32,
     since_contact: f32,
     mode: MoveMode,
+    /// The speed limit's factor: below 1 while carrying a pack (docs/design/trade.md).
+    scale: f32,
 }
 
 /// Check a move horizontally, then its height. Within one frame both checks run in that frame;
@@ -184,11 +187,12 @@ struct Move<'a> {
 fn judge(terrain: &mut Terrain, m: &Move, from: Frame, to_frame: Frame) -> Result<(Footing, Anchor), String> {
     let (p, to, mode) = (m.p, m.to, m.mode);
     let here = [p.x, p.y, p.z];
+    let limit = mode.data().max_speed_mps * m.scale;
     let verdict = if from.ship() == to_frame.ship() {
-        check_move(here, to, m.dt, mode)
+        check_distance(here, to, allowed_distance(limit, m.dt))
     } else {
         let speed = from.ship_speed().max(to_frame.ship_speed());
-        let allowed = sim::ship::frame_change_allowance(mode.data().max_speed_mps, speed, m.dt);
+        let allowed = sim::ship::frame_change_allowance(limit, speed, m.dt);
         check_distance(from.to_world(here), to_frame.to_world(to), allowed)
     };
     match verdict {

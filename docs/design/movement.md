@@ -51,7 +51,7 @@ The run speed matches the original. Walk and swim are placeholders: walk is unkn
 
 ## 3. Deviations and not yet done
 - **No obstacle checks yet.** Vertical checks against the heightmap came with spike 5 (docs/design/terrain.md); walls and buildings come with world-building tooling and housing.
-- **No speed modifiers** (buffs, packs, mounts, gliding). These come with those systems.
+- **One speed modifier so far: carrying a trade pack** scales every mode's limit by `carry_speed_pct` (60%), except for the first move after the pack went on (docs/design/trade.md). Buffs, mounts and gliding come with those systems.
 - **Corrections are rate-free**, so a client that keeps cheating gets corrected each time but isn't kicked. Kicking and thresholds come once the anomaly data has been looked at.
 - **Public positions are readable by any client** (PLAN §4.5). That's accepted.
 - **CLI calls can't hold a session.** `spacetime call` connects and disconnects around each call, and disconnecting despawns the character, so anything that needs a session goes through `loadbot`.

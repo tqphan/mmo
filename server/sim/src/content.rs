@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xc38b8f4f431cd8cd;
+pub const CONTENT_HASH: u64 = 0x0fff855d37a26c54;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -287,6 +287,7 @@ pub enum ItemKind {
     Gear = 2,
     Deed = 3,
     Seed = 4,
+    Pack = 5,
 }
 
 #[derive(Debug, PartialEq)]
@@ -302,7 +303,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 47] = [
+pub static ITEMS: [ItemData; 49] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -350,6 +351,8 @@ pub static ITEMS: [ItemData; 47] = [
     ItemData { wire: 406, id: "amberpear_sapling", name: "Amberpear Sapling", kind: ItemKind::Seed, stack: 100 },
     ItemData { wire: 407, id: "driftpine_sapling", name: "Driftpine Sapling", kind: ItemKind::Seed, stack: 100 },
     ItemData { wire: 408, id: "woolback_lamb", name: "Woolback Lamb", kind: ItemKind::Seed, stack: 10 },
+    ItemData { wire: 500, id: "grain_bale", name: "Grain Bale", kind: ItemKind::Pack, stack: 1 },
+    ItemData { wire: 501, id: "preserves_crate", name: "Preserves Crate", kind: ItemKind::Pack, stack: 1 },
 ];
 
 /// Slots in every character's bag.
@@ -430,10 +433,11 @@ pub struct StationData {
 }
 
 /// Every station kind, sorted by wire, which is the index.
-pub static STATIONS: [StationData; 3] = [
+pub static STATIONS: [StationData; 4] = [
     StationData { wire: 0, id: "joiners_bench", name: "Joiner's Bench" },
     StationData { wire: 1, id: "bloomery", name: "Bloomery" },
     StationData { wire: 2, id: "cookhearth", name: "Cookhearth" },
+    StationData { wire: 3, id: "packwright_bench", name: "Packwright's Bench" },
 ];
 
 /// One input to a recipe.
@@ -464,7 +468,7 @@ pub struct RecipeData {
 }
 
 /// Every recipe, sorted by wire, which is the index.
-pub static RECIPES: [RecipeData; 31] = [
+pub static RECIPES: [RecipeData; 33] = [
     RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
     RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
@@ -496,6 +500,8 @@ pub static RECIPES: [RecipeData; 31] = [
     RecipeData { wire: 28, id: "frostkale_seed", station: 2, inputs: &[Ingredient { item: 85, count: 1 }], output: 405, output_count: 2, labor: 2, craft_s: 2.0 },
     RecipeData { wire: 29, id: "amberpear_sapling", station: 0, inputs: &[Ingredient { item: 86, count: 2 }, Ingredient { item: 30, count: 1 }], output: 406, output_count: 1, labor: 5, craft_s: 4.0 },
     RecipeData { wire: 30, id: "driftpine_sapling", station: 0, inputs: &[Ingredient { item: 20, count: 1 }, Ingredient { item: 30, count: 1 }], output: 407, output_count: 1, labor: 5, craft_s: 4.0 },
+    RecipeData { wire: 31, id: "grain_bale", station: 3, inputs: &[Ingredient { item: 80, count: 20 }, Ingredient { item: 31, count: 2 }], output: 500, output_count: 1, labor: 40, craft_s: 6.0 },
+    RecipeData { wire: 32, id: "preserves_crate", station: 3, inputs: &[Ingredient { item: 101, count: 6 }, Ingredient { item: 40, count: 4 }, Ingredient { item: 52, count: 10 }], output: 501, output_count: 1, labor: 40, craft_s: 6.0 },
 ];
 
 /// How close a character must stand to a station, horizontally and vertically, in metres.
@@ -598,4 +604,82 @@ pub fn crop_by_id(id: &str) -> Option<&'static CropData> {
 /// The crop kind a seed item plants.
 pub fn crop_by_seed(item: u16) -> Option<&'static CropData> {
     CROPS.iter().find(|d| d.seed == item)
+}
+
+/// Trade rules (`content/trade.toml`, docs/design/trade.md).
+#[derive(Debug, PartialEq)]
+pub struct TradeRules {
+    /// Every movement mode's speed limit while carrying a pack, in percent.
+    pub carry_speed_pct: i32,
+    /// How close a character must stand to a post or a dropped pack, horizontally and vertically, m.
+    pub reach_m: f32,
+    /// A post closer than this to where a pack was made won't buy it, km.
+    pub min_km: f32,
+    /// Route factor added per km from where the pack was made, in percent.
+    pub per_km_pct: i32,
+    /// The route factor's cap before a post's bonus, in percent.
+    pub max_route_pct: i32,
+    /// A pack keeps its full value this long after it's made, s.
+    pub fresh_s: i32,
+    /// A pack spoils this long after it's made, s.
+    pub expire_s: i32,
+    /// Its value just before it spoils, in percent.
+    pub stale_pct: i32,
+    /// The lowest a post's demand falls, in percent.
+    pub demand_min_pct: i32,
+    /// How much each sale lowers demand, in percent.
+    pub sale_drop_pct: i32,
+    /// How fast demand recovers, in percent per hour.
+    pub recover_pct_per_h: i32,
+}
+
+pub static TRADE: TradeRules = TradeRules { carry_speed_pct: 60, reach_m: 4.0, min_km: 0.5, per_km_pct: 25, max_route_pct: 250, fresh_s: 86400, expire_s: 518400, stale_pct: 80, demand_min_pct: 40, sale_drop_pct: 4, recover_pct_per_h: 10 };
+
+/// What a pack item is worth (`content/trade.toml`, docs/design/trade.md).
+#[derive(Debug, PartialEq)]
+pub struct PackData {
+    /// The pack item's wire.
+    pub item: u16,
+    /// Its value before route, demand and freshness, in copper.
+    pub value: u32,
+}
+
+/// Every pack, sorted by item wire.
+pub static PACKS: [PackData; 2] = [
+    PackData { item: 500, value: 15000 },
+    PackData { item: 501, value: 18000 },
+];
+
+/// Trade post kinds (`content/trade.toml`, docs/design/trade.md).
+#[derive(Debug, PartialEq)]
+pub struct PostData {
+    /// Stored in post rows and demand keys.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    /// Added to the route factor, in percent.
+    pub bonus_pct: u32,
+}
+
+/// Every post kind, sorted by wire, which is the index.
+pub static POSTS: [PostData; 3] = [
+    PostData { wire: 0, id: "cairnwick_post", name: "Cairnwick Post", bonus_pct: 0 },
+    PostData { wire: 1, id: "redfen_post", name: "Redfen Post", bonus_pct: 0 },
+    PostData { wire: 2, id: "gullhaven_post", name: "Gullhaven Post", bonus_pct: 20 },
+];
+
+/// The value of the pack item `item`, if it is a pack.
+pub fn pack(item: u16) -> Option<&'static PackData> {
+    PACKS.binary_search_by_key(&item, |d| d.item).ok().map(|i| &PACKS[i])
+}
+
+/// The post kind stored as `wire`.
+pub fn post(wire: u8) -> Option<&'static PostData> {
+    POSTS.get(usize::from(wire))
+}
+
+/// The post kind with content id `id`.
+pub fn post_by_id(id: &str) -> Option<&'static PostData> {
+    POSTS.iter().find(|d| d.id == id)
 }

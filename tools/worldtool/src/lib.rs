@@ -4,6 +4,7 @@
 
 pub mod nodes;
 pub mod placeholder;
+pub mod posts;
 pub mod region;
 pub mod stations;
 

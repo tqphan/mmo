@@ -1,7 +1,7 @@
 //! Crafting station placements (`world/stations.tsv`, docs/design/crafting.md), in the same format
 //! as `nodes.tsv`: `kind x y z yaw-degrees`, kinds by content id. For now there is one of each
-//! station in the town round spawn, at fixed spots set on the ground; the coast zone will be placed
-//! by hand (M1, the coast task).
+//! station in the towns (`placeholder::TOWNS`), at fixed spots set on the ground; the coast zone
+//! will be placed by hand (M1, the coast task).
 
 use std::path::Path;
 
@@ -13,8 +13,15 @@ use crate::nodes::{parse_lines, round2};
 
 pub const FILE: &str = "stations.tsv";
 
-/// Where the town's stations stand: (kind, x, z, yaw in degrees), a few metres east of spawn.
-const TOWN: [(&str, f32, f32, u16); 3] = [("joiners_bench", 9.0, -5.0, 270), ("bloomery", 12.0, 2.0, 270), ("cookhearth", 8.0, 8.0, 0)];
+/// Where the stations stand: (kind, x, z, yaw in degrees). The town round spawn has three a few
+/// metres east of spawn; the Packwright's Bench is in Furrowdale, on the west continent's coast by
+/// its housing land, where Hearthgrain grows (docs/design/trade.md).
+const TOWN: [(&str, f32, f32, u16); 4] = [
+    ("joiners_bench", 9.0, -5.0, 270),
+    ("bloomery", 12.0, 2.0, 270),
+    ("cookhearth", 8.0, 8.0, 0),
+    ("packwright_bench", -3800.0, 600.0, 90),
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placement {

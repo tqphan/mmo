@@ -15,6 +15,7 @@ mod ship;
 mod terrain;
 mod tick;
 mod time;
+mod trade;
 
 #[cfg(test)]
 mod tests;

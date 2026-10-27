@@ -123,8 +123,10 @@ const HOUSING: [(f32, f32, f32); 6] = [
     (4300.0, 900.0, 500.0),
     (5300.0, 4300.0, 500.0),
 ];
-/// The trade island's town, round spawn.
-const TOWN_RADIUS_M: f32 = 250.0;
+/// Towns: centre and radius in metres. Gullhaven, the trade island's town round spawn; Furrowdale,
+/// with the Packwright's Bench, on the west continent's coast by its housing land; and the hamlets
+/// of Cairnwick and Redfen, with trade posts (docs/design/trade.md, `posts::POSTS`).
+pub const TOWNS: [(f32, f32, f32); 4] = [(0.0, 0.0, 250.0), (-3800.0, 600.0, 60.0), (-4500.0, -1400.0, 50.0), (-3900.0, 1800.0, 50.0)];
 
 /// The placeholder climate at a position.
 pub fn climate(x: f32, z: f32) -> Climate {
@@ -141,7 +143,7 @@ pub fn climate(x: f32, z: f32) -> Climate {
 
 /// The placeholder use of a texel centred on `(x, z)`, from its mean height and steepest slope.
 fn land_use(x: f32, z: f32, height: f32, slope: f32) -> LandUse {
-    if height > 0.0 && x.hypot(z) < TOWN_RADIUS_M {
+    if height > 0.0 && TOWNS.iter().any(|&(tx, tz, r)| (x - tx).hypot(z - tz) < r) {
         LandUse::Town
     } else if (2.0..60.0).contains(&height) && slope < 0.25 && HOUSING.iter().any(|&(hx, hz, r)| (x - hx).hypot(z - hz) < r) {
         LandUse::Housing

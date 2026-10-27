@@ -34,7 +34,8 @@ namespace Mmo.Gameplay
                     r,
                     GameContent.Item(r.Output),
                     r.Inputs.Select(i => new InputLine(GameContent.Item(i.Item), i.Item, i.Count, Have(i.Item))).ToList(),
-                    Sim.Craft.Affordable(r, Have, labor)))
+                    // Packs are made one at a time, onto the back (docs/design/trade.md).
+                    GameContent.Pack(r.Output) is null ? Sim.Craft.Affordable(r, Have, labor) : Math.Min(Sim.Craft.Affordable(r, Have, labor), 1u)))
                 .ToList();
         }
 

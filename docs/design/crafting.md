@@ -36,7 +36,7 @@ Status: v0.1, 2026-10-26. M1 task 4. Code: `content/crafting.toml`, `server/sim/
   - `labor` from 1 to 1,000 and `craft_s` from 0.5 to 600;
   - `reach_m` from 0.5 to 20 and `max_count` from 1 to 1,000.
 - Recipes and stations are part of the content hash.
-- There are three stations and 20 recipes. Every name is in `docs/world/`, and the numbers are ours.
+- There are three stations and 20 recipes here, plus seed recipes (docs/design/farming.md) and the Packwright's Bench with its two pack recipes (docs/design/trade.md). A recipe whose output is a pack makes one at a time onto the crafter's back. Every name is in `docs/world/`, and the numbers are ours.
 
 | Station | Recipe | Inputs | Makes | Labor | Time |
 |---|---|---|---|---|---|
@@ -116,7 +116,7 @@ The chains are deliberate. Charcoal from the hearth feeds the bloomery, and bars
 
 ## 3. Deviations and not yet done
 - **No proficiencies.** No ranks, no rank requirements, and no cheaper or faster crafts; those come in M2. Every recipe is open to everyone.
-- **Three stations, not the original's dozen or more.** More come with the systems that need them, such as the specialty bench in the trade-pack task (M1).
+- **Four stations, not the original's dozen or more.** More come with the systems that need them.
 - **No recipe book away from a station.** The window lists only the station in front of you.
 - **No quality, crafter's name or crits.** Gear grades come in M2.
 - **No tools needed.** The axe, pick and knife are made but not yet used (gathering doesn't require tools).

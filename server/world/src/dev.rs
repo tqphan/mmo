@@ -90,7 +90,7 @@ pub fn dev_spawn_ship(ctx: &ReducerContext, hull: u8, x: f32, z: f32, yaw: f32) 
     let data = kind.data();
     let m = Motion { x, z, yaw: yaw.rem_euclid(std::f32::consts::TAU), speed: 0.0 };
     let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
-    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::SHIP, ref_id: u64::from(hull) });
+    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::SHIP, ref_id: u64::from(hull), pack: 0 });
     ctx.db.transform().insert(crate::ship::ship_transform(e.id, cell, data, &m));
     ctx.db.vehicle().insert(Vehicle {
         entity_id: e.id,

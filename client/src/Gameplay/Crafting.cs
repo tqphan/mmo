@@ -107,7 +107,10 @@ namespace Mmo.Gameplay
             if (active is not { } a)
                 return;
             var recipe = GameContent.Recipe(a.Recipe);
-            uint got = recipe is null ? 0 : Held(recipe.Output) - heldAtStart;
+            // A pack goes on the back, not in the bag (docs/design/trade.md).
+            bool onBack = recipe is not null && GameContent.Pack(recipe.Output) is not null
+                && session.Conn?.Db.MyPack.Iter().Any(p => p.Carrier == a.CharId && p.Def == recipe.Output) == true;
+            uint got = recipe is null ? 0 : onBack ? 1 : Held(recipe.Output) - heldAtStart;
             session.Log(got > 0
                 ? $"crafted {got} {GameContent.Item(recipe!.Output)?.Name}; labor now {LaborNow()}"
                 : $"crafting {recipe?.Id} stopped with nothing made");

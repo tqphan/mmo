@@ -10,16 +10,20 @@ pub mod abandon_plot_reducer;
 pub mod account_type;
 pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
+pub mod admin_clear_posts_reducer;
 pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
 pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
+pub mod admin_put_posts_reducer;
 pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
 pub mod admin_remove_crops_reducer;
+pub mod admin_remove_dropped_packs_reducer;
 pub mod admin_remove_land_reducer;
 pub mod admin_remove_nodes_reducer;
 pub mod admin_remove_plots_reducer;
+pub mod admin_remove_posts_reducer;
 pub mod admin_remove_stations_reducer;
 pub mod admin_remove_terrain_reducer;
 pub mod cancel_craft_reducer;
@@ -37,6 +41,8 @@ pub mod crop_table;
 pub mod crop_type;
 pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
+pub mod dev_discard_pack_reducer;
+pub mod dev_give_pack_reducer;
 pub mod dev_grant_item_reducer;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
@@ -46,6 +52,9 @@ pub mod dev_spend_labor_reducer;
 pub mod dev_swing_reducer;
 pub mod dev_teleport_reducer;
 pub mod dev_tick_table;
+pub mod drop_pack_reducer;
+pub mod dropped_pack_table;
+pub mod dropped_pack_type;
 pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
@@ -68,18 +77,25 @@ pub mod my_characters_table;
 pub mod my_craft_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
+pub mod my_pack_table;
 pub mod my_presence_table;
+pub mod my_purse_table;
 pub mod node_placement_type;
 pub mod owner_type;
+pub mod pack_type;
 pub mod pay_tax_reducer;
+pub mod pick_up_pack_reducer;
 pub mod place_plot_reducer;
 pub mod plant_reducer;
 pub mod plot_demolition_type;
 pub mod plot_table;
 pub mod plot_type;
+pub mod post_placement_type;
 pub mod presence_type;
+pub mod purse_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
+pub mod sell_pack_reducer;
 pub mod set_plot_access_reducer;
 pub mod ship_motion_type;
 pub mod split_item_reducer;
@@ -92,6 +108,10 @@ pub mod terrain_chunk_type;
 pub mod terrain_info_table;
 pub mod terrain_info_type;
 pub mod tick_state_type;
+pub mod trade_demand_table;
+pub mod trade_demand_type;
+pub mod trade_post_table;
+pub mod trade_post_type;
 pub mod transform_table;
 pub mod transform_type;
 pub mod uproot_reducer;
@@ -103,16 +123,20 @@ pub use abandon_plot_reducer::abandon_plot;
 pub use account_type::Account;
 pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
+pub use admin_clear_posts_reducer::admin_clear_posts;
 pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
 pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
+pub use admin_put_posts_reducer::admin_put_posts;
 pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use admin_remove_crops_reducer::admin_remove_crops;
+pub use admin_remove_dropped_packs_reducer::admin_remove_dropped_packs;
 pub use admin_remove_land_reducer::admin_remove_land;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
 pub use admin_remove_plots_reducer::admin_remove_plots;
+pub use admin_remove_posts_reducer::admin_remove_posts;
 pub use admin_remove_stations_reducer::admin_remove_stations;
 pub use admin_remove_terrain_reducer::admin_remove_terrain;
 pub use cancel_craft_reducer::cancel_craft;
@@ -130,6 +154,8 @@ pub use crop_table::*;
 pub use crop_type::Crop;
 pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
+pub use dev_discard_pack_reducer::dev_discard_pack;
+pub use dev_give_pack_reducer::dev_give_pack;
 pub use dev_grant_item_reducer::dev_grant_item;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
@@ -139,6 +165,9 @@ pub use dev_spend_labor_reducer::dev_spend_labor;
 pub use dev_swing_reducer::dev_swing;
 pub use dev_teleport_reducer::dev_teleport;
 pub use dev_tick_table::*;
+pub use drop_pack_reducer::drop_pack;
+pub use dropped_pack_table::*;
+pub use dropped_pack_type::DroppedPack;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
@@ -161,18 +190,25 @@ pub use my_characters_table::*;
 pub use my_craft_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
+pub use my_pack_table::*;
 pub use my_presence_table::*;
+pub use my_purse_table::*;
 pub use node_placement_type::NodePlacement;
 pub use owner_type::Owner;
+pub use pack_type::Pack;
 pub use pay_tax_reducer::pay_tax;
+pub use pick_up_pack_reducer::pick_up_pack;
 pub use place_plot_reducer::place_plot;
 pub use plant_reducer::plant;
 pub use plot_demolition_type::PlotDemolition;
 pub use plot_table::*;
 pub use plot_type::Plot;
+pub use post_placement_type::PostPlacement;
 pub use presence_type::Presence;
+pub use purse_type::Purse;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
+pub use sell_pack_reducer::sell_pack;
 pub use set_plot_access_reducer::set_plot_access;
 pub use ship_motion_type::ShipMotion;
 pub use split_item_reducer::split_item;
@@ -185,6 +221,10 @@ pub use terrain_chunk_type::TerrainChunk;
 pub use terrain_info_table::*;
 pub use terrain_info_type::TerrainInfo;
 pub use tick_state_type::TickState;
+pub use trade_demand_table::*;
+pub use trade_demand_type::TradeDemand;
+pub use trade_post_table::*;
+pub use trade_post_type::TradePost;
 pub use transform_table::*;
 pub use transform_type::Transform;
 pub use uproot_reducer::uproot;
@@ -205,6 +245,7 @@ pub enum Reducer {
     },
     AdminClearLand,
     AdminClearNodes,
+    AdminClearPosts,
     AdminClearStations,
     AdminClearTerrain,
     AdminPutLand {
@@ -212,6 +253,9 @@ pub enum Reducer {
     },
     AdminPutNodes {
         nodes: Vec<NodePlacement>,
+    },
+    AdminPutPosts {
+        posts: Vec<PostPlacement>,
     },
     AdminPutStations {
         stations: Vec<StationPlacement>,
@@ -222,6 +266,9 @@ pub enum Reducer {
     AdminRemoveCrops {
         ids: Vec<u64>,
     },
+    AdminRemoveDroppedPacks {
+        ids: Vec<u64>,
+    },
     AdminRemoveLand {
         cells: Vec<u64>,
     },
@@ -229,6 +276,9 @@ pub enum Reducer {
         ids: Vec<u64>,
     },
     AdminRemovePlots {
+        ids: Vec<u64>,
+    },
+    AdminRemovePosts {
         ids: Vec<u64>,
     },
     AdminRemoveStations {
@@ -253,6 +303,10 @@ pub enum Reducer {
     },
     DevAdvanceClock {
         micros: i64,
+    },
+    DevDiscardPack,
+    DevGivePack {
+        item: String,
     },
     DevGrantItem {
         item: String,
@@ -283,6 +337,7 @@ pub enum Reducer {
         x: f32,
         z: f32,
     },
+    DropPack,
     EnterWorld {
         char_id: u64,
         content_hash: u64,
@@ -322,6 +377,9 @@ pub enum Reducer {
     PayTax {
         plot_id: u64,
     },
+    PickUpPack {
+        id: u64,
+    },
     PlacePlot {
         item_id: u64,
         x: f32,
@@ -332,6 +390,9 @@ pub enum Reducer {
         item_id: u64,
         x: f32,
         z: f32,
+    },
+    SellPack {
+        post_id: u64,
     },
     SetPlotAccess {
         plot_id: u64,
@@ -358,16 +419,20 @@ impl __sdk::Reducer for Reducer {
             Reducer::AbandonPlot { .. } => "abandon_plot",
             Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
+            Reducer::AdminClearPosts => "admin_clear_posts",
             Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
             Reducer::AdminPutLand { .. } => "admin_put_land",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
+            Reducer::AdminPutPosts { .. } => "admin_put_posts",
             Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::AdminRemoveCrops { .. } => "admin_remove_crops",
+            Reducer::AdminRemoveDroppedPacks { .. } => "admin_remove_dropped_packs",
             Reducer::AdminRemoveLand { .. } => "admin_remove_land",
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
             Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
+            Reducer::AdminRemovePosts { .. } => "admin_remove_posts",
             Reducer::AdminRemoveStations { .. } => "admin_remove_stations",
             Reducer::AdminRemoveTerrain { .. } => "admin_remove_terrain",
             Reducer::CancelCraft => "cancel_craft",
@@ -376,6 +441,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevDiscardPack => "dev_discard_pack",
+            Reducer::DevGivePack { .. } => "dev_give_pack",
             Reducer::DevGrantItem { .. } => "dev_grant_item",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
@@ -384,6 +451,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevSpendLabor { .. } => "dev_spend_labor",
             Reducer::DevSwing { .. } => "dev_swing",
             Reducer::DevTeleport { .. } => "dev_teleport",
+            Reducer::DropPack => "drop_pack",
             Reducer::EnterWorld { .. } => "enter_world",
             Reducer::Fire { .. } => "fire",
             Reducer::Gather { .. } => "gather",
@@ -394,8 +462,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
             Reducer::PayTax { .. } => "pay_tax",
+            Reducer::PickUpPack { .. } => "pick_up_pack",
             Reducer::PlacePlot { .. } => "place_plot",
             Reducer::Plant { .. } => "plant",
+            Reducer::SellPack { .. } => "sell_pack",
             Reducer::SetPlotAccess { .. } => "set_plot_access",
             Reducer::SplitItem { .. } => "split_item",
             Reducer::TakeHelm => "take_helm",
@@ -417,6 +487,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearNodes => {
                 __sats::bsatn::to_vec(&admin_clear_nodes_reducer::AdminClearNodesArgs {})
             }
+            Reducer::AdminClearPosts => {
+                __sats::bsatn::to_vec(&admin_clear_posts_reducer::AdminClearPostsArgs {})
+            }
             Reducer::AdminClearStations => {
                 __sats::bsatn::to_vec(&admin_clear_stations_reducer::AdminClearStationsArgs {})
             }
@@ -431,6 +504,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutNodes { nodes } => {
                 __sats::bsatn::to_vec(&admin_put_nodes_reducer::AdminPutNodesArgs {
                     nodes: nodes.clone(),
+                })
+            }
+            Reducer::AdminPutPosts { posts } => {
+                __sats::bsatn::to_vec(&admin_put_posts_reducer::AdminPutPostsArgs {
+                    posts: posts.clone(),
                 })
             }
             Reducer::AdminPutStations { stations } => {
@@ -448,6 +526,11 @@ impl __sdk::Reducer for Reducer {
                     ids: ids.clone(),
                 })
             }
+            Reducer::AdminRemoveDroppedPacks { ids } => __sats::bsatn::to_vec(
+                &admin_remove_dropped_packs_reducer::AdminRemoveDroppedPacksArgs {
+                    ids: ids.clone(),
+                },
+            ),
             Reducer::AdminRemoveLand { cells } => {
                 __sats::bsatn::to_vec(&admin_remove_land_reducer::AdminRemoveLandArgs {
                     cells: cells.clone(),
@@ -460,6 +543,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::AdminRemovePlots { ids } => {
                 __sats::bsatn::to_vec(&admin_remove_plots_reducer::AdminRemovePlotsArgs {
+                    ids: ids.clone(),
+                })
+            }
+            Reducer::AdminRemovePosts { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_posts_reducer::AdminRemovePostsArgs {
                     ids: ids.clone(),
                 })
             }
@@ -502,6 +590,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevAdvanceClock { micros } => {
                 __sats::bsatn::to_vec(&dev_advance_clock_reducer::DevAdvanceClockArgs {
                     micros: micros.clone(),
+                })
+            }
+            Reducer::DevDiscardPack => {
+                __sats::bsatn::to_vec(&dev_discard_pack_reducer::DevDiscardPackArgs {})
+            }
+            Reducer::DevGivePack { item } => {
+                __sats::bsatn::to_vec(&dev_give_pack_reducer::DevGivePackArgs {
+                    item: item.clone(),
                 })
             }
             Reducer::DevGrantItem { item, count } => {
@@ -549,6 +645,7 @@ impl __sdk::Reducer for Reducer {
                     z: z.clone(),
                 })
             }
+            Reducer::DropPack => __sats::bsatn::to_vec(&drop_pack_reducer::DropPackArgs {}),
             Reducer::EnterWorld {
                 char_id,
                 content_hash,
@@ -603,6 +700,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::PayTax { plot_id } => __sats::bsatn::to_vec(&pay_tax_reducer::PayTaxArgs {
                 plot_id: plot_id.clone(),
             }),
+            Reducer::PickUpPack { id } => {
+                __sats::bsatn::to_vec(&pick_up_pack_reducer::PickUpPackArgs { id: id.clone() })
+            }
             Reducer::PlacePlot { item_id, x, z, yaw } => {
                 __sats::bsatn::to_vec(&place_plot_reducer::PlacePlotArgs {
                     item_id: item_id.clone(),
@@ -616,6 +716,11 @@ impl __sdk::Reducer for Reducer {
                 x: x.clone(),
                 z: z.clone(),
             }),
+            Reducer::SellPack { post_id } => {
+                __sats::bsatn::to_vec(&sell_pack_reducer::SellPackArgs {
+                    post_id: post_id.clone(),
+                })
+            }
             Reducer::SetPlotAccess { plot_id, access } => {
                 __sats::bsatn::to_vec(&set_plot_access_reducer::SetPlotAccessArgs {
                     plot_id: plot_id.clone(),
@@ -648,17 +753,22 @@ pub struct DbUpdate {
     combat_event: __sdk::TableUpdate<CombatEvent>,
     crop: __sdk::TableUpdate<Crop>,
     dev_tick: __sdk::TableUpdate<TickState>,
+    dropped_pack: __sdk::TableUpdate<DroppedPack>,
     entity: __sdk::TableUpdate<Entity>,
     game_clock: __sdk::TableUpdate<GameClock>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_craft: __sdk::TableUpdate<CraftJob>,
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
+    my_pack: __sdk::TableUpdate<Pack>,
     my_presence: __sdk::TableUpdate<Presence>,
+    my_purse: __sdk::TableUpdate<Purse>,
     plot: __sdk::TableUpdate<Plot>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
     station: __sdk::TableUpdate<Station>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
+    trade_demand: __sdk::TableUpdate<TradeDemand>,
+    trade_post: __sdk::TableUpdate<TradePost>,
     transform: __sdk::TableUpdate<Transform>,
     vehicle: __sdk::TableUpdate<Vehicle>,
 }
@@ -681,6 +791,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "dev_tick" => db_update
                     .dev_tick
                     .append(dev_tick_table::parse_table_update(table_update)?),
+                "dropped_pack" => db_update
+                    .dropped_pack
+                    .append(dropped_pack_table::parse_table_update(table_update)?),
                 "entity" => db_update
                     .entity
                     .append(entity_table::parse_table_update(table_update)?),
@@ -699,9 +812,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_labor" => db_update
                     .my_labor
                     .append(my_labor_table::parse_table_update(table_update)?),
+                "my_pack" => db_update
+                    .my_pack
+                    .append(my_pack_table::parse_table_update(table_update)?),
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
+                "my_purse" => db_update
+                    .my_purse
+                    .append(my_purse_table::parse_table_update(table_update)?),
                 "plot" => db_update
                     .plot
                     .append(plot_table::parse_table_update(table_update)?),
@@ -714,6 +833,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "terrain_info" => db_update
                     .terrain_info
                     .append(terrain_info_table::parse_table_update(table_update)?),
+                "trade_demand" => db_update
+                    .trade_demand
+                    .append(trade_demand_table::parse_table_update(table_update)?),
+                "trade_post" => db_update
+                    .trade_post
+                    .append(trade_post_table::parse_table_update(table_update)?),
                 "transform" => db_update
                     .transform
                     .append(transform_table::parse_table_update(table_update)?),
@@ -753,6 +878,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.crop = cache
             .apply_diff_to_table::<Crop>("crop", &self.crop)
             .with_updates_by_pk(|row| &row.id);
+        diff.dropped_pack = cache
+            .apply_diff_to_table::<DroppedPack>("dropped_pack", &self.dropped_pack)
+            .with_updates_by_pk(|row| &row.id);
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
@@ -771,6 +899,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.terrain_info = cache
             .apply_diff_to_table::<TerrainInfo>("terrain_info", &self.terrain_info)
             .with_updates_by_pk(|row| &row.id);
+        diff.trade_demand = cache
+            .apply_diff_to_table::<TradeDemand>("trade_demand", &self.trade_demand)
+            .with_updates_by_pk(|row| &row.key);
+        diff.trade_post = cache
+            .apply_diff_to_table::<TradePost>("trade_post", &self.trade_post)
+            .with_updates_by_pk(|row| &row.id);
         diff.transform = cache
             .apply_diff_to_table::<Transform>("transform", &self.transform)
             .with_updates_by_pk(|row| &row.entity_id);
@@ -783,7 +917,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.my_craft = cache.apply_diff_to_table::<CraftJob>("my_craft", &self.my_craft);
         diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
+        diff.my_pack = cache.apply_diff_to_table::<Pack>("my_pack", &self.my_pack);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
+        diff.my_purse = cache.apply_diff_to_table::<Purse>("my_purse", &self.my_purse);
 
         diff
     }
@@ -803,6 +939,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "dev_tick" => db_update
                     .dev_tick
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "dropped_pack" => db_update
+                    .dropped_pack
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -821,8 +960,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_labor" => db_update
                     .my_labor
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_pack" => db_update
+                    .my_pack
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_purse" => db_update
+                    .my_purse
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "plot" => db_update
                     .plot
@@ -835,6 +980,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "trade_demand" => db_update
+                    .trade_demand
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "trade_post" => db_update
+                    .trade_post
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "transform" => db_update
                     .transform
@@ -867,6 +1018,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "dev_tick" => db_update
                     .dev_tick
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "dropped_pack" => db_update
+                    .dropped_pack
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -885,8 +1039,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_labor" => db_update
                     .my_labor
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_pack" => db_update
+                    .my_pack
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_purse" => db_update
+                    .my_purse
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "plot" => db_update
                     .plot
@@ -899,6 +1059,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "terrain_info" => db_update
                     .terrain_info
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "trade_demand" => db_update
+                    .trade_demand
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "trade_post" => db_update
+                    .trade_post
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "transform" => db_update
                     .transform
@@ -925,17 +1091,22 @@ pub struct AppliedDiff<'r> {
     combat_event: __sdk::TableAppliedDiff<'r, CombatEvent>,
     crop: __sdk::TableAppliedDiff<'r, Crop>,
     dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
+    dropped_pack: __sdk::TableAppliedDiff<'r, DroppedPack>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
+    my_pack: __sdk::TableAppliedDiff<'r, Pack>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
+    my_purse: __sdk::TableAppliedDiff<'r, Purse>,
     plot: __sdk::TableAppliedDiff<'r, Plot>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
+    trade_demand: __sdk::TableAppliedDiff<'r, TradeDemand>,
+    trade_post: __sdk::TableAppliedDiff<'r, TradePost>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
     vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
     __unused: std::marker::PhantomData<&'r ()>,
@@ -963,6 +1134,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Crop>("crop", &self.crop, event);
         callbacks.invoke_table_row_callbacks::<TickState>("dev_tick", &self.dev_tick, event);
+        callbacks.invoke_table_row_callbacks::<DroppedPack>(
+            "dropped_pack",
+            &self.dropped_pack,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
         callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
@@ -973,7 +1149,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CraftJob>("my_craft", &self.my_craft, event);
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
+        callbacks.invoke_table_row_callbacks::<Pack>("my_pack", &self.my_pack, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
+        callbacks.invoke_table_row_callbacks::<Purse>("my_purse", &self.my_purse, event);
         callbacks.invoke_table_row_callbacks::<Plot>("plot", &self.plot, event);
         callbacks.invoke_table_row_callbacks::<ResourceNode>(
             "resource_node",
@@ -986,6 +1164,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.terrain_info,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<TradeDemand>(
+            "trade_demand",
+            &self.trade_demand,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<TradePost>("trade_post", &self.trade_post, event);
         callbacks.invoke_table_row_callbacks::<Transform>("transform", &self.transform, event);
         callbacks.invoke_table_row_callbacks::<Vehicle>("vehicle", &self.vehicle, event);
     }
@@ -1652,17 +1836,22 @@ impl __sdk::SpacetimeModule for RemoteModule {
         combat_event_table::register_table(client_cache);
         crop_table::register_table(client_cache);
         dev_tick_table::register_table(client_cache);
+        dropped_pack_table::register_table(client_cache);
         entity_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_craft_table::register_table(client_cache);
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
+        my_pack_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
+        my_purse_table::register_table(client_cache);
         plot_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
         station_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
+        trade_demand_table::register_table(client_cache);
+        trade_post_table::register_table(client_cache);
         transform_table::register_table(client_cache);
         vehicle_table::register_table(client_cache);
     }
@@ -1671,17 +1860,22 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "combat_event",
         "crop",
         "dev_tick",
+        "dropped_pack",
         "entity",
         "game_clock",
         "my_characters",
         "my_craft",
         "my_inventory",
         "my_labor",
+        "my_pack",
         "my_presence",
+        "my_purse",
         "plot",
         "resource_node",
         "station",
         "terrain_info",
+        "trade_demand",
+        "trade_post",
         "transform",
         "vehicle",
     ];

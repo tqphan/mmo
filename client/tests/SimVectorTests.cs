@@ -269,6 +269,63 @@ namespace Mmo.Tests
             Assert.True(n >= 50 && some > 10 && some < n, $"{n} vectors, {some} affordable");
         }
 
+        [Fact]
+        public void TradeReach()
+        {
+            int n = 0, hits = 0;
+            foreach (var v in Lines("trade_reach"))
+            {
+                bool want = v[7] == "1";
+                Assert.Equal(want, Trade.InReach(new System.Numerics.Vector3(F(v[1]), F(v[2]), F(v[3])), new System.Numerics.Vector3(F(v[4]), F(v[5]), F(v[6]))));
+                hits += want ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 40 && hits >= 5 && hits < n, $"{n} vectors, {hits} in reach");
+        }
+
+        [Fact]
+        public void TradeDemand()
+        {
+            int n = 0;
+            foreach (var v in Lines("trade_demand"))
+            {
+                uint now = Trade.DemandNow(uint.Parse(v[1]), long.Parse(v[2]), long.Parse(v[3]));
+                Assert.Equal(uint.Parse(v[4]), now);
+                Assert.Equal(uint.Parse(v[5]), Trade.AfterSale(now));
+                n++;
+            }
+            Assert.True(n >= 40, $"{n} vectors");
+        }
+
+        [Fact]
+        public void TradeFresh()
+        {
+            int n = 0, spoiled = 0;
+            foreach (var v in Lines("trade_fresh"))
+            {
+                var got = Trade.FreshPermille(long.Parse(v[1]), long.Parse(v[2]));
+                Assert.Equal(v[3] == "spoiled" ? null : uint.Parse(v[3]), got);
+                spoiled += got is null ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 40 && spoiled > 0 && spoiled < n, $"{n} vectors, {spoiled} spoiled");
+        }
+
+        [Fact]
+        public void TradeQuote()
+        {
+            int n = 0;
+            foreach (var v in Lines("trade_quote"))
+            {
+                var (q, refusal) = Trade.Quote(ushort.Parse(v[1]), new System.Numerics.Vector2(F(v[2]), F(v[3])), long.Parse(v[4]),
+                    new System.Numerics.Vector2(F(v[5]), F(v[6])), uint.Parse(v[7]), uint.Parse(v[8]), long.Parse(v[9]));
+                string got = q is { } x ? $"{x.RoutePct}:{x.Demand}:{x.Fresh}:{x.Copper}" : ((byte)refusal!).ToString();
+                Assert.Equal(v[10], got);
+                n++;
+            }
+            Assert.True(n >= 100, $"{n} vectors");
+        }
+
         private static byte[] Hex(string hex) => Convert.FromHexString(hex);
 
         [Fact]

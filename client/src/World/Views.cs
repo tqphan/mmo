@@ -73,6 +73,59 @@ namespace Mmo
             return root;
         }
 
+        /// <summary>
+        /// A trade pack of item <paramref name="def"/> (docs/design/trade.md), its base at its origin:
+        /// a bound bale for grain, a nailed crate for the rest. About 0.7 m, to sit on a back.
+        /// </summary>
+        public static Node3D Pack(ushort def)
+        {
+            var root = new Node3D { Name = "Pack" };
+            var rope = new StandardMaterial3D { AlbedoColor = new Color(0.4f, 0.3f, 0.18f), Roughness = 0.9f };
+            if (Content.GameContent.Item(def)?.Id == "grain_bale")
+            {
+                var straw = new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.74f, 0.42f), Roughness = 1.0f };
+                // A bale lying across the back, with two bands round it.
+                root.AddChild(new MeshInstance3D
+                {
+                    Mesh = new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.3f, Height = 0.75f, RadialSegments = 10, Material = straw },
+                    Position = new Vector3(0, 0.3f, 0),
+                    RotationDegrees = new Vector3(0, 0, 90),
+                });
+                foreach (float x in new[] { -0.2f, 0.2f })
+                    root.AddChild(new MeshInstance3D
+                    {
+                        Mesh = new CylinderMesh { TopRadius = 0.315f, BottomRadius = 0.315f, Height = 0.06f, RadialSegments = 10, Material = rope },
+                        Position = new Vector3(x, 0.3f, 0),
+                        RotationDegrees = new Vector3(0, 0, 90),
+                    });
+            }
+            else
+            {
+                var wood = new StandardMaterial3D { AlbedoColor = new Color(0.62f, 0.42f, 0.24f), Roughness = 0.9f };
+                root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.65f, 0.55f, 0.45f), Material = wood }, Position = new Vector3(0, 0.275f, 0) });
+                foreach (float y in new[] { 0.1f, 0.45f })
+                    root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.67f, 0.06f, 0.47f), Material = rope }, Position = new Vector3(0, y, 0) });
+            }
+            return root;
+        }
+
+        /// <summary>Show <paramref name="def"/>'s pack on a character's back (0 for none), under <paramref name="body"/>, which faces -z.</summary>
+        public static void SetBackPack(Node3D body, ushort def, ref ushort shown)
+        {
+            if (def == shown)
+                return;
+            body.GetNodeOrNull<Node3D>("BackPack")?.QueueFree();
+            shown = def;
+            if (def == 0)
+                return;
+            var pack = Pack(def);
+            pack.Name = "BackPack";
+            // Behind the shoulders, leaning in a little.
+            pack.Position = new Vector3(0, 0.95f, 0.42f);
+            pack.RotationDegrees = new Vector3(-8, 0, 0);
+            body.AddChild(pack);
+        }
+
         /// <summary>A stable, distinct colour per entity id.</summary>
         public static Color ColorFor(ulong id) => Color.FromHsv((id * 0.618034f) % 1.0f, 0.55f, 0.85f);
     }

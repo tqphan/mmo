@@ -97,6 +97,11 @@ namespace Mmo
             var farming = new Farming(session, player, map, world.Land, plotRegistry, crops);
             AddChild(farming);
             player.Farming = farming;
+            var tradeRegistry = new TradeRegistry(session);
+            AddChild(tradeRegistry);
+            var trade = new Trade(session, player, tradeRegistry);
+            AddChild(trade);
+            player.Trade = trade;
             var plots = new Plots(session, player, plotRegistry);
             AddChild(plots);
             player.Plots = plots;
@@ -108,6 +113,8 @@ namespace Mmo
             var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
+            hud.Prompts.Add(() => trade.Status);
+            hud.Prompts.Add(() => trade.Prompt);
             hud.Prompts.Add(() => placement.Active is null && farming.Active is null ? plots.Prompt : "");
             AddChild(hud);
             // Right-clicking a stack uses it: deeds place plots, seeds plant.
@@ -133,6 +140,8 @@ namespace Mmo
                 AddChild(new LandDemo(session, player, map, world.Land, bag, placement, plots, plotWindow));
             if (options.FarmDemo)
                 AddChild(new FarmDemo(session, player, map, world.Land, bag, placement, plotRegistry, farming));
+            if (options.TradeDemo)
+                AddChild(new TradeDemo(session, player, stations, crafting, craftWindow, tradeRegistry, trade));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -227,6 +236,7 @@ namespace Mmo
             Bind("bag", Key.I, Key.B);
             Bind("rotate", Key.R);
             Bind("uproot", Key.G);
+            Bind("drop_pack", Key.X);
         }
     }
 }

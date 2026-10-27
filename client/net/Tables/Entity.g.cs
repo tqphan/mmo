@@ -53,6 +53,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Entity, ulong> Cell { get; }
         public global::SpacetimeDB.Col<Entity, byte> Kind { get; }
         public global::SpacetimeDB.Col<Entity, ulong> RefId { get; }
+        public global::SpacetimeDB.Col<Entity, ushort> Pack { get; }
 
         public EntityCols(string tableName)
         {
@@ -60,6 +61,7 @@ namespace SpacetimeDB.Types
             Cell = new global::SpacetimeDB.Col<Entity, ulong>(tableName, "cell");
             Kind = new global::SpacetimeDB.Col<Entity, byte>(tableName, "kind");
             RefId = new global::SpacetimeDB.Col<Entity, ulong>(tableName, "ref_id");
+            Pack = new global::SpacetimeDB.Col<Entity, ushort>(tableName, "pack");
         }
     }
 

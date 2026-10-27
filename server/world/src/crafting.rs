@@ -79,13 +79,27 @@ fn takes(r: &RecipeData) -> Vec<(u16, u32)> {
     r.inputs.iter().map(|i| (i.item, i.count)).collect()
 }
 
-/// `identity` can make one more unit of `r` for `char_id` now: the labor, the inputs and the room.
+/// The recipe makes a trade pack, which goes on the back rather than in the bag (docs/design/trade.md).
+fn makes_pack(r: &RecipeData) -> bool {
+    sim::trade::pack(r.output).is_some()
+}
+
+/// What one unit puts in the bag: nothing for a pack.
+fn gives(r: &RecipeData) -> (u16, u32) {
+    if makes_pack(r) { (r.output, 0) } else { (r.output, r.output_count) }
+}
+
+/// `identity` can make one more unit of `r` for `char_id` now: the labor, the inputs and the room,
+/// on the back for a pack.
 fn can_make(ctx: &ReducerContext, identity: Identity, char_id: u64, r: &RecipeData) -> Result<(), String> {
+    if makes_pack(r) && crate::trade::carried(ctx, char_id).is_some() {
+        return Err("already carrying a pack".into());
+    }
     let have = crate::labor::available(ctx, identity)?;
     if have < r.labor {
         return Err(format!("not enough labor: have {have}, need {}", r.labor));
     }
-    crate::items::can_exchange(ctx, char_id, &takes(r), (r.output, r.output_count))
+    crate::items::can_exchange(ctx, char_id, &takes(r), gives(r))
 }
 
 /// Start crafting `count` units of `recipe` at `station_id`, one after another. Each finishes in
@@ -108,6 +122,9 @@ pub fn craft(ctx: &ReducerContext, station_id: u64, recipe: u16, count: u32) -> 
     let r = recipe_of(recipe)?;
     if !(1..=CRAFT_MAX_COUNT).contains(&count) {
         return Err(format!("craft 1 to {CRAFT_MAX_COUNT} at a time"));
+    }
+    if makes_pack(r) && count != 1 {
+        return Err("packs are made one at a time".into());
     }
     let s = ctx.db.station().id().find(station_id).ok_or("no such station")?;
     if s.kind != r.station {
@@ -175,13 +192,21 @@ fn finish(ctx: &ReducerContext, job: &CraftJob) -> Result<&'static RecipeData, S
     if p.parent != 0 || moved_off([job.x, job.y, job.z], [p.x, p.y, p.z]) {
         return Err("moved away".into());
     }
-    ctx.db.station().id().find(job.station).ok_or("station gone")?;
+    let s = ctx.db.station().id().find(job.station).ok_or("station gone")?;
     let r = recipe_of(job.recipe)?;
     let have = crate::labor::available(ctx, job.identity)?;
     if have < r.labor {
         return Err(format!("not enough labor: have {have}, need {}", r.labor));
     }
-    crate::items::exchange(ctx, p.char_id, &takes(r), (r.output, r.output_count))?;
+    if makes_pack(r) {
+        if crate::trade::carried(ctx, p.char_id).is_some() {
+            return Err("already carrying a pack".into());
+        }
+        crate::items::take(ctx, p.char_id, &takes(r))?;
+        crate::trade::made(ctx, &p, r.output, [s.x, s.y, s.z]);
+    } else {
+        crate::items::exchange(ctx, p.char_id, &takes(r), (r.output, r.output_count))?;
+    }
     crate::labor::spend(ctx, job.identity, r.labor)?;
     Ok(r)
 }

@@ -1,0 +1,24 @@
+# 0027: Packs are carried in a private table and dropped into a public one; prices come from distance and timestamps; carriers' moves are judged slower
+
+- **Status:** Accepted, 2026-10-26
+- **Context:**
+  - Trade packs (M1 task 7) carry per-pack data (where and when one was made) that ordinary item rows don't have (ADR 0022). They live on a character's back, never in a bag, and can lie on the ground for anyone to take.
+  - Everyone should see who carries a pack, since that's what makes robbing traders possible, but hidden data stays private (CLAUDE.md).
+  - Demand at outposts falls with sales and recovers over time, and packs lose value with age; nothing may be ticked.
+  - The original priced routes from tables by origin zone and destination. We have one placeholder zone, and the coast task will lay out the real one.
+  - The speed check must slow carriers without correcting the step during which a pack went on.
+- **Decision:**
+  - **Two tables, not item rows.** A private `pack` table keyed by the carrier's `char_id` (one per back) holds the def, the maker, the origin and `made_at`, plus `on_at`; its owner reads it through `my_pack`. A public `dropped_pack` table in the Static tier holds packs on the ground. Dropping and picking up move a row from one to the other. Pack definitions stay items (kind `pack`) so recipes, names and wires work as they do for everything else.
+  - **`entity.pack`** (the def or 0) is what others see: it's in the Near tier already and changes only when a pack goes on or comes off.
+  - **Prices from distance.** The route factor is `min(100 + per_km × km, cap) + the post's bonus`, from where the pack was made to the post, with a minimum distance. Any bench works anywhere; zone tables can come with zones.
+  - **Demand and freshness from timestamps.** A public `trade_demand` row per (post kind, pack kind) stores the permille and when; its value now recovers linearly to full, and a sale writes value-now minus a step, floored. No row means full. Freshness is a function of `made_at` alone, and a pack spoils at `expire_s`.
+  - **Coins are a private `purse` row per character**, in copper; nothing spends them yet.
+  - **The speed check scales every mode's limit** (and the frame-change allowance) by `carry_speed_pct` while a pack is on, unless it went on since the last accepted move. The client scales its own speed from `my_pack` and holds still while a pick-up is on its way.
+  - Rules are in `sim::trade`, ported to C# and checked against vectors, so the sell prompt shows the server's price.
+- **Consequences:**
+  - Every move costs one more primary-key lookup (`pack` by `char_id`).
+  - A pack outlives its carrier's session; it's on the back again on entering.
+  - Posts are placed from `world/posts.tsv`, once per kind, since demand is keyed by kind. Duplicates would share demand.
+  - Spoiled packs on the ground stay as rows until someone tries to pick them up.
+  - Gliders, mounts and teleports must check `pack` when they come.
+  - The schema changed (`entity.pack` and five new tables), so `cargo xtask publish --clear` and `cargo xtask world` once.
