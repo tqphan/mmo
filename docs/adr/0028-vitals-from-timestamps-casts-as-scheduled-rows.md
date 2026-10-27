@@ -1,0 +1,22 @@
+# 0028: Vitals are a public row settled from timestamps; casts and projectiles are scheduled rows; the client turns to face before a skill
+
+- **Status:** Accepted, 2026-10-27
+- **Context:**
+  - Combat (M1 task 1, first half) needs HP and mana that everyone nearby can see, regeneration that differs in and out of combat, timed casts, projectiles, cooldowns, death and respawning. Nothing that can be computed from timestamps may be ticked (CLAUDE.md).
+  - PLAN §5.2 sketches a public `status` table. The C# SDK puts row types in `SpacetimeDB.Types` beside `SpacetimeDB.Status`, the reducer outcome every client callback matches on, so a row type called `Status` would make every such match ambiguous.
+  - The original required most attacks to face the target. Our client only reports its heading when it moves, so a player standing still couldn't turn to face anything the server would believe.
+  - The dead respawn at statues, which are places in the world like posts and stations.
+- **Decision:**
+  - **`vitals`, public, in the Near tier,** one row per fighting entity: HP and mana as of `at`, `combat_until`, the target, the cast under way and `dead_at`. HP and mana now come from `sim::combat::settle`, at the in-combat rate until `combat_until` and the out-of-combat rate after, capped. Every write settles first. The row is written on hits, heals, casts and target changes, never by regeneration.
+  - **`fighter`, private, one per character** (read through `my_fighter`): the global cooldown, skill cooldowns, death stacks, and the vitals kept while the character is out of the world, so logging out doesn't heal or revive.
+  - **A timed cast is a private scheduled `cast_job`,** one per caster, like crafts (ADR 0024). A move past `cast_move_m` from where it began, `cancel_cast`, dying or leaving deletes it. Mana and the cooldown are spent when it finishes, after the target is checked again with a range leeway, so an interrupted cast costs nothing. The global cooldown starts when it begins.
+  - **A projectile is a private scheduled `skill_impact`** due after distance ÷ speed. It homes: it lands on its target wherever it went, if it's still alive.
+  - **Facing is checked on the server from `presence.yaw`** (plus the ship's yaw on a deck). When the target is behind, the client turns, sends that turn as a forced movement event, then sends the skill. Reducer calls from one client are applied in order.
+  - **Wayshrines are placed like posts,** from `world/shrines.tsv` by `worldtool shrines` and `cargo xtask world`, into a public Static-tier `shrine` table. The dead get up 3 m in front of the nearest one.
+  - **Characters can attack characters.** Factions and the crime task decide the consequences later.
+  - Rules live in `sim::combat`, ported to C# and checked against vectors; the client refuses what it can see is wrong and draws bars and cooldowns settled to the present.
+- **Consequences:**
+  - Characters and dummies get a `vitals` row on entering or spawning. Its cell is kept with the entity's wherever cells change: published moves, ships, teleports and respawns.
+  - Every reducer that acts in the world checks the caller is alive, and `move_event` refuses the dead without a correction. The client stops sending moves while dead.
+  - Statuses and buffs (combat B) will extend `vitals` with a list of slots, as PLAN §5.2 planned for `status`.
+  - The schema changed (`vitals`, `fighter`, `cast_job`, `skill_impact`, `shrine`), so `cargo xtask publish --clear` and `cargo xtask world` once.

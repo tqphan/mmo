@@ -1,6 +1,6 @@
 //! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes,
-//! crafting stations and trade posts included; `worldtool nodes`, `worldtool stations` and
-//! `worldtool posts` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
+//! crafting stations, trade posts and Wayshrines included; `worldtool nodes`, `worldtool stations`,
+//! `worldtool posts` and `worldtool shrines` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
 //! prints what's in it. Paths are relative to the repo root,
 //! which `cargo xtask` runs from (docs/design/world.md).
 
@@ -19,9 +19,10 @@ fn main() -> ExitCode {
         Some("nodes") => World::load(&dir).and_then(|w| write_nodes(&dir, &w)),
         Some("stations") => World::load(&dir).and_then(|w| write_stations(&dir, &w)),
         Some("posts") => World::load(&dir).and_then(|w| write_posts(&dir, &w)),
+        Some("shrines") => World::load(&dir).and_then(|w| write_shrines(&dir, &w)),
         Some("info") => info(&dir),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|posts|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|info [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -42,7 +43,16 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     summary(&world);
     write_nodes(dir, &world)?;
     write_stations(dir, &world)?;
-    write_posts(dir, &world)
+    write_posts(dir, &world)?;
+    write_shrines(dir, &world)
+}
+
+/// Place Wayshrines on `world` and write them to `dir` (docs/design/combat.md).
+fn write_shrines(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let shrines = worldtool::shrines::place(world);
+    worldtool::shrines::save(dir, &shrines)?;
+    println!("wrote {} Wayshrines to {}", shrines.len(), dir.join(worldtool::shrines::FILE).display());
+    Ok(())
 }
 
 /// Place trade posts on `world` and write them to `dir` (docs/design/trade.md).
@@ -93,6 +103,11 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     println!("{} trade posts", posts.len());
     for p in &posts {
         println!("  {:<16} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
+    }
+    let shrines = worldtool::shrines::load(dir)?;
+    println!("{} Wayshrines", shrines.len());
+    for p in &shrines {
+        println!("  {:<20} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
     }
     Ok(())
 }

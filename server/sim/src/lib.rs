@@ -2,6 +2,7 @@
 //! No SpacetimeDB dependency, so everything here is plain unit-testable Rust.
 
 pub mod cell;
+pub mod combat;
 pub mod content;
 pub mod craft;
 pub mod farm;

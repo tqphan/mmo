@@ -94,6 +94,7 @@ pub fn let_go(ctx: &ReducerContext, ship: u64, who: u64) {
 /// The caller's presence and the deck it stands on.
 fn aboard(ctx: &ReducerContext) -> Result<(Presence, Deck, Vehicle), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     let d = deck(ctx, p.parent).ok_or("not aboard a ship")?;
     let v = ctx.db.vehicle().entity_id().find(d.ship).ok_or("not aboard a ship")?;
     Ok((p, d, v))
@@ -235,6 +236,7 @@ pub fn step_ships(ctx: &ReducerContext, dt: f32, publish: bool) {
                 if let Some(t) = ctx.db.transform().entity_id().find(e) {
                     ctx.db.transform().entity_id().update(Transform { cell, ..t });
                 }
+                crate::combat::recell(ctx, e, cell);
             }
         }
         if (publish || new_cell)

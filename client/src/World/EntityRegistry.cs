@@ -37,6 +37,11 @@ namespace Mmo.World
 
         public ShipView? Ship(ulong id) => ships.GetValueOrDefault(id);
 
+        /// <summary>Another character or a dummy, as drawn.</summary>
+        public RemoteView? View(ulong id) => views.GetValueOrDefault(id);
+
+        public IEnumerable<RemoteView> Views => views.Values;
+
         /// <summary>Every ship in view, where it was placed this physics frame.</summary>
         public IReadOnlyList<Gameplay.Deck> Decks => decks;
 
@@ -50,6 +55,8 @@ namespace Mmo.World
             db.Vehicle.OnUpdate += (_, _, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
             db.Entity.OnInsert += (_, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
             db.Entity.OnUpdate += (_, _, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
+            db.Vitals.OnInsert += (_, v) => views.GetValueOrDefault(v.EntityId)?.SetDead(v.DeadAt is not null);
+            db.Vitals.OnUpdate += (_, _, v) => views.GetValueOrDefault(v.EntityId)?.SetDead(v.DeadAt is not null);
             db.CharacterPublic.OnInsert += (_, c) =>
             {
                 foreach (var v in views.Values)
@@ -88,7 +95,10 @@ namespace Mmo.World
                 AddChild(view);
                 if (view.Kind == EntityKind.Character)
                     view.SetLabel(session.Conn.Db.CharacterPublic.CharId.Find(view.RefId)?.Name ?? $"#{t.EntityId}");
+                else if (view.Kind == EntityKind.Dummy)
+                    view.SetLabel("Straw Dummy");
                 view.SetPack(e?.Pack ?? 0);
+                view.SetDead(session.Conn.Db.Vitals.EntityId.Find(t.EntityId)?.DeadAt is not null);
                 session.Log($"sees entity {t.EntityId} ({view.Label}) at ({t.X:F1}, {t.Z:F1})");
             }
             view.Push(t, Clock.Now);
@@ -152,6 +162,8 @@ namespace Mmo.World
     {
         public const byte Character = 1;
         public const byte Ship = 2;
+        /// <summary>A dev Straw Dummy (docs/design/combat.md).</summary>
+        public const byte Dummy = 3;
     }
 
     /// <summary>Another player, drawn from its snapshot buffer, in its ship's frame when it's aboard one.</summary>
@@ -171,9 +183,10 @@ namespace Mmo.World
         public RemoteView(ulong id, byte kind, ulong refId)
         {
             Name = $"Entity{id}";
+            EntityId = id;
             Kind = kind;
             RefId = refId;
-            body = Views.Capsule(Views.ColorFor(id));
+            body = kind == EntityKind.Dummy ? Views.Dummy() : Views.Capsule(Views.ColorFor(id));
             AddChild(body);
             label = new Label3D
             {
@@ -189,12 +202,22 @@ namespace Mmo.World
             AddChild(label);
         }
 
+        public ulong EntityId { get; }
         public byte Kind { get; }
         public ulong RefId { get; }
         public ulong ParentId { get; private set; }
         public string Label => label.Text;
 
         public void SetLabel(string text) => label.Text = text;
+
+        /// <summary>Lying down while dead (docs/design/combat.md).</summary>
+        public void SetDead(bool value)
+        {
+            Dead = value;
+            Views.Lie(body, 0, value);
+        }
+
+        public bool Dead { get; private set; }
 
         /// <summary>Show the trade pack on its back, or none (docs/design/trade.md).</summary>
         public void SetPack(ushort def) => Views.SetBackPack(body, def, ref pack);

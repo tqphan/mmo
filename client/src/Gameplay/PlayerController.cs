@@ -94,6 +94,9 @@ namespace Mmo.Gameplay
         /// <summary>Trade packs; set by <see cref="Main"/>. Carrying one slows us; F on land sells at a post or picks one up before gathering.</summary>
         public Trade? Trade { get; set; }
 
+        /// <summary>Combat; set by <see cref="Main"/>. The dead lie still and send nothing.</summary>
+        public Combat? Combat { get; set; }
+
         /// <summary>Dev demos: walk this way (world x, z, length up to 1) instead of reading the keyboard, while set.</summary>
         public Vector2? DemoWish { get; set; }
 
@@ -159,7 +162,14 @@ namespace Mmo.Gameplay
             // Carried by the ship: where our place on deck is now.
             var carried = ship is null ? GlobalPosition : ToGodot(ship.Pose.ToWorld(ToNumerics(local)));
             GlobalPosition = carried;
-            body.Rotation = new Vector3(0, FrameYaw + heading, 0);
+            bool dead = Combat?.Dead == true;
+            Views.Lie(body, FrameYaw + heading, dead);
+            if (dead)
+            {
+                // Lying where we fell until the respawn's correction snaps us to a Wayshrine.
+                Velocity = Vector3.Zero;
+                return;
+            }
             // The window only moves once we're 8 m into a cell it already covers, so the ground under
             // us is always there.
             ground.Follow(GlobalPosition.X, GlobalPosition.Z);
@@ -283,6 +293,18 @@ namespace Mmo.Gameplay
                 settle = 2;
             sender.Reset(0, State(0, true), Clock.Now);
             session.Log($"dev teleport to ({x:F1}, {z:F1})");
+        }
+
+        /// <summary>
+        /// Turn on the spot to face world yaw <paramref name="yaw"/> and tell the server at once, so
+        /// a skill sent after this is judged facing that way (docs/design/combat.md).
+        /// </summary>
+        public void Face(float yaw)
+        {
+            heading = yaw - FrameYaw;
+            body.Rotation = new Vector3(0, yaw, 0);
+            float speed = new Vector2(Velocity.X, Velocity.Z).Length();
+            session.SendMove(sender.Force(Clock.Now, State(speed, swimming || IsOnFloor())));
         }
 
         /// <summary>Climb aboard the ship alongside, if the server would allow the jump to its deck now.</summary>

@@ -116,6 +116,7 @@ fn micros(t: Timestamp) -> i64 {
 /// The caller in the world, on land: not aboard a ship and not swimming.
 fn on_foot(ctx: &ReducerContext, ship: &str, water: &str) -> Result<Presence, String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     if p.parent != 0 {
         return Err(ship.into());
     }
@@ -182,11 +183,28 @@ fn theft(thief: u64, d: &DroppedPack) {
 pub fn drop_pack(ctx: &ReducerContext) -> Result<(), String> {
     let p = on_foot(ctx, "can't drop a pack on a ship yet", "can't drop a pack in the water")?;
     let pk = carried(ctx, p.char_id).ok_or("not carrying a pack")?;
-    take_off(ctx, &p);
+    put_down(ctx, &p, pk);
+    Ok(())
+}
+
+/// Called when `p`'s character dies: on land, its pack falls at its feet for anyone to take. On a
+/// ship or in the water it stays on the back until vehicles give it somewhere to fall.
+pub fn drop_on_death(ctx: &ReducerContext, p: &Presence) {
+    if p.parent != 0 || p.mode == MoveMode::Swim as u8 {
+        return;
+    }
+    if let Some(pk) = carried(ctx, p.char_id) {
+        put_down(ctx, p, pk);
+    }
+}
+
+/// Take `pk` off `p`'s back and lay it on the ground where `p` stands. A spoiled pack falls apart.
+fn put_down(ctx: &ReducerContext, p: &Presence, pk: Pack) {
+    take_off(ctx, p);
     let t = now(ctx);
     if fresh_permille(micros(pk.made_at), micros(t)).is_none() {
         log::info!("char {}'s spoiled pack fell apart", p.char_id);
-        return Ok(());
+        return;
     }
     ctx.db.dropped_pack().insert(DroppedPack {
         id: 0,
@@ -202,7 +220,6 @@ pub fn drop_pack(ctx: &ReducerContext) -> Result<(), String> {
         made_at: pk.made_at,
         dropped_at: t,
     });
-    Ok(())
 }
 
 /// Put a dropped pack on the caller's back. Taking one made by another account's character is theft.

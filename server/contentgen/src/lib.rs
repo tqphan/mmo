@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 10";
+const FORMAT: &str = "contentgen 11";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -42,6 +42,17 @@ const MAX_PLOT_M: u32 = 64;
 const MAX_HEAVY_TAX_STEPS: usize = 10;
 /// A pack worth more than this many copper (1,000 gold) is a typo.
 const MAX_PACK_VALUE: u32 = 10_000_000;
+/// Whom a skill may be used on, in wire order, fixed here like the item kinds (docs/design/combat.md).
+pub const SKILL_TARGETS: [&str; 3] = ["enemy", "ally", "caster"];
+/// What a skill's effects do, in wire order, fixed here like the item kinds.
+pub const EFFECT_KINDS: [&str; 2] = ["damage", "heal"];
+/// Skill wires below this are the cannon and the dev swing in `combat_event.skill_id`.
+const MIN_SKILL_WIRE: u16 = 100;
+const MAX_SKILL_WIRE: u16 = 999;
+/// A bigger hit or heal than this, a longer cast or cooldown, or a longer reach is a typo.
+const MAX_EFFECT: i32 = 100_000;
+const MAX_SKILL_MS: u32 = 60_000;
+const MAX_SKILL_RANGE_M: f32 = 60.0;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -54,6 +65,7 @@ pub struct Sources {
     pub crafting: String,
     pub farming: String,
     pub trade: String,
+    pub combat: String,
 }
 
 impl Sources {
@@ -71,6 +83,7 @@ impl Sources {
             crafting: read("crafting.toml")?,
             farming: read("farming.toml")?,
             trade: read("trade.toml")?,
+            combat: read("combat.toml")?,
         })
     }
 }
@@ -387,6 +400,82 @@ pub struct PostDef {
     pub bonus_pct: u32,
 }
 
+/// `combat.toml`: combat rules, skillsets, skills and Wayshrines (docs/design/combat.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CombatFile {
+    combat: CombatRules,
+    skillset: Vec<SkillsetDef>,
+    skill: Vec<SkillDef>,
+    shrine: Vec<ShrineDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CombatRules {
+    pub hp_max: i32,
+    pub mp_max: i32,
+    pub hp_regen_out: i32,
+    pub hp_regen_in: i32,
+    pub mp_regen_out: i32,
+    pub mp_regen_in: i32,
+    pub combat_s: i32,
+    pub gcd_ms: i32,
+    pub cast_move_m: f32,
+    pub cast_leeway_m: f32,
+    pub respawn_first_s: i32,
+    pub respawn_step_s: i32,
+    pub respawn_max_s: i32,
+    pub death_stack_s: i32,
+    pub respawn_pct: i32,
+    pub dummy_hp: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SkillsetDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SkillDef {
+    pub wire: u16,
+    pub id: String,
+    pub name: String,
+    /// A skillset id.
+    pub skillset: String,
+    /// One of `SKILL_TARGETS`.
+    pub target: String,
+    pub cast_ms: u32,
+    pub cooldown_ms: u32,
+    pub range_m: f32,
+    pub cost_mp: i32,
+    /// 0 lands at once; otherwise a projectile's speed, m/s.
+    pub speed_mps: f32,
+    /// The target must be in front.
+    pub facing: bool,
+    pub effects: Vec<EffectDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct EffectDef {
+    /// One of `EFFECT_KINDS`.
+    pub kind: String,
+    pub amount: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ShrineDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -420,6 +509,13 @@ pub struct Content {
     pub packs: Vec<PackDef>,
     /// Sorted by `wire`, like the modes.
     pub posts: Vec<PostDef>,
+    pub combat: CombatRules,
+    /// Sorted by `wire`, like the modes.
+    pub skillsets: Vec<SkillsetDef>,
+    /// Sorted by `wire`, which runs from 100 with gaps.
+    pub skills: Vec<SkillDef>,
+    /// Sorted by `wire`, like the modes.
+    pub shrines: Vec<ShrineDef>,
     pub hash: u64,
 }
 
@@ -432,6 +528,11 @@ impl Content {
     /// The wire of a climate; parsing checked it exists.
     fn climate_wire(&self, id: &str) -> u8 {
         self.climates.iter().find(|c| c.id == id).map_or(0, |c| c.wire)
+    }
+
+    /// The wire of a skillset; parsing checked it exists.
+    fn skillset_wire(&self, id: &str) -> u8 {
+        self.skillsets.iter().find(|s| s.id == id).map_or(0, |s| s.wire)
     }
 
     /// The wire of a station kind; parsing checked it exists.
@@ -452,10 +553,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let crafting: Result<CraftingFile, _> = from_toml("crafting.toml", &src.crafting);
     let farming: Result<FarmingFile, _> = from_toml("farming.toml", &src.farming);
     let trade: Result<TradeFile, _> = from_toml("trade.toml", &src.trade);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade) =
-        match (movement, ships, land, labor, items, gathering, crafting, farming, trade) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t)) => (m.mode, s.hull, l, b, i, g, c, f, t),
-            (m, s, l, b, i, g, c, f, t) => {
+    let combat: Result<CombatFile, _> = from_toml("combat.toml", &src.combat);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k)) => (m.mode, s.hull, l, b, i, g, c, f, t, k),
+            (m, s, l, b, i, g, c, f, t, k) => {
                 let all = m
                     .err()
                     .into_iter()
@@ -466,7 +568,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
                     .chain(g.err())
                     .chain(c.err())
                     .chain(f.err())
-                    .chain(t.err());
+                    .chain(t.err())
+                    .chain(k.err());
                 return Err(all.flatten().collect());
             }
         };
@@ -483,6 +586,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let wire_of = |id: &str| items.item.iter().find(|i| i.id == id).map_or(0, |i| i.wire);
     trade.pack.sort_by_key(|p| wire_of(&p.item));
     trade.post.sort_by_key(|p| p.wire);
+    combat.skillset.sort_by_key(|s| s.wire);
+    combat.skill.sort_by_key(|s| s.wire);
+    combat.shrine.sort_by_key(|s| s.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &items.item, &mut errors);
@@ -492,6 +598,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_crafting(&crafting, &items.item, &mut errors);
     check_farming(&farming, &items.item, &land.climate, &mut errors);
     check_trade(&trade, &items.item, &crafting.recipe, &mut errors);
+    check_combat(&combat, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -508,6 +615,10 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         trade: trade.trade,
         packs: trade.pack,
         posts: trade.post,
+        combat: combat.combat,
+        skillsets: combat.skillset,
+        skills: combat.skill,
+        shrines: combat.shrine,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -941,6 +1052,104 @@ fn check_trade(t: &TradeFile, items: &[ItemDef], recipes: &[RecipeDef], errors: 
     }
 }
 
+fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
+    let file = "combat.toml";
+    let r = &k.combat;
+    let mut num = |name: &str, v: i32, lo: i32, hi: i32| {
+        if !(lo..=hi).contains(&v) {
+            errors.push(format!("{file}: combat.{name} must be from {lo} to {hi}"));
+        }
+    };
+    num("hp_max", r.hp_max, 1, 1_000_000);
+    num("mp_max", r.mp_max, 0, 1_000_000);
+    for (name, v) in [("hp_regen_out", r.hp_regen_out), ("hp_regen_in", r.hp_regen_in), ("mp_regen_out", r.mp_regen_out), ("mp_regen_in", r.mp_regen_in)] {
+        num(name, v, 0, 100_000);
+    }
+    num("combat_s", r.combat_s, 0, 600);
+    num("gcd_ms", r.gcd_ms, 0, 10_000);
+    num("respawn_first_s", r.respawn_first_s, 0, 3600);
+    num("respawn_step_s", r.respawn_step_s, 0, 3600);
+    num("respawn_max_s", r.respawn_max_s, 0, 3600);
+    num("death_stack_s", r.death_stack_s, 0, 86_400);
+    num("respawn_pct", r.respawn_pct, 1, 100);
+    num("dummy_hp", r.dummy_hp, 1, 1_000_000);
+    check_range(file, "combat.cast_move_m", r.cast_move_m, 0.05, 10.0, errors);
+    check_range(file, "combat.cast_leeway_m", r.cast_leeway_m, 0.0, 20.0, errors);
+    if r.respawn_first_s > r.respawn_max_s {
+        errors.push(format!("{file}: combat.respawn_first_s must be at most respawn_max_s"));
+    }
+    check_ids(file, "skillset", k.skillset.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
+    check_ids(file, "shrine", k.shrine.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
+    let mut names = std::collections::HashSet::new();
+    for (what, id, name) in k.skillset.iter().map(|s| ("skillset", &s.id, &s.name)).chain(k.shrine.iter().map(|s| ("shrine", &s.id, &s.name))) {
+        if !is_item_name(name) {
+            errors.push(format!("{file}: {what} {id:?}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(name.as_str()) {
+            errors.push(format!("{file}: {what} {id:?}: duplicate name {name:?}"));
+        }
+    }
+    if k.skill.is_empty() {
+        errors.push(format!("{file}: no skills"));
+    }
+    for (i, sk) in k.skill.iter().enumerate() {
+        let at = format!("{file}: skill {:?}", sk.id);
+        if !is_id(&sk.id) {
+            errors.push(format!("{at}: ids are lower-case letters, digits and _, starting with a letter"));
+        }
+        if k.skill[..i].iter().any(|o| o.id == sk.id) {
+            errors.push(format!("{at}: duplicate id"));
+        }
+        if !(MIN_SKILL_WIRE..=MAX_SKILL_WIRE).contains(&sk.wire) {
+            errors.push(format!("{at}: wire must be from {MIN_SKILL_WIRE} to {MAX_SKILL_WIRE}"));
+        }
+        if i > 0 && k.skill[i - 1].wire == sk.wire {
+            errors.push(format!("{at}: duplicate wire {}", sk.wire));
+        }
+        if !is_item_name(&sk.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(sk.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", sk.name));
+        }
+        if !k.skillset.iter().any(|s| s.id == sk.skillset) {
+            errors.push(format!("{at}: no skillset {:?}", sk.skillset));
+        }
+        if !SKILL_TARGETS.contains(&sk.target.as_str()) {
+            errors.push(format!("{at}: target must be one of {}", SKILL_TARGETS.join(", ")));
+        }
+        if sk.cast_ms > MAX_SKILL_MS || sk.cooldown_ms > MAX_SKILL_MS {
+            errors.push(format!("{at}: cast_ms and cooldown_ms must be at most {MAX_SKILL_MS}"));
+        }
+        let lo = if sk.target == "caster" { 0.0 } else { 1.0 };
+        check_range(&at, "range_m", sk.range_m, lo, MAX_SKILL_RANGE_M, errors);
+        if !(0..=r.mp_max).contains(&sk.cost_mp) {
+            errors.push(format!("{at}: cost_mp must be from 0 to combat.mp_max"));
+        }
+        if !(sk.speed_mps == 0.0 || (5.0..=200.0).contains(&sk.speed_mps)) {
+            errors.push(format!("{at}: speed_mps must be 0 or from 5 to 200"));
+        }
+        if sk.effects.is_empty() {
+            errors.push(format!("{at}: no effects"));
+        }
+        for e in &sk.effects {
+            if !EFFECT_KINDS.contains(&e.kind.as_str()) {
+                errors.push(format!("{at}: effect kind must be one of {}", EFFECT_KINDS.join(", ")));
+            }
+            if !(1..=MAX_EFFECT).contains(&e.amount) {
+                errors.push(format!("{at}: effect amounts must be from 1 to {MAX_EFFECT}"));
+            }
+        }
+        let (harms, heals) = (sk.effects.iter().any(|e| e.kind == "damage"), sk.effects.iter().any(|e| e.kind == "heal"));
+        if sk.target == "enemy" && (!harms || heals) {
+            errors.push(format!("{at}: an enemy skill deals damage and doesn't heal"));
+        }
+        if sk.target != "enemy" && (harms || !heals) && SKILL_TARGETS.contains(&sk.target.as_str()) {
+            errors.push(format!("{at}: an {} skill heals and doesn't deal damage", sk.target));
+        }
+    }
+}
+
 /// Safe to print as a string literal in both Rust and C# without escaping.
 fn is_item_name(s: &str) -> bool {
     s.chars().count() <= MAX_ITEM_NAME
@@ -1072,6 +1281,39 @@ fn canonical(c: &Content) -> String {
     for p in &c.posts {
         writeln!(s, "post\t{}\t{}\t{}\t{}", p.wire, p.id, p.name, p.bonus_pct).unwrap();
     }
+    s += "combat";
+    for f in combat_fields(&c.combat) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
+    for k in &c.skillsets {
+        writeln!(s, "skillset\t{}\t{}\t{}", k.wire, k.id, k.name).unwrap();
+    }
+    for k in &c.skills {
+        write!(
+            s,
+            "skill\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            k.wire,
+            k.id,
+            k.name,
+            k.skillset,
+            k.target,
+            k.cast_ms,
+            k.cooldown_ms,
+            Value::F32(k.range_m).bits(),
+            k.cost_mp,
+            Value::F32(k.speed_mps).bits(),
+            k.facing
+        )
+        .unwrap();
+        for e in &k.effects {
+            write!(s, "\t{}:{}", e.kind, e.amount).unwrap();
+        }
+        s += "\n";
+    }
+    for k in &c.shrines {
+        writeln!(s, "shrine\t{}\t{}\t{}", k.wire, k.id, k.name).unwrap();
+    }
     s
 }
 
@@ -1200,6 +1442,29 @@ fn trade_fields(t: &TradeRules) -> Vec<Field> {
         f("demand_min_pct", "The lowest a post's demand falls, in percent.", i(t.demand_min_pct)),
         f("sale_drop_pct", "How much each sale lowers demand, in percent.", i(t.sale_drop_pct)),
         f("recover_pct_per_h", "How fast demand recovers, in percent per hour.", i(t.recover_pct_per_h)),
+    ]
+}
+
+fn combat_fields(k: &CombatRules) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    vec![
+        f("hp_max", "Every character's most HP, until levels and gear.", I32(k.hp_max)),
+        f("mp_max", "Every character's most mana.", I32(k.mp_max)),
+        f("hp_regen_out", "HP regenerated per second out of combat.", I32(k.hp_regen_out)),
+        f("hp_regen_in", "HP regenerated per second in combat.", I32(k.hp_regen_in)),
+        f("mp_regen_out", "Mana regenerated per second out of combat.", I32(k.mp_regen_out)),
+        f("mp_regen_in", "Mana regenerated per second in combat.", I32(k.mp_regen_in)),
+        f("combat_s", "How long a character stays in combat after it last hit or was hit, s.", I32(k.combat_s)),
+        f("gcd_ms", "The global cooldown every skill starts, ms.", I32(k.gcd_ms)),
+        f("cast_move_m", "Moving this far from where a cast began interrupts it, m.", F32(k.cast_move_m)),
+        f("cast_leeway_m", "How far beyond its range a target may be when a cast finishes, m.", F32(k.cast_leeway_m)),
+        f("respawn_first_s", "The wait to respawn after a first death, s.", I32(k.respawn_first_s)),
+        f("respawn_step_s", "Added to the wait for each further death within death_stack_s, s.", I32(k.respawn_step_s)),
+        f("respawn_max_s", "The longest wait to respawn, s.", I32(k.respawn_max_s)),
+        f("death_stack_s", "How long a death counts toward the next wait, s.", I32(k.death_stack_s)),
+        f("respawn_pct", "HP and mana on respawning, in percent.", I32(k.respawn_pct)),
+        f("dummy_hp", "A dev Straw Dummy's HP.", I32(k.dummy_hp)),
     ]
 }
 
@@ -1634,7 +1899,81 @@ pub fn render_rust(c: &Content) -> String {
     s += "pub fn post(wire: u8) -> Option<&'static PostData> {\n    POSTS.get(usize::from(wire))\n}\n\n";
     s += "/// The post kind with content id `id`.\n";
     s += "pub fn post_by_id(id: &str) -> Option<&'static PostData> {\n";
-    s += "    POSTS.iter().find(|d| d.id == id)\n}\n";
+    s += "    POSTS.iter().find(|d| d.id == id)\n}\n\n";
+
+    let combat = combat_fields(&c.combat);
+    s += "/// Combat rules (`content/combat.toml`, docs/design/combat.md).\n#[derive(Debug, PartialEq)]\npub struct CombatRules {\n";
+    rust_struct_fields(&mut s, &combat);
+    s += "}\n\n";
+    writeln!(s, "pub static COMBAT: CombatRules = CombatRules {{ {} }};\n", rust_values(&combat)).unwrap();
+    s += "/// Whom a skill may be used on. The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum SkillTarget {\n";
+    for (w, k) in SKILL_TARGETS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "/// What a skill's effect does. The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum EffectKind {\n";
+    for (w, k) in EFFECT_KINDS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct EffectData {\n    pub kind: EffectKind,\n    pub amount: i32,\n}\n\n";
+    s += "/// Skillsets (`content/combat.toml`, docs/design/combat.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct SkillsetData {\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n}\n\n";
+    s += "/// Every skillset, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static SKILLSETS: [SkillsetData; {}] = [", c.skillsets.len()).unwrap();
+    for k in &c.skillsets {
+        writeln!(s, "    SkillsetData {{ wire: {}, id: {:?}, name: {:?} }},", k.wire, k.id, k.name).unwrap();
+    }
+    s += "];\n\n";
+    s += "/// Skills (`content/combat.toml`, docs/design/combat.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct SkillData {\n";
+    s += "    /// Stored in casts and combat events.\n    pub wire: u16,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    /// The skillset's wire.\n    pub skillset: u8,\n    pub target: SkillTarget,\n";
+    s += "    /// 0 is instant.\n    pub cast_ms: u32,\n    pub cooldown_ms: u32,\n    pub range_m: f32,\n    pub cost_mp: i32,\n";
+    s += "    /// 0 lands at once; otherwise a projectile's speed, m/s.\n    pub speed_mps: f32,\n";
+    s += "    /// The target must be in front.\n    pub facing: bool,\n    pub effects: &'static [EffectData],\n}\n\n";
+    s += "/// Every skill, sorted by wire.\n";
+    writeln!(s, "pub static SKILLS: [SkillData; {}] = [", c.skills.len()).unwrap();
+    for k in &c.skills {
+        let effects: Vec<String> =
+            k.effects.iter().map(|e| format!("EffectData {{ kind: EffectKind::{}, amount: {} }}", pascal(&e.kind), e.amount)).collect();
+        writeln!(
+            s,
+            "    SkillData {{ wire: {}, id: {:?}, name: {:?}, skillset: {}, target: SkillTarget::{}, cast_ms: {}, cooldown_ms: {}, range_m: {:?}, cost_mp: {}, speed_mps: {:?}, facing: {}, effects: &[{}] }},",
+            k.wire,
+            k.id,
+            k.name,
+            c.skillset_wire(&k.skillset),
+            pascal(&k.target),
+            k.cast_ms,
+            k.cooldown_ms,
+            k.range_m,
+            k.cost_mp,
+            k.speed_mps,
+            k.facing,
+            effects.join(", ")
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The skill stored as `wire`.\n";
+    s += "pub fn skill(wire: u16) -> Option<&'static SkillData> {\n    SKILLS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &SKILLS[i])\n}\n\n";
+    s += "/// The skill with content id `id`.\n";
+    s += "pub fn skill_by_id(id: &str) -> Option<&'static SkillData> {\n    SKILLS.iter().find(|d| d.id == id)\n}\n\n";
+    s += "/// Wayshrine kinds (`content/combat.toml`, docs/design/combat.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct ShrineData {\n    /// Stored in shrine rows.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n}\n\n";
+    s += "/// Every Wayshrine kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static SHRINES: [ShrineData; {}] = [", c.shrines.len()).unwrap();
+    for k in &c.shrines {
+        writeln!(s, "    ShrineData {{ wire: {}, id: {:?}, name: {:?} }},", k.wire, k.id, k.name).unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The Wayshrine kind stored as `wire`.\n";
+    s += "pub fn shrine(wire: u8) -> Option<&'static ShrineData> {\n    SHRINES.get(usize::from(wire))\n}\n\n";
+    s += "/// The Wayshrine kind with content id `id`.\n";
+    s += "pub fn shrine_by_id(id: &str) -> Option<&'static ShrineData> {\n    SHRINES.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -1770,6 +2109,35 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"Wire\">Stored in post rows and demand keys.</param>\n";
     s += "    /// <param name=\"BonusPct\">Added to the route factor, in percent.</param>\n";
     s += "    public sealed record PostData(byte Wire, string Id, string Name, uint BonusPct);\n\n";
+    let combat = combat_fields(&c.combat);
+    s += "    /// <summary>Combat rules (content/combat.toml, docs/design/combat.md).</summary>\n";
+    csharp_param_docs(&mut s, &combat);
+    writeln!(s, "    public sealed record CombatRules({});\n", csharp_params(&combat)).unwrap();
+    s += "    /// <summary>Whom a skill may be used on. The value is the wire value.</summary>\n";
+    s += "    public enum SkillTarget : byte\n    {\n";
+    for (w, k) in SKILL_TARGETS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <summary>What a skill's effect does. The value is the wire value.</summary>\n";
+    s += "    public enum EffectKind : byte\n    {\n";
+    for (w, k) in EFFECT_KINDS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    public sealed record EffectData(EffectKind Kind, int Amount);\n\n";
+    s += "    /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    public sealed record SkillsetData(byte Wire, string Id, string Name);\n\n";
+    s += "    /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in casts and combat events.</param>\n";
+    s += "    /// <param name=\"Skillset\">The skillset's wire.</param>\n";
+    s += "    /// <param name=\"CastMs\">0 is instant.</param>\n";
+    s += "    /// <param name=\"SpeedMps\">0 lands at once; otherwise a projectile's speed, m/s.</param>\n";
+    s += "    /// <param name=\"Facing\">The target must be in front.</param>\n";
+    s += "    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);\n\n";
+    s += "    /// <summary>Wayshrine kinds (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in shrine rows.</param>\n";
+    s += "    public sealed record ShrineData(byte Wire, string Id, string Name);\n\n";
     let hull = hull_fields(first);
     csharp_param_docs(&mut s, &hull);
     writeln!(
@@ -1970,7 +2338,47 @@ pub fn render_csharp(c: &Content) -> String {
     }
     s += "        };\n\n";
     s += "        /// <summary>The post kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
-    s += "        public static PostData? Post(byte wire) => wire < Posts.Count ? Posts[wire] : null;\n";
+    s += "        public static PostData? Post(byte wire) => wire < Posts.Count ? Posts[wire] : null;\n\n";
+    writeln!(s, "        public static readonly CombatRules Combat = new({});\n", csharp_values(&combat)).unwrap();
+    s += "        /// <summary>Every skillset, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<SkillsetData> Skillsets = new SkillsetData[]\n        {\n";
+    for k in &c.skillsets {
+        writeln!(s, "            new({}, {:?}, {:?}),", k.wire, k.id, k.name).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>Every skill, sorted by wire.</summary>\n";
+    s += "        public static readonly IReadOnlyList<SkillData> Skills = new SkillData[]\n        {\n";
+    for k in &c.skills {
+        let effects: Vec<String> = k.effects.iter().map(|e| format!("new(EffectKind.{}, {})", pascal(&e.kind), e.amount)).collect();
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, {}, SkillTarget.{}, {}, {}, {}, {}, {}, {}, new EffectData[] {{ {} }}),",
+            k.wire,
+            k.id,
+            k.name,
+            c.skillset_wire(&k.skillset),
+            pascal(&k.target),
+            k.cast_ms,
+            k.cooldown_ms,
+            Value::F32(k.range_m).csharp(),
+            k.cost_mp,
+            Value::F32(k.speed_mps).csharp(),
+            if k.facing { "true" } else { "false" },
+            effects.join(", ")
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The skill stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static SkillData? Skill(ushort wire) => Skills.FirstOrDefault(k => k.Wire == wire);\n\n";
+    s += "        /// <summary>Every Wayshrine kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<ShrineData> Shrines = new ShrineData[]\n        {\n";
+    for k in &c.shrines {
+        writeln!(s, "            new({}, {:?}, {:?}),", k.wire, k.id, k.name).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The Wayshrine kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static ShrineData? Shrine(byte wire) => wire < Shrines.Count ? Shrines[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -2292,6 +2700,69 @@ mod tests {
         craft_s = 6.0
     "#;
 
+    const COMBAT: &str = r#"
+        [combat]
+        hp_max = 1000
+        mp_max = 800
+        hp_regen_out = 20
+        hp_regen_in = 4
+        mp_regen_out = 16
+        mp_regen_in = 6
+        combat_s = 6
+        gcd_ms = 1000
+        cast_move_m = 0.5
+        cast_leeway_m = 3.0
+        respawn_first_s = 5
+        respawn_step_s = 25
+        respawn_max_s = 180
+        death_stack_s = 600
+        respawn_pct = 50
+        dummy_hp = 5000
+
+        [[skillset]]
+        wire = 1
+        id = "frost"
+        name = "Frost"
+
+        [[skillset]]
+        wire = 0
+        id = "blade"
+        name = "Blade"
+
+        [[skill]]
+        wire = 210
+        id = "mend"
+        name = "Mend"
+        skillset = "frost"
+        target = "ally"
+        cast_ms = 1500
+        cooldown_ms = 0
+        range_m = 25.0
+        cost_mp = 60
+        speed_mps = 0.0
+        facing = false
+        effects = [{ kind = "heal", amount = 260 }]
+
+        [[skill]]
+        wire = 100
+        id = "bolt"
+        name = "Bolt"
+        skillset = "frost"
+        target = "enemy"
+        cast_ms = 1000
+        cooldown_ms = 8000
+        range_m = 25.0
+        cost_mp = 30
+        speed_mps = 30.0
+        facing = true
+        effects = [{ kind = "damage", amount = 110 }, { kind = "damage", amount = 5 }]
+
+        [[shrine]]
+        wire = 0
+        id = "town_shrine"
+        name = "Town Shrine"
+    "#;
+
     fn sources() -> Sources {
         Sources {
             movement: MOVEMENT.into(),
@@ -2303,7 +2774,16 @@ mod tests {
             crafting: CRAFTING.into(),
             farming: FARMING.into(),
             trade: TRADE.into(),
+            combat: COMBAT.into(),
         }
+    }
+
+    fn parse_combat(combat: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { combat: combat.into(), ..sources() })
+    }
+
+    fn combat_errors(combat: &str) -> String {
+        parse_combat(combat).unwrap_err().join("\n")
     }
 
     fn parse_trade(trade: &str) -> Result<Content, Vec<String>> {
@@ -2498,9 +2978,10 @@ mod tests {
             crafting: "[crafting\n".into(),
             farming: "[farming\n".into(),
             trade: "[trade\n".into(),
+            combat: "[combat\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -3046,6 +3527,79 @@ mod tests {
         for (path, text) in render(&c) {
             let on_disk = std::fs::read_to_string(root.join(path)).unwrap().replace("\r\n", "\n");
             assert!(on_disk == text, "{path} is stale; run `cargo xtask content`");
+        }
+    }
+
+    #[test]
+    fn combat_parses_in_order_and_reaches_both_outputs() {
+        let c = parse_combat(COMBAT).unwrap();
+        assert_eq!(c.skills.iter().map(|k| k.wire).collect::<Vec<_>>(), [100, 210]);
+        assert_eq!(c.skillsets.iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["blade", "frost"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("pub static COMBAT: CombatRules = CombatRules { hp_max: 1000, mp_max: 800, hp_regen_out: 20, hp_regen_in: 4, mp_regen_out: 16, mp_regen_in: 6, combat_s: 6, gcd_ms: 1000, cast_move_m: 0.5, cast_leeway_m: 3.0, respawn_first_s: 5, respawn_step_s: 25, respawn_max_s: 180, death_stack_s: 600, respawn_pct: 50, dummy_hp: 5000 };"), "{rs}");
+        assert!(rs.contains("Caster = 2,") && cs.contains("Caster = 2,") && rs.contains("Heal = 1,"), "{rs}");
+        assert!(rs.contains(r#"SkillData { wire: 100, id: "bolt", name: "Bolt", skillset: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 8000, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110 }, EffectData { kind: EffectKind::Damage, amount: 5 }] },"#), "{rs}");
+        assert!(rs.contains(r#"ShrineData { wire: 0, id: "town_shrine", name: "Town Shrine" },"#), "{rs}");
+        assert!(cs.contains("public static readonly CombatRules Combat = new(1000, 800, 20, 4, 16, 6, 6, 1000, 0.5f, 3.0f, 5, 25, 180, 600, 50, 5000);"), "{cs}");
+        assert!(cs.contains(r#"new(210, "mend", "Mend", 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260) }),"#), "{cs}");
+        assert!(cs.contains(r#"new(0, "town_shrine", "Town Shrine"),"#), "{cs}");
+    }
+
+    #[test]
+    fn any_combat_change_changes_the_hash() {
+        let a = parse_combat(COMBAT).unwrap().hash;
+        for (from, to) in [
+            ("hp_max = 1000", "hp_max = 1001"),
+            ("cast_move_m = 0.5", "cast_move_m = 0.6"),
+            ("respawn_pct = 50", "respawn_pct = 51"),
+            ("cast_ms = 1000", "cast_ms = 1100"),
+            ("speed_mps = 30.0", "speed_mps = 31.0"),
+            ("facing = true", "facing = false"),
+            ("amount = 5 }", "amount = 6 }"),
+            ("\"Town Shrine\"", "\"Old Shrine\""),
+            ("name = \"Frost\"", "name = \"Rime\""),
+        ] {
+            let changed = COMBAT.replacen(from, to, 1);
+            assert_ne!(changed, COMBAT, "{from}");
+            assert_ne!(parse_combat(&changed).map(|c| c.hash), Ok(a), "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_combat_is_reported_together() {
+        let bad = COMBAT
+            .replace("hp_max = 1000", "hp_max = 0")
+            .replace("respawn_first_s = 5", "respawn_first_s = 500")
+            .replace("cast_move_m = 0.5", "cast_move_m = 0.0")
+            .replace("wire = 210", "wire = 99")
+            .replace("skillset = \"frost\"\n        target = \"ally\"", "skillset = \"fire\"\n        target = \"friend\"")
+            .replace("range_m = 25.0\n        cost_mp = 30", "range_m = 90.0\n        cost_mp = 900")
+            .replace("speed_mps = 30.0", "speed_mps = 2.0")
+            .replace("cooldown_ms = 8000", "cooldown_ms = 80000")
+            .replace("amount = 5 }", "amount = 0 }");
+        let e = combat_errors(&bad);
+        for want in [
+            "combat.hp_max must be from 1",
+            "respawn_first_s must be at most respawn_max_s",
+            "combat.cast_move_m must be from",
+            "skill \"mend\": wire must be from 100 to 999",
+            "no skillset \"fire\"",
+            "target must be one of enemy, ally, caster",
+            "range_m must be from 1 to 60",
+            "cost_mp must be from 0 to combat.mp_max",
+            "speed_mps must be 0 or from 5 to 200",
+            "cast_ms and cooldown_ms must be at most 60000",
+            "effect amounts must be from 1",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = combat_errors(&COMBAT.replace("kind = \"heal\"", "kind = \"damage\"").replace("{ kind = \"damage\", amount = 5 }", "{ kind = \"heal\", amount = 5 }"));
+        for want in ["an enemy skill deals damage and doesn't heal", "an ally skill heals and doesn't deal damage"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = combat_errors(&COMBAT.replace("wire = 210", "wire = 100").replace("name = \"Mend\"", "name = \"Bolt\"").replace("effects = [{ kind = \"heal\", amount = 260 }]", "effects = []"));
+        for want in ["duplicate wire 100", "duplicate name \"Bolt\"", "no effects"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
         }
     }
 }

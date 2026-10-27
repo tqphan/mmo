@@ -485,5 +485,69 @@ namespace Mmo.Tests
             Assert.Equal(-(0.1f + MathF.Tau - 6.2f), Yaw.Delta(0.1f, 6.2f), 4);
             Assert.Equal(MathF.PI / 2, Yaw.Delta(0, MathF.PI / 2), 5);
         }
+
+        [Fact]
+        public void CombatSettle()
+        {
+            int n = 0;
+            foreach (var v in Lines("combat_settle"))
+            {
+                int got = Combat.Settle(int.Parse(v[1]), int.Parse(v[2]), long.Parse(v[3]), long.Parse(v[4]), long.Parse(v[5]), int.Parse(v[6]), int.Parse(v[7]));
+                Assert.True(int.Parse(v[8]) == got, $"combat_settle {string.Join(' ', v[1..8])}: want {v[8]}, got {got}");
+                n++;
+            }
+            Assert.True(n >= 60, $"only {n} vectors");
+        }
+
+        [Fact]
+        public void CombatDeaths()
+        {
+            int n = 0;
+            foreach (var v in Lines("combat_deaths"))
+            {
+                long? last = v[2] == "none" ? null : long.Parse(v[2]);
+                uint after = Combat.DeathsAfter(uint.Parse(v[1]), last, long.Parse(v[3]));
+                Assert.Equal(uint.Parse(v[4]), after);
+                Assert.Equal(long.Parse(v[5]), Combat.RespawnWaitMicros(after));
+                n++;
+            }
+            Assert.True(n >= 30, $"only {n} vectors");
+        }
+
+        [Fact]
+        public void CombatFront()
+        {
+            int n = 0;
+            foreach (var v in Lines("combat_front"))
+            {
+                var from = new System.Numerics.Vector3(F(v[2]), F(v[3]), F(v[4]));
+                var to = new System.Numerics.Vector3(F(v[5]), F(v[6]), F(v[7]));
+                Assert.True((v[8] == "1") == Combat.InFront(F(v[1]), from, to), $"combat_front {string.Join(' ', v[1..8])}");
+                Assert.Equal(v[9] == "1", Combat.MovedOff(from, to));
+                Assert.Equal(long.Parse(v[10]), Combat.ImpactMicros(Combat.Distance(from, to), 30.0f));
+                n++;
+            }
+            Assert.True(n >= 60, $"only {n} vectors");
+        }
+
+        [Fact]
+        public void CombatCheck()
+        {
+            int n = 0, refused = 0;
+            foreach (var v in Lines("combat_check"))
+            {
+                var skill = GameContent.Skill(ushort.Parse(v[1]))!;
+                var at = new System.Numerics.Vector3(F(v[2]), F(v[3]), F(v[4]));
+                var c = new Caster(at, F(v[5]), v[6] == "1", v[7] == "1", int.Parse(v[8]), long.Parse(v[9]));
+                var t = new CombatTarget(new System.Numerics.Vector3(F(v[10]), F(v[11]), F(v[12])), v[13] == "1", v[14] == "1");
+                byte code = (byte?)Combat.Check(skill, c, t, long.Parse(v[15])) ?? 0;
+                Assert.True(byte.Parse(v[16]) == code, $"combat_check {string.Join(' ', v[1..16])}: want {v[16]}, got {code}");
+                Assert.Equal(byte.Parse(v[17]), (byte?)Combat.CheckFinish(skill, at, t) ?? 0);
+                if (code != 0)
+                    refused++;
+                n++;
+            }
+            Assert.True(n >= 120 && refused > 20 && refused < n, $"{n} vectors, {refused} refused");
+        }
     }
 }

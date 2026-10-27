@@ -163,6 +163,7 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 - The slowdown from carrying a pack, as a percentage, and on-foot walk and swim speeds (§2A.4)
 - Jump height, gravity and the fall-damage threshold (§2A.4)
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (§2A.4)
+- The global cooldown, HP and mana regeneration in and out of combat, HP on respawning, and how long combat lasts (§2A.6)
 
 ### 2A.4 Movement and ship numbers (searched 2026-10-26)
 Fan wikis on Fandom sit behind a bot check, so these come from search extracts of them and from one item database. Wikis for private servers and emulators were left out on purpose (CLAUDE.md), and a wiki titled for *ArcheAge Chronicles*, a different game, was not relied on.
@@ -192,6 +193,21 @@ From search extracts again (docs/design/items.md).
 | Bag and warehouse size | Both start at 50 slots; each expansion adds 10, up to 150 | B | [Fandom: Expansion Scroll](https://archeage.fandom.com/wiki/Expansion_Scroll), [Saarith guide (2019)](https://saarith.com/archeage-expansion-scrolls-and-how-to-get-more-storage-space/) |
 | How expansions were bought | Scrolls from the cash shop, tradeable for gold (about 75 gold each in 2019); warehouses stopped expanding for gold after patch 1.2 | B | [Fandom: Warehouse](https://archeage.fandom.com/wiki/Warehouse), Saarith |
 | Stack sizes | Not found; common materials are remembered as stacking to 1,000 | C | — |
+
+### 2A.6 Combat and death (searched 2026-10-27)
+From search extracts of the Fandom wiki (behind a bot check), an item database and guides (docs/design/combat.md).
+
+| Fact | Value | Conf. | Source |
+|---|---|---|---|
+| A starter melee skill (Battlerage's Triple Slash) | Instant, 30 mana, 0–4 m, no cooldown, up to three hits in a row; combos with Shaken, Snared and Tripped | B | [Fandom: Battlerage](https://archeage.fandom.com/wiki/Battlerage) |
+| A starter ranged spell (Occultism's Mana Stars) | Instant, 24 mana, 0–20 m, no cooldown; up to 20% more damage as a combo | B | [Fandom: Occultism](https://archeage.fandom.com/wiki/Occultism) |
+| Long casts existed | A Sorcery skill's cast went from 3.8 to 4.8 s at rank 7 in a late patch | C | [SteamDB patch notes](https://steamdb.info/patchnotes/7812456) |
+| Where the dead get up | At the last-visited or closest statue | B | [Fandom: Combat](https://archeage.fandom.com/wiki/Combat) |
+| The wait to resurrect | Each death adds a stacking 10-minute debuff that lengthens the next wait, up to 180 s | B | Fandom: Combat |
+| Death penalties | Dying to a monster costs gear durability and combat experience; dying to a player costs nothing but the debuff | B | Fandom: Combat |
+| Resurrection items | A scroll revives at 5% of max HP and mana; a bound self-resurrection scroll at 80% on the spot, 30-minute cooldown | B | [Fandom: Scroll: Resurrection](https://archeage.fandom.com/wiki/Scroll:_Resurrection), [Codex item 34021](https://archeagecodex.com/us/item/34021/) |
+| Packs and death | A carried pack can be lost on death, and the killer can pick it up | B | [Ten Ton Hammer: trade packs](https://www.tentonhammer.com/guide/archeage/archeage-trade-pack-guide) |
+| Global cooldown, HP and mana regeneration, HP on respawning, how long "in combat" lasts | Not found | — | — |
 
 ---
 

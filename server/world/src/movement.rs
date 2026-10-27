@@ -53,6 +53,7 @@ pub fn move_event(
     if seq <= p.last_seq {
         return Ok(()); // stale or duplicate; ordering is the client's job, not an error
     }
+    crate::combat::require_alive(ctx, &p)?;
     let mode = MoveMode::from_u8(mode).ok_or("unknown movement mode")?;
     let at = now(ctx);
     let entity_id = p.entity_id;
@@ -84,6 +85,7 @@ pub fn move_event(
             });
             crate::gathering::moved(ctx, p.char_id, parent, to);
             crate::crafting::moved(ctx, p.char_id, parent, to);
+            crate::combat::moved(ctx, entity_id, parent, to);
             // Walking away from the helm, or off the ship, lets go of it.
             if let Frame::Deck(d) = from
                 && (parent != p.parent || sim::ship::reach(to, d.hull.helm_x, d.hull.helm_z) > sim::ship::REACH_M)
@@ -115,6 +117,40 @@ pub fn move_event(
     }
     mark_moved(ctx, entity_id);
     Ok(())
+}
+
+/// Put `p`'s character at (x, z) in the world, on the ground, off any ship and at rest in `mode`,
+/// publishing it at once, and return its cell. With `correct`, its client is told to snap there
+/// (a respawn); without, the client is expected to follow (dev teleports).
+pub fn relocate(ctx: &ReducerContext, p: Presence, x: f32, z: f32, mode: MoveMode, correct: bool) -> u64 {
+    let y = settle(Terrain::new(ctx).ground(x, z), [x, p.y, z], mode);
+    crate::ship::let_go(ctx, p.parent, p.entity_id);
+    let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
+    if let Some(e) = ctx.db.entity().id().find(p.entity_id) {
+        ctx.db.entity().id().update(Entity { cell, ..e });
+    }
+    if let Some(t) = ctx.db.transform().entity_id().find(p.entity_id) {
+        ctx.db.transform().entity_id().update(Transform { cell, parent: 0, x, y, z, speed: 0, mode: mode as u8, ..t });
+    }
+    crate::combat::recell(ctx, p.entity_id, cell);
+    // Moves are measured from here and now.
+    let at = now(ctx);
+    ctx.db.presence().identity().update(Presence {
+        parent: 0,
+        last_move_at: at,
+        corrections: if correct { p.corrections + 1 } else { p.corrections },
+        x,
+        y,
+        z,
+        speed: 0,
+        mode: mode as u8,
+        anchor_x: x,
+        anchor_y: y,
+        anchor_z: z,
+        contact_at: at,
+        ..p
+    });
+    cell
 }
 
 /// Queue an entity for the next tick's publish.
@@ -238,10 +274,11 @@ pub fn publish_moves(ctx: &ReducerContext) -> usize {
             0 => sim::cell::cell_of(sim::cell::OPEN_WORLD, p.x, p.z),
             ship => ctx.db.transform().entity_id().find(ship).map_or(t.cell, |s| s.cell),
         };
-        if cell != t.cell
-            && let Some(e) = ctx.db.entity().id().find(id)
-        {
-            ctx.db.entity().id().update(Entity { cell, ..e });
+        if cell != t.cell {
+            if let Some(e) = ctx.db.entity().id().find(id) {
+                ctx.db.entity().id().update(Entity { cell, ..e });
+            }
+            crate::combat::recell(ctx, id, cell);
         }
         ctx.db.transform().entity_id().update(Transform {
             cell,

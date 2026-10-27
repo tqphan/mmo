@@ -18,11 +18,11 @@ namespace Mmo.Net
     /// </summary>
     public partial class Session : Node
     {
-        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP.</summary>
-        public static readonly string[] NearTables = { "entity", "transform", "vehicle" };
+        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP; <c>vitals</c> and <c>combat_event</c> are combat's (docs/design/combat.md).</summary>
+        public static readonly string[] NearTables = { "entity", "transform", "vehicle", "vitals", "combat_event" };
         public const ushort NearRadius = 2;
-        /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md), plots (docs/design/land.md), crops (docs/design/farming.md), and trade posts and dropped packs (docs/design/trade.md).</summary>
-        public static readonly string[] StaticTables = { "resource_node", "station", "plot", "crop", "trade_post", "dropped_pack" };
+        /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md), plots (docs/design/land.md), crops (docs/design/farming.md), trade posts and dropped packs (docs/design/trade.md), and Wayshrines (docs/design/combat.md).</summary>
+        public static readonly string[] StaticTables = { "resource_node", "station", "plot", "crop", "trade_post", "dropped_pack", "shrine" };
         public const ushort StaticRadius = 4;
 
         private readonly ClientOptions options;
@@ -138,7 +138,7 @@ namespace Mmo.Net
                 {
                     "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public",
                     "SELECT * FROM my_labor", "SELECT * FROM game_clock", "SELECT * FROM my_inventory", "SELECT * FROM my_craft",
-                    "SELECT * FROM my_pack", "SELECT * FROM my_purse", "SELECT * FROM trade_demand",
+                    "SELECT * FROM my_pack", "SELECT * FROM my_purse", "SELECT * FROM trade_demand", "SELECT * FROM my_fighter",
                 });
         }
 

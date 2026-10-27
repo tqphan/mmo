@@ -11,11 +11,13 @@ pub mod account_type;
 pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
 pub mod admin_clear_posts_reducer;
+pub mod admin_clear_shrines_reducer;
 pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
 pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
 pub mod admin_put_posts_reducer;
+pub mod admin_put_shrines_reducer;
 pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
 pub mod admin_remove_crops_reducer;
@@ -24,16 +26,20 @@ pub mod admin_remove_land_reducer;
 pub mod admin_remove_nodes_reducer;
 pub mod admin_remove_plots_reducer;
 pub mod admin_remove_posts_reducer;
+pub mod admin_remove_shrines_reducer;
 pub mod admin_remove_stations_reducer;
 pub mod admin_remove_terrain_reducer;
+pub mod cancel_cast_reducer;
 pub mod cancel_craft_reducer;
 pub mod cancel_gather_reducer;
 pub mod cannon_shot_type;
+pub mod cast_job_type;
 pub mod character_private_type;
 pub mod character_public_table;
 pub mod character_public_type;
 pub mod combat_event_table;
 pub mod combat_event_type;
+pub mod cooldown_type;
 pub mod craft_job_type;
 pub mod craft_reducer;
 pub mod create_character_reducer;
@@ -44,9 +50,12 @@ pub mod dev_advance_clock_reducer;
 pub mod dev_discard_pack_reducer;
 pub mod dev_give_pack_reducer;
 pub mod dev_grant_item_reducer;
+pub mod dev_remove_dummy_reducer;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
+pub mod dev_set_vitals_reducer;
+pub mod dev_spawn_dummy_reducer;
 pub mod dev_spawn_ship_reducer;
 pub mod dev_spend_labor_reducer;
 pub mod dev_swing_reducer;
@@ -58,6 +67,7 @@ pub mod dropped_pack_type;
 pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
+pub mod fighter_type;
 pub mod fire_reducer;
 pub mod game_clock_table;
 pub mod game_clock_type;
@@ -75,6 +85,7 @@ pub mod move_item_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
 pub mod my_craft_table;
+pub mod my_fighter_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
 pub mod my_pack_table;
@@ -95,9 +106,15 @@ pub mod presence_type;
 pub mod purse_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
+pub mod respawn_reducer;
 pub mod sell_pack_reducer;
 pub mod set_plot_access_reducer;
+pub mod set_target_reducer;
 pub mod ship_motion_type;
+pub mod shrine_placement_type;
+pub mod shrine_table;
+pub mod shrine_type;
+pub mod skill_impact_type;
 pub mod split_item_reducer;
 pub mod station_placement_type;
 pub mod station_table;
@@ -115,8 +132,11 @@ pub mod trade_post_type;
 pub mod transform_table;
 pub mod transform_type;
 pub mod uproot_reducer;
+pub mod use_skill_reducer;
 pub mod vehicle_table;
 pub mod vehicle_type;
+pub mod vitals_table;
+pub mod vitals_type;
 pub mod world_tick_timer_type;
 
 pub use abandon_plot_reducer::abandon_plot;
@@ -124,11 +144,13 @@ pub use account_type::Account;
 pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
 pub use admin_clear_posts_reducer::admin_clear_posts;
+pub use admin_clear_shrines_reducer::admin_clear_shrines;
 pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
 pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_posts_reducer::admin_put_posts;
+pub use admin_put_shrines_reducer::admin_put_shrines;
 pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use admin_remove_crops_reducer::admin_remove_crops;
@@ -137,16 +159,20 @@ pub use admin_remove_land_reducer::admin_remove_land;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
 pub use admin_remove_plots_reducer::admin_remove_plots;
 pub use admin_remove_posts_reducer::admin_remove_posts;
+pub use admin_remove_shrines_reducer::admin_remove_shrines;
 pub use admin_remove_stations_reducer::admin_remove_stations;
 pub use admin_remove_terrain_reducer::admin_remove_terrain;
+pub use cancel_cast_reducer::cancel_cast;
 pub use cancel_craft_reducer::cancel_craft;
 pub use cancel_gather_reducer::cancel_gather;
 pub use cannon_shot_type::CannonShot;
+pub use cast_job_type::CastJob;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
 pub use combat_event_table::*;
 pub use combat_event_type::CombatEvent;
+pub use cooldown_type::Cooldown;
 pub use craft_job_type::CraftJob;
 pub use craft_reducer::craft;
 pub use create_character_reducer::create_character;
@@ -157,9 +183,12 @@ pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_discard_pack_reducer::dev_discard_pack;
 pub use dev_give_pack_reducer::dev_give_pack;
 pub use dev_grant_item_reducer::dev_grant_item;
+pub use dev_remove_dummy_reducer::dev_remove_dummy;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
+pub use dev_set_vitals_reducer::dev_set_vitals;
+pub use dev_spawn_dummy_reducer::dev_spawn_dummy;
 pub use dev_spawn_ship_reducer::dev_spawn_ship;
 pub use dev_spend_labor_reducer::dev_spend_labor;
 pub use dev_swing_reducer::dev_swing;
@@ -171,6 +200,7 @@ pub use dropped_pack_type::DroppedPack;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
+pub use fighter_type::Fighter;
 pub use fire_reducer::fire;
 pub use game_clock_table::*;
 pub use game_clock_type::GameClock;
@@ -188,6 +218,7 @@ pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
 pub use my_craft_table::*;
+pub use my_fighter_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
 pub use my_pack_table::*;
@@ -208,9 +239,15 @@ pub use presence_type::Presence;
 pub use purse_type::Purse;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
+pub use respawn_reducer::respawn;
 pub use sell_pack_reducer::sell_pack;
 pub use set_plot_access_reducer::set_plot_access;
+pub use set_target_reducer::set_target;
 pub use ship_motion_type::ShipMotion;
+pub use shrine_placement_type::ShrinePlacement;
+pub use shrine_table::*;
+pub use shrine_type::Shrine;
+pub use skill_impact_type::SkillImpact;
 pub use split_item_reducer::split_item;
 pub use station_placement_type::StationPlacement;
 pub use station_table::*;
@@ -228,8 +265,11 @@ pub use trade_post_type::TradePost;
 pub use transform_table::*;
 pub use transform_type::Transform;
 pub use uproot_reducer::uproot;
+pub use use_skill_reducer::use_skill;
 pub use vehicle_table::*;
 pub use vehicle_type::Vehicle;
+pub use vitals_table::*;
+pub use vitals_type::Vitals;
 pub use world_tick_timer_type::WorldTickTimer;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -246,6 +286,7 @@ pub enum Reducer {
     AdminClearLand,
     AdminClearNodes,
     AdminClearPosts,
+    AdminClearShrines,
     AdminClearStations,
     AdminClearTerrain,
     AdminPutLand {
@@ -256,6 +297,9 @@ pub enum Reducer {
     },
     AdminPutPosts {
         posts: Vec<PostPlacement>,
+    },
+    AdminPutShrines {
+        shrines: Vec<ShrinePlacement>,
     },
     AdminPutStations {
         stations: Vec<StationPlacement>,
@@ -281,12 +325,16 @@ pub enum Reducer {
     AdminRemovePosts {
         ids: Vec<u64>,
     },
+    AdminRemoveShrines {
+        ids: Vec<u64>,
+    },
     AdminRemoveStations {
         ids: Vec<u64>,
     },
     AdminRemoveTerrain {
         cells: Vec<u64>,
     },
+    CancelCast,
     CancelCraft,
     CancelGather,
     Craft {
@@ -312,6 +360,9 @@ pub enum Reducer {
         item: String,
         count: u32,
     },
+    DevRemoveDummy {
+        id: u64,
+    },
     DevRemoveShip {
         ship: u64,
     },
@@ -320,6 +371,14 @@ pub enum Reducer {
     },
     DevSetLabor {
         points: i32,
+    },
+    DevSetVitals {
+        hp: i32,
+        mp: i32,
+    },
+    DevSpawnDummy {
+        x: f32,
+        z: f32,
     },
     DevSpawnShip {
         hull: u8,
@@ -391,12 +450,16 @@ pub enum Reducer {
         x: f32,
         z: f32,
     },
+    Respawn,
     SellPack {
         post_id: u64,
     },
     SetPlotAccess {
         plot_id: u64,
         access: u8,
+    },
+    SetTarget {
+        target: u64,
     },
     SplitItem {
         item_id: u64,
@@ -406,6 +469,10 @@ pub enum Reducer {
     TakeHelm,
     Uproot {
         crop_id: u64,
+    },
+    UseSkill {
+        skill: u16,
+        target: u64,
     },
 }
 
@@ -420,11 +487,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearPosts => "admin_clear_posts",
+            Reducer::AdminClearShrines => "admin_clear_shrines",
             Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
             Reducer::AdminPutLand { .. } => "admin_put_land",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutPosts { .. } => "admin_put_posts",
+            Reducer::AdminPutShrines { .. } => "admin_put_shrines",
             Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::AdminRemoveCrops { .. } => "admin_remove_crops",
@@ -433,8 +502,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
             Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
             Reducer::AdminRemovePosts { .. } => "admin_remove_posts",
+            Reducer::AdminRemoveShrines { .. } => "admin_remove_shrines",
             Reducer::AdminRemoveStations { .. } => "admin_remove_stations",
             Reducer::AdminRemoveTerrain { .. } => "admin_remove_terrain",
+            Reducer::CancelCast => "cancel_cast",
             Reducer::CancelCraft => "cancel_craft",
             Reducer::CancelGather => "cancel_gather",
             Reducer::Craft { .. } => "craft",
@@ -444,9 +515,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevDiscardPack => "dev_discard_pack",
             Reducer::DevGivePack { .. } => "dev_give_pack",
             Reducer::DevGrantItem { .. } => "dev_grant_item",
+            Reducer::DevRemoveDummy { .. } => "dev_remove_dummy",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
+            Reducer::DevSetVitals { .. } => "dev_set_vitals",
+            Reducer::DevSpawnDummy { .. } => "dev_spawn_dummy",
             Reducer::DevSpawnShip { .. } => "dev_spawn_ship",
             Reducer::DevSpendLabor { .. } => "dev_spend_labor",
             Reducer::DevSwing { .. } => "dev_swing",
@@ -465,11 +539,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::PickUpPack { .. } => "pick_up_pack",
             Reducer::PlacePlot { .. } => "place_plot",
             Reducer::Plant { .. } => "plant",
+            Reducer::Respawn => "respawn",
             Reducer::SellPack { .. } => "sell_pack",
             Reducer::SetPlotAccess { .. } => "set_plot_access",
+            Reducer::SetTarget { .. } => "set_target",
             Reducer::SplitItem { .. } => "split_item",
             Reducer::TakeHelm => "take_helm",
             Reducer::Uproot { .. } => "uproot",
+            Reducer::UseSkill { .. } => "use_skill",
             _ => unreachable!(),
         }
     }
@@ -490,6 +567,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearPosts => {
                 __sats::bsatn::to_vec(&admin_clear_posts_reducer::AdminClearPostsArgs {})
             }
+            Reducer::AdminClearShrines => {
+                __sats::bsatn::to_vec(&admin_clear_shrines_reducer::AdminClearShrinesArgs {})
+            }
             Reducer::AdminClearStations => {
                 __sats::bsatn::to_vec(&admin_clear_stations_reducer::AdminClearStationsArgs {})
             }
@@ -509,6 +589,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutPosts { posts } => {
                 __sats::bsatn::to_vec(&admin_put_posts_reducer::AdminPutPostsArgs {
                     posts: posts.clone(),
+                })
+            }
+            Reducer::AdminPutShrines { shrines } => {
+                __sats::bsatn::to_vec(&admin_put_shrines_reducer::AdminPutShrinesArgs {
+                    shrines: shrines.clone(),
                 })
             }
             Reducer::AdminPutStations { stations } => {
@@ -551,6 +636,11 @@ impl __sdk::Reducer for Reducer {
                     ids: ids.clone(),
                 })
             }
+            Reducer::AdminRemoveShrines { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_shrines_reducer::AdminRemoveShrinesArgs {
+                    ids: ids.clone(),
+                })
+            }
             Reducer::AdminRemoveStations { ids } => {
                 __sats::bsatn::to_vec(&admin_remove_stations_reducer::AdminRemoveStationsArgs {
                     ids: ids.clone(),
@@ -561,6 +651,7 @@ impl __sdk::Reducer for Reducer {
                     cells: cells.clone(),
                 })
             }
+            Reducer::CancelCast => __sats::bsatn::to_vec(&cancel_cast_reducer::CancelCastArgs {}),
             Reducer::CancelCraft => {
                 __sats::bsatn::to_vec(&cancel_craft_reducer::CancelCraftArgs {})
             }
@@ -606,6 +697,11 @@ impl __sdk::Reducer for Reducer {
                     count: count.clone(),
                 })
             }
+            Reducer::DevRemoveDummy { id } => {
+                __sats::bsatn::to_vec(&dev_remove_dummy_reducer::DevRemoveDummyArgs {
+                    id: id.clone(),
+                })
+            }
             Reducer::DevRemoveShip { ship } => {
                 __sats::bsatn::to_vec(&dev_remove_ship_reducer::DevRemoveShipArgs {
                     ship: ship.clone(),
@@ -619,6 +715,18 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevSetLabor { points } => {
                 __sats::bsatn::to_vec(&dev_set_labor_reducer::DevSetLaborArgs {
                     points: points.clone(),
+                })
+            }
+            Reducer::DevSetVitals { hp, mp } => {
+                __sats::bsatn::to_vec(&dev_set_vitals_reducer::DevSetVitalsArgs {
+                    hp: hp.clone(),
+                    mp: mp.clone(),
+                })
+            }
+            Reducer::DevSpawnDummy { x, z } => {
+                __sats::bsatn::to_vec(&dev_spawn_dummy_reducer::DevSpawnDummyArgs {
+                    x: x.clone(),
+                    z: z.clone(),
                 })
             }
             Reducer::DevSpawnShip { hull, x, z, yaw } => {
@@ -716,6 +824,7 @@ impl __sdk::Reducer for Reducer {
                 x: x.clone(),
                 z: z.clone(),
             }),
+            Reducer::Respawn => __sats::bsatn::to_vec(&respawn_reducer::RespawnArgs {}),
             Reducer::SellPack { post_id } => {
                 __sats::bsatn::to_vec(&sell_pack_reducer::SellPackArgs {
                     post_id: post_id.clone(),
@@ -725,6 +834,11 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&set_plot_access_reducer::SetPlotAccessArgs {
                     plot_id: plot_id.clone(),
                     access: access.clone(),
+                })
+            }
+            Reducer::SetTarget { target } => {
+                __sats::bsatn::to_vec(&set_target_reducer::SetTargetArgs {
+                    target: target.clone(),
                 })
             }
             Reducer::SplitItem {
@@ -740,6 +854,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::Uproot { crop_id } => __sats::bsatn::to_vec(&uproot_reducer::UprootArgs {
                 crop_id: crop_id.clone(),
             }),
+            Reducer::UseSkill { skill, target } => {
+                __sats::bsatn::to_vec(&use_skill_reducer::UseSkillArgs {
+                    skill: skill.clone(),
+                    target: target.clone(),
+                })
+            }
             _ => unreachable!(),
         }
     }
@@ -758,6 +878,7 @@ pub struct DbUpdate {
     game_clock: __sdk::TableUpdate<GameClock>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_craft: __sdk::TableUpdate<CraftJob>,
+    my_fighter: __sdk::TableUpdate<Fighter>,
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_pack: __sdk::TableUpdate<Pack>,
@@ -765,12 +886,14 @@ pub struct DbUpdate {
     my_purse: __sdk::TableUpdate<Purse>,
     plot: __sdk::TableUpdate<Plot>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
+    shrine: __sdk::TableUpdate<Shrine>,
     station: __sdk::TableUpdate<Station>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
     trade_demand: __sdk::TableUpdate<TradeDemand>,
     trade_post: __sdk::TableUpdate<TradePost>,
     transform: __sdk::TableUpdate<Transform>,
     vehicle: __sdk::TableUpdate<Vehicle>,
+    vitals: __sdk::TableUpdate<Vitals>,
 }
 
 impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
@@ -806,6 +929,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_craft" => db_update
                     .my_craft
                     .append(my_craft_table::parse_table_update(table_update)?),
+                "my_fighter" => db_update
+                    .my_fighter
+                    .append(my_fighter_table::parse_table_update(table_update)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(my_inventory_table::parse_table_update(table_update)?),
@@ -827,6 +953,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "resource_node" => db_update
                     .resource_node
                     .append(resource_node_table::parse_table_update(table_update)?),
+                "shrine" => db_update
+                    .shrine
+                    .append(shrine_table::parse_table_update(table_update)?),
                 "station" => db_update
                     .station
                     .append(station_table::parse_table_update(table_update)?),
@@ -845,6 +974,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "vehicle" => db_update
                     .vehicle
                     .append(vehicle_table::parse_table_update(table_update)?),
+                "vitals" => db_update
+                    .vitals
+                    .append(vitals_table::parse_table_update(table_update)?),
 
                 unknown => {
                     return Err(__sdk::InternalError::unknown_name(
@@ -893,6 +1025,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.resource_node = cache
             .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
             .with_updates_by_pk(|row| &row.id);
+        diff.shrine = cache
+            .apply_diff_to_table::<Shrine>("shrine", &self.shrine)
+            .with_updates_by_pk(|row| &row.id);
         diff.station = cache
             .apply_diff_to_table::<Station>("station", &self.station)
             .with_updates_by_pk(|row| &row.id);
@@ -911,10 +1046,14 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.vehicle = cache
             .apply_diff_to_table::<Vehicle>("vehicle", &self.vehicle)
             .with_updates_by_pk(|row| &row.entity_id);
+        diff.vitals = cache
+            .apply_diff_to_table::<Vitals>("vitals", &self.vitals)
+            .with_updates_by_pk(|row| &row.entity_id);
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
         diff.my_craft = cache.apply_diff_to_table::<CraftJob>("my_craft", &self.my_craft);
+        diff.my_fighter = cache.apply_diff_to_table::<Fighter>("my_fighter", &self.my_fighter);
         diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
         diff.my_pack = cache.apply_diff_to_table::<Pack>("my_pack", &self.my_pack);
@@ -954,6 +1093,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_craft" => db_update
                     .my_craft
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_fighter" => db_update
+                    .my_fighter
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -975,6 +1117,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "resource_node" => db_update
                     .resource_node
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "shrine" => db_update
+                    .shrine
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "station" => db_update
                     .station
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -992,6 +1137,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vehicle" => db_update
                     .vehicle
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "vitals" => db_update
+                    .vitals
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => {
                     return Err(
@@ -1033,6 +1181,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_craft" => db_update
                     .my_craft
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_fighter" => db_update
+                    .my_fighter
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_inventory" => db_update
                     .my_inventory
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -1054,6 +1205,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "resource_node" => db_update
                     .resource_node
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "shrine" => db_update
+                    .shrine
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "station" => db_update
                     .station
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -1071,6 +1225,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vehicle" => db_update
                     .vehicle
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "vitals" => db_update
+                    .vitals
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => {
                     return Err(
@@ -1096,6 +1253,7 @@ pub struct AppliedDiff<'r> {
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
+    my_fighter: __sdk::TableAppliedDiff<'r, Fighter>,
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_pack: __sdk::TableAppliedDiff<'r, Pack>,
@@ -1103,12 +1261,14 @@ pub struct AppliedDiff<'r> {
     my_purse: __sdk::TableAppliedDiff<'r, Purse>,
     plot: __sdk::TableAppliedDiff<'r, Plot>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
+    shrine: __sdk::TableAppliedDiff<'r, Shrine>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
     trade_demand: __sdk::TableAppliedDiff<'r, TradeDemand>,
     trade_post: __sdk::TableAppliedDiff<'r, TradePost>,
     transform: __sdk::TableAppliedDiff<'r, Transform>,
     vehicle: __sdk::TableAppliedDiff<'r, Vehicle>,
+    vitals: __sdk::TableAppliedDiff<'r, Vitals>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
 
@@ -1147,6 +1307,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<CraftJob>("my_craft", &self.my_craft, event);
+        callbacks.invoke_table_row_callbacks::<Fighter>("my_fighter", &self.my_fighter, event);
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Pack>("my_pack", &self.my_pack, event);
@@ -1158,6 +1319,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.resource_node,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Shrine>("shrine", &self.shrine, event);
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
             "terrain_info",
@@ -1172,6 +1334,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<TradePost>("trade_post", &self.trade_post, event);
         callbacks.invoke_table_row_callbacks::<Transform>("transform", &self.transform, event);
         callbacks.invoke_table_row_callbacks::<Vehicle>("vehicle", &self.vehicle, event);
+        callbacks.invoke_table_row_callbacks::<Vitals>("vitals", &self.vitals, event);
     }
 }
 
@@ -1841,6 +2004,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         game_clock_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_craft_table::register_table(client_cache);
+        my_fighter_table::register_table(client_cache);
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_pack_table::register_table(client_cache);
@@ -1848,12 +2012,14 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_purse_table::register_table(client_cache);
         plot_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
+        shrine_table::register_table(client_cache);
         station_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
         trade_demand_table::register_table(client_cache);
         trade_post_table::register_table(client_cache);
         transform_table::register_table(client_cache);
         vehicle_table::register_table(client_cache);
+        vitals_table::register_table(client_cache);
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "character_public",
@@ -1865,6 +2031,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "game_clock",
         "my_characters",
         "my_craft",
+        "my_fighter",
         "my_inventory",
         "my_labor",
         "my_pack",
@@ -1872,11 +2039,13 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_purse",
         "plot",
         "resource_node",
+        "shrine",
         "station",
         "terrain_info",
         "trade_demand",
         "trade_post",
         "transform",
         "vehicle",
+        "vitals",
     ];
 }

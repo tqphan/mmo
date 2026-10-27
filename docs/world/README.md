@@ -72,5 +72,13 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Place | Cairnwick | An inland hamlet north-west of Furrowdale, with Cairnwick Post |
 | Place | Redfen | A hamlet south of Furrowdale, with Redfen Post |
 | Trade post | Cairnwick Post, Redfen Post, Gullhaven Post | Where packs are sold (`content/trade.toml`) |
+| Skillset | Emberlore | Fire and frost at range (`emberlore`, `content/combat.toml`) |
+| Skillset | Ironvow | Weapons and fury up close (`ironvow`) |
+| Skillset | Wellspring | Healing, and a little harm (`wellspring`) |
+| Skill: Emberlore | Cinder Dart, Frostspike, Flare Burst | (`cinder_dart`, `frostspike`, `flare_burst`) |
+| Skill: Ironvow | Threefold Cut, Rending Blow, Sundering Cleave | (`threefold_cut`, `rending_blow`, `sundering_cleave`) |
+| Skill: Wellspring | Mending Word, Quick Balm, Brine Lash | (`mending_word`, `quick_balm`, `brine_lash`) |
+| Wayshrine | Gullhaven Wayshrine, Furrowdale Wayshrine, Cairnwick Wayshrine, Redfen Wayshrine | Standing stones where the dead get up again, one in each town (`content/combat.toml`) |
+| Dev target | Straw Dummy | A practice target on a post, dev builds only, until NPCs |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

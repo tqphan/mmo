@@ -72,6 +72,7 @@ fn kind_of(n: &ResourceNode) -> Result<&'static NodeData, String> {
 #[spacetimedb::reducer]
 pub fn gather(ctx: &ReducerContext, node_id: u64) -> Result<(), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     if p.parent != 0 {
         return Err("can't gather from a ship".into());
     }

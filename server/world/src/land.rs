@@ -127,6 +127,7 @@ fn plots_owned(ctx: &ReducerContext, identity: Identity) -> usize {
 /// The caller, in the world on land, and a plot it owns within reach, not yet demolished.
 fn my_plot_in_reach(ctx: &ReducerContext, plot_id: u64) -> Result<(Plot, u64), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     let pl = ctx.db.plot().id().find(plot_id).filter(|pl| standing(ctx, pl) != Standing::Demolished).ok_or("no such plot")?;
     if !characters_of(ctx, ctx.sender()).contains(&pl.owner) {
         return Err("that isn't your plot".into());
@@ -174,6 +175,7 @@ fn demolish(ctx: &ReducerContext, p: &Plot) {
 #[spacetimedb::reducer]
 pub fn place_plot(ctx: &ReducerContext, item_id: u64, x: f32, z: f32, yaw: u8) -> Result<(), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     if p.parent != 0 {
         return Err("can't place a plot from a ship".into());
     }

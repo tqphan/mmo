@@ -190,14 +190,14 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
 ### 4.3 World partitioning and interest management
 
 - **Cells.** The map is split into 64 m cells, 250×250 in total. Each cell key packs the instance id, the cell's y index and its x index into one `u64`. Instance 0 is the open world. Dungeons, arenas, the prison and the courthouse each get their own instance id, so they're separated for free.
-- **Every public table with a world position has an indexed `cell` column.** Data that hangs off an entity goes inside a row that already has `cell` (for example, the buff list lives inside `status`), or is fetched with a join subscription if the pinned version supports it (verify in M0).
+- **Every public table with a world position has an indexed `cell` column.** Data that hangs off an entity goes inside a row that already has `cell` (for example, the buff list lives inside `vitals`, called `status` in early sketches; ADR 0028), or is fetched with a join subscription if the pinned version supports it (verify in M0).
 - **Subscribe cell by cell.** Use one `cell = key` query per cell and table, not a range per row. SpacetimeDB 2.13 prunes equality queries when it works out who receives a change, and shares identical queries between clients, but it checks every range query against every change. The M0 throughput spike measured 7× less database time this way (docs/spikes/throughput.md).
 - **Subscription tiers:**
 
   | Tier | Contents | Radius | Write rate |
   |---|---|---|---|
   | Self | The player's own private data through views: inventory, cooldowns, quests, labor, mail, crime record | — | On change |
-  | Near | `entity`, `transform`, `status`, `combat_event` | 5×5 cells, about ±160 m | Published in one batch per 10 Hz tick (ADR 0011) |
+  | Near | `entity`, `transform`, `vitals`, `combat_event` | 5×5 cells, about ±160 m | Published in one batch per 10 Hz tick (ADR 0011) |
   | Static | Plots, buildings, crops, trees, livestock, furniture, resource nodes | 9×9 cells, about ±290 m | Rarely |
   | Far | `far_marker` (ships, world bosses, siege engines) on a 512 m grid | 5×5 cells, about ±1.3 km | 1 Hz |
   | Global | Zone war states, world events, clock, weather | Whole world | Rarely |
@@ -351,7 +351,7 @@ pub struct Transform {
     mode: u8,                                        // walk / swim / glide / mount / carry / transformed / dead
 }
 
-#[table(accessor = status, public)]                  // warm
+#[table(accessor = status, public)]                  // warm; built as `vitals` (ADR 0028: `Status` clashes in the C# SDK)
 pub struct Status {
     #[primary_key] entity_id: u64,
     #[index(btree)] cell: u64,

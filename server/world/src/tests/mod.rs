@@ -7,6 +7,8 @@ use crate::movement::{move_event, moved, suspicion};
 use crate::session::*;
 use sim::content::CONTENT_HASH;
 
+#[cfg(feature = "dev")]
+mod combat;
 mod crafting;
 mod farming;
 mod gathering;

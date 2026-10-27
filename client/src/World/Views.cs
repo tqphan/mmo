@@ -29,6 +29,26 @@ namespace Mmo
             return root;
         }
 
+        /// <summary>Stand a body up facing <paramref name="yaw"/>, or lay it down that way when dead (docs/design/combat.md).</summary>
+        public static void Lie(Node3D body, float yaw, bool dead)
+        {
+            body.Rotation = new Vector3(dead ? -Mathf.Pi / 2 : 0, yaw, 0);
+            body.Position = dead ? new Vector3(0, 0.35f, 0) : Vector3.Zero;
+        }
+
+        /// <summary>A Straw Dummy: a post with a crossbar and a stuffed sack for a body, standing on its origin.</summary>
+        public static Node3D Dummy()
+        {
+            var root = new Node3D { Name = "Body" };
+            var wood = new StandardMaterial3D { AlbedoColor = new Color(0.45f, 0.32f, 0.2f), Roughness = 0.9f };
+            var straw = new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.74f, 0.42f), Roughness = 1.0f };
+            root.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.07f, BottomRadius = 0.08f, Height = 1.9f, Material = wood }, Position = new Vector3(0, 0.95f, 0) });
+            root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(1.3f, 0.1f, 0.1f), Material = wood }, Position = new Vector3(0, 1.45f, 0) });
+            root.AddChild(new MeshInstance3D { Mesh = new CapsuleMesh { Radius = 0.3f, Height = 0.9f, Material = straw }, Position = new Vector3(0, 1.2f, 0) });
+            root.AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.2f, Height = 0.4f, Material = straw }, Position = new Vector3(0, 1.85f, 0) });
+            return root;
+        }
+
         /// <summary>A hull-sized box for a ship, deck at its origin.</summary>
         public static Node3D Ship(Vector3 size)
         {

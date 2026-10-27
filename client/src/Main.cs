@@ -102,6 +102,11 @@ namespace Mmo
             var trade = new Trade(session, player, tradeRegistry);
             AddChild(trade);
             player.Trade = trade;
+            AddChild(new ShrineRegistry(session));
+            var combat = new Combat(session, player, entities);
+            AddChild(combat);
+            player.Combat = combat;
+            AddChild(new CombatHud(combat));
             var plots = new Plots(session, player, plotRegistry);
             AddChild(plots);
             player.Plots = plots;
@@ -142,6 +147,8 @@ namespace Mmo
                 AddChild(new FarmDemo(session, player, map, world.Land, bag, placement, plotRegistry, farming));
             if (options.TradeDemo)
                 AddChild(new TradeDemo(session, player, stations, crafting, craftWindow, tradeRegistry, trade));
+            if (options.CombatDemo)
+                AddChild(new CombatDemo(session, player, entities, combat));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -237,6 +244,13 @@ namespace Mmo
             Bind("rotate", Key.R);
             Bind("uproot", Key.G);
             Bind("drop_pack", Key.X);
+            Bind("target_next", Key.Tab);
+            Bind("target_self", Key.F1);
+            Bind("target_clear", Key.Escape);
+            Bind("respawn", Key.R);
+            Key[] digits = { Key.Key1, Key.Key2, Key.Key3, Key.Key4, Key.Key5, Key.Key6, Key.Key7, Key.Key8, Key.Key9 };
+            for (int k = 0; k < digits.Length; k++)
+                Bind($"skill_{k + 1}", digits[k]);
         }
     }
 }

@@ -107,6 +107,7 @@ fn can_make(ctx: &ReducerContext, identity: Identity, char_id: u64, r: &RecipeDa
 #[spacetimedb::reducer]
 pub fn craft(ctx: &ReducerContext, station_id: u64, recipe: u16, count: u32) -> Result<(), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     if p.parent != 0 {
         return Err("can't craft from a ship".into());
     }

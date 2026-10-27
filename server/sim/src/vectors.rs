@@ -70,7 +70,11 @@ pub fn generate() -> String {
          # trade_reach <thing x y z> <at x y z> <1 or 0>\n\
          # trade_demand <permille> <at> <now> <demand now> <after a sale>\n\
          # trade_fresh <made at> <now> <permille, or spoiled>\n\
-         # trade_quote <pack item wire> <origin x> <origin z> <made at> <post x> <post z> <bonus pct> <demand> <now> <route:demand:fresh:copper, or the error code>\n",
+         # trade_quote <pack item wire> <origin x> <origin z> <made at> <post x> <post z> <bonus pct> <demand> <now> <route:demand:fresh:copper, or the error code>\n\
+         # combat_settle <value> <max> <at> <combat until> <now> <rate in> <rate out> <settled>\n\
+         # combat_deaths <deaths> <last death at, or none> <now> <deaths after> <respawn wait µs>\n\
+         # combat_front <yaw> <from x y z> <to x y z> <in front: 1 or 0> <moved off: 1 or 0> <impact µs at 30 m/s>\n\
+         # combat_check <skill wire> <at x y z> <yaw> <alive> <casting> <mp> <ready at> <target x y z> <target alive> <is caster> <now> <0, or the error code> <finish: 0, or the error code>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -167,7 +171,90 @@ pub fn generate() -> String {
     craft(&mut out, &mut rng);
     land(&mut out, &mut rng);
     trade(&mut out, &mut rng);
+    combat(&mut out, &mut rng);
     out
+}
+
+/// `sim::combat`'s regeneration, death stacks, facing and skill checks, for the client's port.
+fn combat(out: &mut String, rng: &mut Lcg) {
+    use crate::combat::{COMBAT, Caster, SKILLS, Target, check, check_finish, deaths_after, impact_micros, in_front, moved_off, respawn_wait_micros, settle};
+    const S: i64 = 1_000_000;
+    let t0 = 1_800_000_000 * S;
+    for k in 0..60 {
+        let max = if k % 7 == 0 { 800 } else { 1000 };
+        let value = match k % 5 {
+            0 => max,
+            1 => 0,
+            _ => (rng.next() * max as f32) as i32,
+        };
+        let combat_until = t0 + (rng.range(-20.0, 20.0) as f64 * S as f64) as i64;
+        let now = t0 + (rng.range(-5.0, 120.0) as f64 * S as f64) as i64;
+        let (rin, rout) = (if k % 3 == 0 { 0 } else { COMBAT.hp_regen_in }, COMBAT.hp_regen_out + k % 4);
+        let got = settle(value, max, t0, combat_until, now, rin, rout);
+        out.push_str(&format!("combat_settle {value} {max} {t0} {combat_until} {now} {rin} {rout} {got}\n"));
+    }
+    for k in 0..30u32 {
+        let last = if k % 4 == 0 { None } else { Some(t0) };
+        let now = t0 + (rng.next() as f64 * 2.0 * f64::from(COMBAT.death_stack_s) * S as f64) as i64;
+        let after = deaths_after(k % 9, last, now);
+        let last_text = last.map_or("none".to_string(), |l| l.to_string());
+        out.push_str(&format!("combat_deaths {} {last_text} {now} {after} {}\n", k % 9, respawn_wait_micros(after)));
+    }
+    let pos = |rng: &mut Lcg, r: f32| [rng.range(-r, r), rng.range(-r / 4.0, r / 4.0), rng.range(-r, r)];
+    for k in 0..60 {
+        let from = pos(rng, 100.0);
+        let to = if k % 6 == 0 { [from[0] + 0.3, from[1], from[2] - 0.4] } else { [from[0] + rng.range(-30.0, 30.0), from[1] + rng.range(-3.0, 3.0), from[2] + rng.range(-30.0, 30.0)] };
+        let yaw = rng.range(-7.0, 7.0);
+        out.push_str(&format!(
+            "combat_front {} {} {} {} {} {} {} {} {} {}\n",
+            f(yaw),
+            f(from[0]),
+            f(from[1]),
+            f(from[2]),
+            f(to[0]),
+            f(to[1]),
+            f(to[2]),
+            u8::from(in_front(yaw, from, to)),
+            u8::from(moved_off(from, to)),
+            impact_micros(crate::combat::distance(from, to), 30.0)
+        ));
+    }
+    for k in 0..120 {
+        let s = &SKILLS[k % SKILLS.len()];
+        let at = pos(rng, 50.0);
+        let near = k % 3 != 0;
+        let spread = if near { s.range_m * 0.8 } else { s.range_m * 1.5 };
+        let to = [at[0] + rng.range(-spread, spread), at[1] + rng.range(-2.0, 2.0), at[2] + rng.range(-spread, spread)];
+        let c = Caster {
+            at,
+            yaw: rng.range(0.0, std::f32::consts::TAU),
+            alive: k % 17 != 0,
+            casting: k % 19 == 0,
+            mp: if k % 11 == 0 { s.cost_mp - 1 } else { 800 },
+            ready_at: if k % 13 == 0 { t0 + S } else { t0 - S },
+        };
+        let t = Target { at: to, alive: k % 23 != 0, is_caster: k % 29 == 0 };
+        let code = |r: Result<(), crate::combat::Refusal>| r.map_or_else(|e| e as u8, |()| 0);
+        out.push_str(&format!(
+            "combat_check {} {} {} {} {} {} {} {} {} {} {} {} {} {} {t0} {} {}\n",
+            s.wire,
+            f(at[0]),
+            f(at[1]),
+            f(at[2]),
+            f(c.yaw),
+            u8::from(c.alive),
+            u8::from(c.casting),
+            c.mp,
+            c.ready_at,
+            f(to[0]),
+            f(to[1]),
+            f(to[2]),
+            u8::from(t.alive),
+            u8::from(t.is_caster),
+            code(check(s, &c, &t, t0)),
+            code(check_finish(s, at, &t))
+        ));
+    }
 }
 
 /// `sim::trade`'s reach, demand, freshness and quotes, for the client's port.

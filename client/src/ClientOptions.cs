@@ -16,6 +16,7 @@ namespace Mmo
     /// <item><c>--gather-demo</c>: dev builds; on entering, teleport beside the nearest ready plant and gather it, then the nearest tree (docs/design/gathering.md).</item>
     /// <item><c>--farm-demo</c>: dev builds; on entering, place a farm on the nearest housing site, plant a row of Hearthgrain, a Woolback and an Amberpear Tree on it and Hearthgrain beside it, ripen them with the dev clock, harvest, then let the crop beside it wither (docs/design/farming.md).</item>
     /// <item><c>--trade-demo</c>: dev builds; on entering, teleport to the Packwright's Bench, craft a Grain Bale, walk a few steps with it, drop it and pick it up, then teleport to Gullhaven Post and sell it (docs/design/trade.md).</item>
+    /// <item><c>--combat-demo</c>: dev builds; on entering, put a Straw Dummy ahead and fight it through the hotbar, have a cast interrupted, turn to face it, heal, then die and respawn at a Wayshrine (docs/design/combat.md).</item>
     /// <item><c>--land-demo</c>: dev builds; on entering, teleport beside the nearest housing site, place a garden through the placement mode, pay its tax, make it public, then move the dev clock past its demolition (docs/design/land.md).</item>
     /// <item><c>--craft-demo</c>: dev builds; on entering, teleport to the Cookhearth, grant logs and ore, craft Charcoal, then a Rustiron Bar at the Bloomery (docs/design/crafting.md).</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
@@ -46,6 +47,7 @@ namespace Mmo
         public bool LandDemo;
         public bool FarmDemo;
         public bool TradeDemo;
+        public bool CombatDemo;
         public bool Walk;
         public float CamYawDeg;
         public bool Trace;
@@ -91,6 +93,7 @@ namespace Mmo
                     case "--land-demo": o.LandDemo = true; break;
                     case "--farm-demo": o.FarmDemo = true; break;
                     case "--trade-demo": o.TradeDemo = true; break;
+                    case "--combat-demo": o.CombatDemo = true; break;
                     case "--labor": o.Labor = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--spawn-ship": o.SpawnShip = Triple(Next()); break;
                     case "--trace": o.Trace = true; break;

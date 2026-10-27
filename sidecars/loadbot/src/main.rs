@@ -9,6 +9,7 @@
 
 #[allow(clippy::all, unused)]
 mod module_bindings;
+mod combat;
 mod craft;
 mod director;
 mod gather;
@@ -112,6 +113,7 @@ fn main() {
         "land" => land::scenario(&args),
         "farm" => farm::scenario(&args),
         "trade" => trade::scenario(&args),
+        "combat" => combat::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -132,7 +134,8 @@ fn main() {
                  craft            a bot by stations: refusals, a batch that pays out, a batch that runs out, cancelling\n  \
                  land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock\n  \
                  farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot\n  \
-                 trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock"
+                 trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock\n  \
+                 combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn"
             );
             std::process::exit(2);
         }

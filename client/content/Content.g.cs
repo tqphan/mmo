@@ -184,6 +184,57 @@ namespace Mmo.Content
     /// <param name="BonusPct">Added to the route factor, in percent.</param>
     public sealed record PostData(byte Wire, string Id, string Name, uint BonusPct);
 
+    /// <summary>Combat rules (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="HpMax">Every character's most HP, until levels and gear.</param>
+    /// <param name="MpMax">Every character's most mana.</param>
+    /// <param name="HpRegenOut">HP regenerated per second out of combat.</param>
+    /// <param name="HpRegenIn">HP regenerated per second in combat.</param>
+    /// <param name="MpRegenOut">Mana regenerated per second out of combat.</param>
+    /// <param name="MpRegenIn">Mana regenerated per second in combat.</param>
+    /// <param name="CombatS">How long a character stays in combat after it last hit or was hit, s.</param>
+    /// <param name="GcdMs">The global cooldown every skill starts, ms.</param>
+    /// <param name="CastMoveM">Moving this far from where a cast began interrupts it, m.</param>
+    /// <param name="CastLeewayM">How far beyond its range a target may be when a cast finishes, m.</param>
+    /// <param name="RespawnFirstS">The wait to respawn after a first death, s.</param>
+    /// <param name="RespawnStepS">Added to the wait for each further death within death_stack_s, s.</param>
+    /// <param name="RespawnMaxS">The longest wait to respawn, s.</param>
+    /// <param name="DeathStackS">How long a death counts toward the next wait, s.</param>
+    /// <param name="RespawnPct">HP and mana on respawning, in percent.</param>
+    /// <param name="DummyHp">A dev Straw Dummy's HP.</param>
+    public sealed record CombatRules(int HpMax, int MpMax, int HpRegenOut, int HpRegenIn, int MpRegenOut, int MpRegenIn, int CombatS, int GcdMs, float CastMoveM, float CastLeewayM, int RespawnFirstS, int RespawnStepS, int RespawnMaxS, int DeathStackS, int RespawnPct, int DummyHp);
+
+    /// <summary>Whom a skill may be used on. The value is the wire value.</summary>
+    public enum SkillTarget : byte
+    {
+        Enemy = 0,
+        Ally = 1,
+        Caster = 2,
+    }
+
+    /// <summary>What a skill's effect does. The value is the wire value.</summary>
+    public enum EffectKind : byte
+    {
+        Damage = 0,
+        Heal = 1,
+    }
+
+    public sealed record EffectData(EffectKind Kind, int Amount);
+
+    /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>
+    public sealed record SkillsetData(byte Wire, string Id, string Name);
+
+    /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="Wire">Stored in casts and combat events.</param>
+    /// <param name="Skillset">The skillset's wire.</param>
+    /// <param name="CastMs">0 is instant.</param>
+    /// <param name="SpeedMps">0 lands at once; otherwise a projectile's speed, m/s.</param>
+    /// <param name="Facing">The target must be in front.</param>
+    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);
+
+    /// <summary>Wayshrine kinds (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="Wire">Stored in shrine rows.</param>
+    public sealed record ShrineData(byte Wire, string Id, string Name);
+
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -201,7 +252,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x0fff855d37a26c54UL;
+        public const ulong Hash = 0xf2c15f765b7e838eUL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -437,5 +488,44 @@ namespace Mmo.Content
 
         /// <summary>The post kind stored as <paramref name="wire"/>, if it exists.</summary>
         public static PostData? Post(byte wire) => wire < Posts.Count ? Posts[wire] : null;
+
+        public static readonly CombatRules Combat = new(1000, 800, 20, 4, 16, 6, 6, 1000, 0.5f, 3.0f, 5, 25, 180, 600, 50, 5000);
+
+        /// <summary>Every skillset, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<SkillsetData> Skillsets = new SkillsetData[]
+        {
+            new(0, "emberlore", "Emberlore"),
+            new(1, "ironvow", "Ironvow"),
+            new(2, "wellspring", "Wellspring"),
+        };
+
+        /// <summary>Every skill, sorted by wire.</summary>
+        public static readonly IReadOnlyList<SkillData> Skills = new SkillData[]
+        {
+            new(100, "cinder_dart", "Cinder Dart", 0, SkillTarget.Enemy, 1000, 0, 25.0f, 30, 30.0f, true, new EffectData[] { new(EffectKind.Damage, 110) }),
+            new(101, "frostspike", "Frostspike", 0, SkillTarget.Enemy, 0, 8000, 20.0f, 45, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80) }),
+            new(102, "flare_burst", "Flare Burst", 0, SkillTarget.Enemy, 2000, 12000, 25.0f, 80, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 240) }),
+            new(200, "threefold_cut", "Threefold Cut", 1, SkillTarget.Enemy, 0, 0, 4.0f, 20, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 70) }),
+            new(201, "rending_blow", "Rending Blow", 1, SkillTarget.Enemy, 0, 6000, 4.0f, 40, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 140) }),
+            new(202, "sundering_cleave", "Sundering Cleave", 1, SkillTarget.Enemy, 1500, 10000, 5.0f, 60, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 230) }),
+            new(300, "mending_word", "Mending Word", 2, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260) }),
+            new(301, "quick_balm", "Quick Balm", 2, SkillTarget.Ally, 0, 6000, 25.0f, 50, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 120) }),
+            new(302, "brine_lash", "Brine Lash", 2, SkillTarget.Enemy, 1000, 0, 20.0f, 30, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80) }),
+        };
+
+        /// <summary>The skill stored as <paramref name="wire"/>, if it exists.</summary>
+        public static SkillData? Skill(ushort wire) => Skills.FirstOrDefault(k => k.Wire == wire);
+
+        /// <summary>Every Wayshrine kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<ShrineData> Shrines = new ShrineData[]
+        {
+            new(0, "gullhaven_wayshrine", "Gullhaven Wayshrine"),
+            new(1, "furrowdale_wayshrine", "Furrowdale Wayshrine"),
+            new(2, "cairnwick_wayshrine", "Cairnwick Wayshrine"),
+            new(3, "redfen_wayshrine", "Redfen Wayshrine"),
+        };
+
+        /// <summary>The Wayshrine kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static ShrineData? Shrine(byte wire) => wire < Shrines.Count ? Shrines[wire] : null;
     }
 }

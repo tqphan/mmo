@@ -1,0 +1,197 @@
+# Combat (docs/design/combat.md): vitals, skills and where the dead respawn. Skill `wire`s are stored
+# in casts and combat events, 100 to 999 (below 100 are the cannon and dev swing); skillset and
+# shrine wires run 0, 1, 2, … like hulls. Names come from docs/world/. Every number is ours, for the
+# M1 playtest to tune: the original's regeneration, global cooldown and respawn HP weren't found.
+
+[combat]
+# Every character's, until levels and gear.
+hp_max = 1000
+mp_max = 800
+# Points per second, out of combat and in it.
+hp_regen_out = 20
+hp_regen_in = 4
+mp_regen_out = 16
+mp_regen_in = 6
+# A character is in combat this long after it last hit or was hit.
+combat_s = 6
+# Every skill starts the global cooldown.
+gcd_ms = 1000
+# Moving this far from where a cast began interrupts it.
+cast_move_m = 0.5
+# How far beyond its range a target may have gone when a cast finishes.
+cast_leeway_m = 3.0
+# The wait before respawning: the first, plus a step for each further death within
+# `death_stack_s`, up to the most (180 s and a 10-minute debuff, B).
+respawn_first_s = 5
+respawn_step_s = 25
+respawn_max_s = 180
+death_stack_s = 600
+# HP and mana on respawning, in percent.
+respawn_pct = 50
+# A dev Straw Dummy's HP.
+dummy_hp = 5000
+
+[[skillset]]
+wire = 0
+id = "emberlore"
+name = "Emberlore"
+
+[[skillset]]
+wire = 1
+id = "ironvow"
+name = "Ironvow"
+
+[[skillset]]
+wire = 2
+id = "wellspring"
+name = "Wellspring"
+
+# Emberlore: fire and frost at range.
+[[skill]]
+wire = 100
+id = "cinder_dart"
+name = "Cinder Dart"
+skillset = "emberlore"
+target = "enemy"
+cast_ms = 1000
+cooldown_ms = 0
+range_m = 25.0
+cost_mp = 30
+speed_mps = 30.0
+facing = true
+effects = [{ kind = "damage", amount = 110 }]
+
+[[skill]]
+wire = 101
+id = "frostspike"
+name = "Frostspike"
+skillset = "emberlore"
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 8000
+range_m = 20.0
+cost_mp = 45
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 80 }]
+
+[[skill]]
+wire = 102
+id = "flare_burst"
+name = "Flare Burst"
+skillset = "emberlore"
+target = "enemy"
+cast_ms = 2000
+cooldown_ms = 12000
+range_m = 25.0
+cost_mp = 80
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 240 }]
+
+# Ironvow: weapons and fury up close.
+[[skill]]
+wire = 200
+id = "threefold_cut"
+name = "Threefold Cut"
+skillset = "ironvow"
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 0
+range_m = 4.0
+cost_mp = 20
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 70 }]
+
+[[skill]]
+wire = 201
+id = "rending_blow"
+name = "Rending Blow"
+skillset = "ironvow"
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 6000
+range_m = 4.0
+cost_mp = 40
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 140 }]
+
+[[skill]]
+wire = 202
+id = "sundering_cleave"
+name = "Sundering Cleave"
+skillset = "ironvow"
+target = "enemy"
+cast_ms = 1500
+cooldown_ms = 10000
+range_m = 5.0
+cost_mp = 60
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 230 }]
+
+# Wellspring: healing, and a little harm.
+[[skill]]
+wire = 300
+id = "mending_word"
+name = "Mending Word"
+skillset = "wellspring"
+target = "ally"
+cast_ms = 1500
+cooldown_ms = 0
+range_m = 25.0
+cost_mp = 60
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "heal", amount = 260 }]
+
+[[skill]]
+wire = 301
+id = "quick_balm"
+name = "Quick Balm"
+skillset = "wellspring"
+target = "ally"
+cast_ms = 0
+cooldown_ms = 6000
+range_m = 25.0
+cost_mp = 50
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "heal", amount = 120 }]
+
+[[skill]]
+wire = 302
+id = "brine_lash"
+name = "Brine Lash"
+skillset = "wellspring"
+target = "enemy"
+cast_ms = 1000
+cooldown_ms = 0
+range_m = 20.0
+cost_mp = 30
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 80 }]
+
+# Wayshrines, where the dead respawn. Each is placed once, from world/shrines.tsv.
+[[shrine]]
+wire = 0
+id = "gullhaven_wayshrine"
+name = "Gullhaven Wayshrine"
+
+[[shrine]]
+wire = 1
+id = "furrowdale_wayshrine"
+name = "Furrowdale Wayshrine"
+
+[[shrine]]
+wire = 2
+id = "cairnwick_wayshrine"
+name = "Cairnwick Wayshrine"
+
+[[shrine]]
+wire = 3
+id = "redfen_wayshrine"
+name = "Redfen Wayshrine"

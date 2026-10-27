@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x0fff855d37a26c54;
+pub const CONTENT_HASH: u64 = 0xf2c15f765b7e838e;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -682,4 +682,156 @@ pub fn post(wire: u8) -> Option<&'static PostData> {
 /// The post kind with content id `id`.
 pub fn post_by_id(id: &str) -> Option<&'static PostData> {
     POSTS.iter().find(|d| d.id == id)
+}
+
+/// Combat rules (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct CombatRules {
+    /// Every character's most HP, until levels and gear.
+    pub hp_max: i32,
+    /// Every character's most mana.
+    pub mp_max: i32,
+    /// HP regenerated per second out of combat.
+    pub hp_regen_out: i32,
+    /// HP regenerated per second in combat.
+    pub hp_regen_in: i32,
+    /// Mana regenerated per second out of combat.
+    pub mp_regen_out: i32,
+    /// Mana regenerated per second in combat.
+    pub mp_regen_in: i32,
+    /// How long a character stays in combat after it last hit or was hit, s.
+    pub combat_s: i32,
+    /// The global cooldown every skill starts, ms.
+    pub gcd_ms: i32,
+    /// Moving this far from where a cast began interrupts it, m.
+    pub cast_move_m: f32,
+    /// How far beyond its range a target may be when a cast finishes, m.
+    pub cast_leeway_m: f32,
+    /// The wait to respawn after a first death, s.
+    pub respawn_first_s: i32,
+    /// Added to the wait for each further death within death_stack_s, s.
+    pub respawn_step_s: i32,
+    /// The longest wait to respawn, s.
+    pub respawn_max_s: i32,
+    /// How long a death counts toward the next wait, s.
+    pub death_stack_s: i32,
+    /// HP and mana on respawning, in percent.
+    pub respawn_pct: i32,
+    /// A dev Straw Dummy's HP.
+    pub dummy_hp: i32,
+}
+
+pub static COMBAT: CombatRules = CombatRules { hp_max: 1000, mp_max: 800, hp_regen_out: 20, hp_regen_in: 4, mp_regen_out: 16, mp_regen_in: 6, combat_s: 6, gcd_ms: 1000, cast_move_m: 0.5, cast_leeway_m: 3.0, respawn_first_s: 5, respawn_step_s: 25, respawn_max_s: 180, death_stack_s: 600, respawn_pct: 50, dummy_hp: 5000 };
+
+/// Whom a skill may be used on. The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SkillTarget {
+    Enemy = 0,
+    Ally = 1,
+    Caster = 2,
+}
+
+/// What a skill's effect does. The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum EffectKind {
+    Damage = 0,
+    Heal = 1,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct EffectData {
+    pub kind: EffectKind,
+    pub amount: i32,
+}
+
+/// Skillsets (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct SkillsetData {
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+}
+
+/// Every skillset, sorted by wire, which is the index.
+pub static SKILLSETS: [SkillsetData; 3] = [
+    SkillsetData { wire: 0, id: "emberlore", name: "Emberlore" },
+    SkillsetData { wire: 1, id: "ironvow", name: "Ironvow" },
+    SkillsetData { wire: 2, id: "wellspring", name: "Wellspring" },
+];
+
+/// Skills (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct SkillData {
+    /// Stored in casts and combat events.
+    pub wire: u16,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    /// The skillset's wire.
+    pub skillset: u8,
+    pub target: SkillTarget,
+    /// 0 is instant.
+    pub cast_ms: u32,
+    pub cooldown_ms: u32,
+    pub range_m: f32,
+    pub cost_mp: i32,
+    /// 0 lands at once; otherwise a projectile's speed, m/s.
+    pub speed_mps: f32,
+    /// The target must be in front.
+    pub facing: bool,
+    pub effects: &'static [EffectData],
+}
+
+/// Every skill, sorted by wire.
+pub static SKILLS: [SkillData; 9] = [
+    SkillData { wire: 100, id: "cinder_dart", name: "Cinder Dart", skillset: 0, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110 }] },
+    SkillData { wire: 101, id: "frostspike", name: "Frostspike", skillset: 0, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 8000, range_m: 20.0, cost_mp: 45, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80 }] },
+    SkillData { wire: 102, id: "flare_burst", name: "Flare Burst", skillset: 0, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 12000, range_m: 25.0, cost_mp: 80, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 240 }] },
+    SkillData { wire: 200, id: "threefold_cut", name: "Threefold Cut", skillset: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 0, range_m: 4.0, cost_mp: 20, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 70 }] },
+    SkillData { wire: 201, id: "rending_blow", name: "Rending Blow", skillset: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 6000, range_m: 4.0, cost_mp: 40, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 140 }] },
+    SkillData { wire: 202, id: "sundering_cleave", name: "Sundering Cleave", skillset: 1, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 10000, range_m: 5.0, cost_mp: 60, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 230 }] },
+    SkillData { wire: 300, id: "mending_word", name: "Mending Word", skillset: 2, target: SkillTarget::Ally, cast_ms: 1500, cooldown_ms: 0, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 260 }] },
+    SkillData { wire: 301, id: "quick_balm", name: "Quick Balm", skillset: 2, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 6000, range_m: 25.0, cost_mp: 50, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 120 }] },
+    SkillData { wire: 302, id: "brine_lash", name: "Brine Lash", skillset: 2, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 20.0, cost_mp: 30, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80 }] },
+];
+
+/// The skill stored as `wire`.
+pub fn skill(wire: u16) -> Option<&'static SkillData> {
+    SKILLS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &SKILLS[i])
+}
+
+/// The skill with content id `id`.
+pub fn skill_by_id(id: &str) -> Option<&'static SkillData> {
+    SKILLS.iter().find(|d| d.id == id)
+}
+
+/// Wayshrine kinds (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct ShrineData {
+    /// Stored in shrine rows.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+}
+
+/// Every Wayshrine kind, sorted by wire, which is the index.
+pub static SHRINES: [ShrineData; 4] = [
+    ShrineData { wire: 0, id: "gullhaven_wayshrine", name: "Gullhaven Wayshrine" },
+    ShrineData { wire: 1, id: "furrowdale_wayshrine", name: "Furrowdale Wayshrine" },
+    ShrineData { wire: 2, id: "cairnwick_wayshrine", name: "Cairnwick Wayshrine" },
+    ShrineData { wire: 3, id: "redfen_wayshrine", name: "Redfen Wayshrine" },
+];
+
+/// The Wayshrine kind stored as `wire`.
+pub fn shrine(wire: u8) -> Option<&'static ShrineData> {
+    SHRINES.get(usize::from(wire))
+}
+
+/// The Wayshrine kind with content id `id`.
+pub fn shrine_by_id(id: &str) -> Option<&'static ShrineData> {
+    SHRINES.iter().find(|d| d.id == id)
 }

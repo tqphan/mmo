@@ -31,7 +31,7 @@ cargo xtask <task> [options]
                        PNGs to target/captures/<name>/; args go to the client
 ";
 
-const SCENARIOS: &[&str] = &["see-each-other", "tick", "cross-cells", "terrain", "ship", "labor", "items", "gather", "craft", "land", "farm", "trade"];
+const SCENARIOS: &[&str] = &["see-each-other", "tick", "cross-cells", "terrain", "ship", "labor", "items", "gather", "craft", "land", "farm", "trade", "combat"];
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

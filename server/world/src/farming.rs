@@ -109,6 +109,7 @@ fn crops_near(ctx: &ReducerContext, x: f32, z: f32) -> Vec<Crop> {
 /// The caller in the world, on land and not swimming; `what` names the action for the refusals.
 fn on_foot(ctx: &ReducerContext, what: &str) -> Result<crate::session::Presence, String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
     if p.parent != 0 {
         return Err(format!("can't {what} from a ship"));
     }

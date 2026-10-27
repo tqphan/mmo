@@ -18,6 +18,9 @@ pub mod entity_kind {
     /// `ref_id` is the hull's wire id (docs/design/ships.md).
     #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_ship` makes ships until shipyards (M1)
     pub const SHIP: u8 = 2;
+    /// A dev Straw Dummy (docs/design/combat.md).
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_dummy` makes dummies until NPCs (M1)
+    pub const DUMMY: u8 = 3;
 }
 
 /// `account.gm_level` values.
@@ -273,6 +276,7 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64, terrai
         speed: 0,
         mode: mode as u8,
     });
+    crate::combat::enter(ctx, ctx.sender(), char_id, e.id, cell);
     let t = now(ctx);
     ctx.db.presence().insert(Presence {
         identity: ctx.sender(),
@@ -310,6 +314,7 @@ fn despawn(ctx: &ReducerContext, who: Identity) {
     crate::ship::let_go(ctx, p.parent, p.entity_id);
     crate::gathering::cancel(ctx, p.char_id);
     crate::crafting::cancel(ctx, p.char_id);
+    crate::combat::leave(ctx, p.char_id, p.entity_id);
     if let Some(c) = ctx.db.character_private().char_id().find(p.char_id) {
         ctx.db.character_private().char_id().update(CharacterPrivate { x, y, z, ..c });
     }

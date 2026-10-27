@@ -103,6 +103,17 @@ namespace Mmo.Gameplay
             }
             if (reason is not MoveReason r)
                 return null;
+            return Emit(now, s, r);
+        }
+
+        /// <summary>
+        /// Send <paramref name="s"/> now, whatever has changed: a turn on the spot, which
+        /// <see cref="Update"/> doesn't send, to face a target before a skill (docs/design/combat.md).
+        /// </summary>
+        public MoveMsg Force(double now, MoveState s) => Emit(now, s, MoveReason.Turn);
+
+        private MoveMsg Emit(double now, MoveState s, MoveReason r)
+        {
             seq++;
             Sent++;
             last = s;

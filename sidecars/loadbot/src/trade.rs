@@ -26,10 +26,23 @@ const FAR: (f32, f32) = (450.0, 30.0);
 const STEP: Duration = Duration::from_millis(250);
 
 /// The ground's height, from the world's files when the server has terrain, else 0.
-struct Ground(Option<HeightFile>);
+pub(crate) struct Ground(Option<HeightFile>);
 
 impl Ground {
-    fn at(&self, x: f32, z: f32) -> f32 {
+    /// The ground `bot`'s server stands on: the world's files if it has terrain, which must be
+    /// theirs, else none.
+    pub(crate) fn of(bot: &Bot) -> Result<Self, String> {
+        if bot.server_terrain().hash == 0 {
+            return Ok(Ground(None));
+        }
+        let w = worldtool::World::load(std::path::Path::new(worldtool::DEFAULT_DIR))?;
+        if w.terrain_hash() != bot.server_terrain().hash {
+            return Err("the server's terrain isn't the world's; run `cargo xtask world`".into());
+        }
+        Ok(Ground(Some(w.heights)))
+    }
+
+    pub(crate) fn at(&self, x: f32, z: f32) -> f32 {
         self.0.as_ref().map_or(0.0, |h| ground(&mut FileChunks::new(h), x, z).map_or(0.0, |g| g.hi))
     }
 }
@@ -39,15 +52,7 @@ pub fn scenario(args: &Args) -> Check {
     let recipe = sim::craft::recipe_by_id("grain_bale").ok_or("no grain_bale recipe")?;
     let a = Bot::connect(args, "A")?;
     a.subscribe_self()?;
-    let land = if a.server_terrain().hash != 0 {
-        let w = worldtool::World::load(std::path::Path::new(worldtool::DEFAULT_DIR))?;
-        if w.terrain_hash() != a.server_terrain().hash {
-            return Err("the server's terrain isn't the world's; run `cargo xtask world`".into());
-        }
-        Ground(Some(w.heights))
-    } else {
-        Ground(None)
-    };
+    let land = Ground::of(&a)?;
     let b = Bot::connect(args, "B")?;
     b.subscribe_self()?;
     let cells: Vec<u64> = [BENCH, FAR].iter().flat_map(|&(x, z)| sim::cell::window_cells(sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z), 1)).collect();
@@ -194,7 +199,7 @@ pub fn scenario(args: &Args) -> Check {
 }
 
 /// Move to `(x, z)` on the ground, running.
-fn walk(bot: &Bot, land: &Ground, x: f32, z: f32) -> Check {
+pub(crate) fn walk(bot: &Bot, land: &Ground, x: f32, z: f32) -> Check {
     let p = bot.presence().ok_or("left the world")?;
     let y = land.at(x, z);
     call(bot, |tx| bot.conn.reducers.move_event_then(p.last_seq + 1, 0, x, y, z, 0, (RUN_SPEED * 100.0) as i16, 1, tx))?;
