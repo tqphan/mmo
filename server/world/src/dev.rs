@@ -51,7 +51,7 @@ pub fn dev_swing(ctx: &ReducerContext, target: u64) -> Result<(), String> {
         return Err("no line of sight".into());
     }
     let cell = ctx.db.transform().entity_id().find(p.entity_id).map_or(0, |t| t.cell);
-    ctx.db.combat_event().insert(CombatEvent { cell, source: p.entity_id, target, skill_id: skill::SWING, amount: 100, flags: 0 });
+    ctx.db.combat_event().insert(CombatEvent { cell, source: p.entity_id, target, skill_id: skill::SWING, amount: 100, flags: 0, status: 0 });
     Ok(())
 }
 

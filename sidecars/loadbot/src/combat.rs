@@ -1,7 +1,9 @@
 //! The `combat` scenario (docs/design/combat.md): bots A and B and a Straw Dummy on the trade
 //! island. A is refused out of range and with B behind it, then hits B instantly, is held by the
 //! global cooldown, hits the dummy, lands a timed cast and a projectile on B, and has a cast
-//! interrupted by stepping. B heals itself with a heal aimed at the dummy. Then B, carrying a pack, is killed: its pack falls, it
+//! interrupted by stepping. B heals itself with a heal aimed at the dummy. A soaks B with Brine
+//! Lash and Frostspike stuns it as a combo; stunned, B can't act, and a Shield Bash then lands for
+//! half as long. Then B, carrying a pack, is killed: its pack falls, it
 //! can't move or fight, respawning is refused until the wait has passed, and it gets up at the
 //! Wayshrine the scenario placed, with half its HP, which regenerates by the dev clock. Then it
 //! cleans up.
@@ -9,7 +11,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use sim::combat::{COMBAT, respawn_share, shrine_by_id, skill_by_id};
+use sim::combat::{COMBAT, level_max, respawn_share, shrine_by_id, skill_by_id, status_by_id};
 
 use crate::gather::{advance, call, game_now, subscribe};
 use crate::land::refused;
@@ -78,7 +80,13 @@ pub fn scenario(args: &Args) -> Check {
         }
         bot.arrive()?;
         call(bot, |tx| bot.conn.reducers.dev_set_gm_then(3, tx))?;
+        // Top level, with every skillset.
+        call(bot, |tx| bot.conn.reducers.dev_set_level_then(level_max(), tx))?;
+        for set in 0..3 {
+            call(bot, |tx| bot.conn.reducers.pick_skillset_then(set, tx))?;
+        }
     }
+    let hp_max = sim::combat::hp_max_at(level_max());
     let log = seen.clone();
     b.conn.db.combat_event().on_insert(move |_, e| log.lock().unwrap().push(e.clone()));
     let events = |skill: &str| -> Vec<CombatEvent> {
@@ -114,8 +122,8 @@ pub fn scenario(args: &Args) -> Check {
     // An instant hit, seen by B; the global cooldown holds the next.
     let spike = skill_by_id("frostspike").ok_or("no frostspike")?;
     use_skill(&a, "frostspike", eb)?;
-    wait_for("B sees the Frostspike", || events("frostspike").len() == 1)?;
-    wait_for("B's HP", || hp_mp(&b, eb).0 == COMBAT.hp_max - spike.effects[0].amount)?;
+    wait_for("B sees the Frostspike", || events("frostspike").iter().filter(|e| e.flags & 1 != 0).count() == 1)?;
+    wait_for("B's HP", || hp_mp(&b, eb).0 == hp_max - spike.effects[0].amount)?;
     refused_skill(&a, "frostspike", eb, "not ready")?;
     println!("A hit B with Frostspike for {}; the cooldowns held the next", spike.effects[0].amount);
     std::thread::sleep(Duration::from_millis(COMBAT.gcd_ms as u64 + 50));
@@ -175,6 +183,36 @@ pub fn scenario(args: &Args) -> Check {
     wait_for("B healed", || hp_mp(&b, eb).0 > hurt)?;
     println!("B's Quick Balm on the dummy healed B instead: {hurt} → {} HP", hp_mp(&b, eb).0);
 
+    // A combo: Brine Lash soaks B, and Frostspike stuns the Soaked. The dev clock skips the cooldowns.
+    let soaked = status_by_id("soaked").ok_or("no soaked")?.wire;
+    let stunned = status_by_id("stunned").ok_or("no stunned")?.wire;
+    let landed = |status: u8| seen.lock().unwrap().iter().filter(|e| e.target == eb && e.status == status && e.flags & 8 != 0).map(|e| e.amount).collect::<Vec<_>>();
+    advance(&a, 20_000_000)?;
+    use_skill(&a, "brine_lash", eb)?;
+    wait_for("B soaked", || landed(soaked).len() == 1)?;
+    std::thread::sleep(Duration::from_millis(COMBAT.gcd_ms as u64 + 50));
+    use_skill(&a, "frostspike", eb)?;
+    wait_for("B stunned by the combo", || landed(stunned).len() == 1)?;
+    let now = game_now(&b);
+    let has = |status: u8| vitals(&b, eb).is_some_and(|v| v.statuses.iter().any(|s| s.status == status && s.until.to_micros_since_unix_epoch() > now));
+    if !has(stunned) || !has(soaked) {
+        return Err("B's vitals don't show it Soaked and Stunned".into());
+    }
+    refused_skill(&b, "quick_balm", eb, "can't act")?;
+    println!("Brine Lash soaked B and Frostspike stunned it for {} ms; B couldn't act", landed(stunned)[0]);
+    // The next stun in a row lands for half as long.
+    std::thread::sleep(Duration::from_millis(COMBAT.gcd_ms as u64 + 50));
+    b.teleport(x, z - 3.0)?;
+    use_skill(&a, "shield_bash", eb)?;
+    wait_for("the second stun", || landed(stunned).len() == 2)?;
+    let (first, second) = (landed(stunned)[0], landed(stunned)[1]);
+    if second * 2 != first {
+        return Err(format!("the second stun lasted {second} ms after {first}"));
+    }
+    println!("A's Shield Bash stunned B again, for {second} ms: diminishing returns");
+    b.teleport(x, z - APART_M)?;
+    advance(&b, 5_000_000)?;
+
     // B dies carrying a pack: the pack falls, and the dead wait.
     call(&b, |tx| b.conn.reducers.dev_give_pack_then("grain_bale".into(), tx))?;
     wait_for("B's pack", || b.conn.db.my_pack().count() == 1)?;
@@ -208,11 +246,11 @@ pub fn scenario(args: &Args) -> Check {
         return Err(format!("B respawned at ({}, {}) with {} corrections, expected ({ux}, {uz}) and {}", p.x, p.z, p.corrections, corrections + 1));
     }
     let hp = hp_mp(&b, eb).0;
-    if !(respawn_share(COMBAT.hp_max)..respawn_share(COMBAT.hp_max) + 3 * COMBAT.hp_regen_out).contains(&hp) {
+    if !(respawn_share(hp_max)..respawn_share(hp_max) + 3 * COMBAT.hp_regen_out).contains(&hp) {
         return Err(format!("B respawned with {hp} HP"));
     }
     advance(&b, 60_000_000)?;
-    wait_for("B's HP to regenerate", || hp_mp(&b, eb).0 == COMBAT.hp_max)?;
+    wait_for("B's HP to regenerate", || hp_mp(&b, eb).0 == hp_max)?;
     println!("B respawned at the Wayshrine with {hp} HP and was full a minute later by the dev clock");
 
     // Clean up.

@@ -45,7 +45,11 @@ const MAX_PACK_VALUE: u32 = 10_000_000;
 /// Whom a skill may be used on, in wire order, fixed here like the item kinds (docs/design/combat.md).
 pub const SKILL_TARGETS: [&str; 3] = ["enemy", "ally", "caster"];
 /// What a skill's effects do, in wire order, fixed here like the item kinds.
-pub const EFFECT_KINDS: [&str; 2] = ["damage", "heal"];
+pub const EFFECT_KINDS: [&str; 4] = ["damage", "heal", "status", "cleanse"];
+/// What a status does to movement and skills, in wire order, fixed here like the item kinds.
+pub const CONTROLS: [&str; 4] = ["none", "stun", "knockdown", "snare"];
+const MAX_STATUS_MS: u32 = 60_000;
+const MAX_DR_STEPS: usize = 8;
 /// Skill wires below this are the cannon and the dev swing in `combat_event.skill_id`.
 const MIN_SKILL_WIRE: u16 = 100;
 const MAX_SKILL_WIRE: u16 = 999;
@@ -408,6 +412,65 @@ struct CombatFile {
     skillset: Vec<SkillsetDef>,
     skill: Vec<SkillDef>,
     shrine: Vec<ShrineDef>,
+    progress: ProgressRules,
+    control: ControlRules,
+    status: Vec<StatusDef>,
+}
+
+/// Levels, experience and skillset picks.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProgressRules {
+    /// Experience from each level to the next; its length plus 1 is the level cap.
+    pub xp_to_next: Vec<u32>,
+    /// The levels at which a skillset may be picked, one each.
+    pub skillset_at: Vec<u8>,
+    pub hp_per_level: i32,
+    pub mp_per_level: i32,
+    pub kill_xp: u32,
+    pub kill_xp_per_level: u32,
+    pub kill_xp_gap_pct: u32,
+    pub death_xp_pct: u32,
+}
+
+/// Crowd control's diminishing returns.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ControlRules {
+    pub window_s: u32,
+    /// The share of its duration each control in a row lands for; past the last, immune.
+    pub steps_pct: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StatusDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub debuff: bool,
+    /// One of `CONTROLS`.
+    #[serde(default = "no_control")]
+    pub control: String,
+    /// A snare's share of the speed limit, in percent; 100 for anything else.
+    #[serde(default = "full_speed")]
+    pub speed_pct: u32,
+    /// Added to direct damage dealt and taken, in percent.
+    #[serde(default)]
+    pub dealt_pct: i32,
+    #[serde(default)]
+    pub taken_pct: i32,
+    /// How often it hurts or heals by its effect's amount; 0 for never.
+    #[serde(default)]
+    pub tick_ms: u32,
+}
+
+fn no_control() -> String {
+    "none".into()
+}
+
+fn full_speed() -> u32 {
+    100
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -447,6 +510,8 @@ pub struct SkillDef {
     pub name: String,
     /// A skillset id.
     pub skillset: String,
+    /// The level a character must be to use it.
+    pub level: u8,
     /// One of `SKILL_TARGETS`.
     pub target: String,
     pub cast_ms: u32,
@@ -465,7 +530,17 @@ pub struct SkillDef {
 pub struct EffectDef {
     /// One of `EFFECT_KINDS`.
     pub kind: String,
+    /// Damage or healing; a status's per tick; nothing for a cleanse.
+    #[serde(default)]
     pub amount: i32,
+    /// A status effect's status id, and how long it lasts.
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub ms: u32,
+    /// A status id the target must have when the skill lands for this effect to happen (a combo).
+    #[serde(default)]
+    pub when: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -516,6 +591,10 @@ pub struct Content {
     pub skills: Vec<SkillDef>,
     /// Sorted by `wire`, like the modes.
     pub shrines: Vec<ShrineDef>,
+    pub progress: ProgressRules,
+    pub control: ControlRules,
+    /// Sorted by `wire`, like the modes.
+    pub statuses: Vec<StatusDef>,
     pub hash: u64,
 }
 
@@ -533,6 +612,11 @@ impl Content {
     /// The wire of a skillset; parsing checked it exists.
     fn skillset_wire(&self, id: &str) -> u8 {
         self.skillsets.iter().find(|s| s.id == id).map_or(0, |s| s.wire)
+    }
+
+    /// The wire of a status, if `id` names one; parsing checked any it's given exists.
+    fn status_wire(&self, id: &str) -> Option<u8> {
+        self.statuses.iter().find(|s| s.id == id).map(|s| s.wire)
     }
 
     /// The wire of a station kind; parsing checked it exists.
@@ -589,6 +673,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     combat.skillset.sort_by_key(|s| s.wire);
     combat.skill.sort_by_key(|s| s.wire);
     combat.shrine.sort_by_key(|s| s.wire);
+    combat.status.sort_by_key(|s| s.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &items.item, &mut errors);
@@ -619,6 +704,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         skillsets: combat.skillset,
         skills: combat.skill,
         shrines: combat.shrine,
+        progress: combat.progress,
+        control: combat.control,
+        statuses: combat.status,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -1129,23 +1217,107 @@ fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
         if !(sk.speed_mps == 0.0 || (5.0..=200.0).contains(&sk.speed_mps)) {
             errors.push(format!("{at}: speed_mps must be 0 or from 5 to 200"));
         }
+        let level_max = k.progress.xp_to_next.len() + 1;
+        if !(1..=level_max).contains(&usize::from(sk.level)) {
+            errors.push(format!("{at}: level must be from 1 to {level_max}"));
+        }
         if sk.effects.is_empty() {
             errors.push(format!("{at}: no effects"));
         }
+        let status_of = |id: &str| k.status.iter().find(|st| st.id == id);
         for e in &sk.effects {
             if !EFFECT_KINDS.contains(&e.kind.as_str()) {
                 errors.push(format!("{at}: effect kind must be one of {}", EFFECT_KINDS.join(", ")));
             }
-            if !(1..=MAX_EFFECT).contains(&e.amount) {
-                errors.push(format!("{at}: effect amounts must be from 1 to {MAX_EFFECT}"));
+            if !e.when.is_empty() && status_of(&e.when).is_none() {
+                errors.push(format!("{at}: effect condition: no status {:?}", e.when));
+            }
+            match e.kind.as_str() {
+                "damage" | "heal" if !(1..=MAX_EFFECT).contains(&e.amount) || !e.status.is_empty() || e.ms != 0 => {
+                    errors.push(format!("{at}: damage and heal effects have amounts from 1 to {MAX_EFFECT} and no status"));
+                }
+                "status" => match status_of(&e.status) {
+                    None => errors.push(format!("{at}: no status {:?}", e.status)),
+                    Some(st) => {
+                        if !(500..=MAX_STATUS_MS).contains(&e.ms) {
+                            errors.push(format!("{at}: status effects last ms from 500 to {MAX_STATUS_MS}"));
+                        }
+                        let wants = if st.tick_ms > 0 { 1..=MAX_EFFECT } else { 0..=0 };
+                        if !wants.contains(&e.amount) {
+                            errors.push(format!("{at}: a status effect's amount is from 1 to {MAX_EFFECT} if the status ticks, and 0 if not"));
+                        }
+                    }
+                },
+                "cleanse" if e.amount != 0 || !e.status.is_empty() || e.ms != 0 => {
+                    errors.push(format!("{at}: cleanse effects have no amount or status"));
+                }
+                _ => {}
             }
         }
-        let (harms, heals) = (sk.effects.iter().any(|e| e.kind == "damage"), sk.effects.iter().any(|e| e.kind == "heal"));
-        if sk.target == "enemy" && (!harms || heals) {
-            errors.push(format!("{at}: an enemy skill deals damage and doesn't heal"));
+        let debuff = |e: &EffectDef| e.kind == "status" && status_of(&e.status).is_some_and(|st| st.debuff);
+        let buff = |e: &EffectDef| e.kind == "status" && status_of(&e.status).is_some_and(|st| !st.debuff);
+        let harms = sk.effects.iter().any(|e| e.kind == "damage" || debuff(e));
+        let helps = sk.effects.iter().any(|e| matches!(e.kind.as_str(), "heal" | "cleanse") || buff(e));
+        if sk.target == "enemy" && (!harms || helps) {
+            errors.push(format!("{at}: an enemy skill deals damage or debuffs, and doesn't heal, buff or cleanse"));
         }
-        if sk.target != "enemy" && (harms || !heals) && SKILL_TARGETS.contains(&sk.target.as_str()) {
-            errors.push(format!("{at}: an {} skill heals and doesn't deal damage", sk.target));
+        if sk.target != "enemy" && (harms || !helps) && SKILL_TARGETS.contains(&sk.target.as_str()) {
+            errors.push(format!("{at}: an {} skill heals, buffs or cleanses, and doesn't deal damage or debuff", sk.target));
+        }
+    }
+    check_progress(file, &k.progress, k.skillset.len(), errors);
+    let c = &k.control;
+    if !(1..=3600).contains(&c.window_s) {
+        errors.push(format!("{file}: control.window_s must be from 1 to 3600"));
+    }
+    if c.steps_pct.is_empty() || c.steps_pct.len() > MAX_DR_STEPS || c.steps_pct.iter().any(|&p| !(1..=100).contains(&p)) || c.steps_pct.windows(2).any(|w| w[1] > w[0]) {
+        errors.push(format!("{file}: control.steps_pct needs 1 to {MAX_DR_STEPS} entries from 1 to 100 that never rise"));
+    }
+    check_ids(file, "status", k.status.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
+    for st in &k.status {
+        let at = format!("{file}: status {:?}", st.id);
+        if !is_item_name(&st.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(st.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", st.name));
+        }
+        if !CONTROLS.contains(&st.control.as_str()) {
+            errors.push(format!("{at}: control must be one of {}", CONTROLS.join(", ")));
+        }
+        if st.control != "none" && !st.debuff {
+            errors.push(format!("{at}: only debuffs control"));
+        }
+        let speed_ok = if st.control == "snare" { (1..=99).contains(&st.speed_pct) } else { st.speed_pct == 100 };
+        if !speed_ok {
+            errors.push(format!("{at}: speed_pct is from 1 to 99 for a snare and 100 for anything else"));
+        }
+        if !(-90..=200).contains(&st.dealt_pct) || !(-90..=200).contains(&st.taken_pct) {
+            errors.push(format!("{at}: dealt_pct and taken_pct must be from -90 to 200"));
+        }
+        if st.tick_ms != 0 && !(250..=MAX_STATUS_MS).contains(&st.tick_ms) {
+            errors.push(format!("{at}: tick_ms must be 0 or from 250 to {MAX_STATUS_MS}"));
+        }
+    }
+}
+
+fn check_progress(file: &str, p: &ProgressRules, skillsets: usize, errors: &mut Vec<String>) {
+    if p.xp_to_next.is_empty() || p.xp_to_next.len() > 98 || p.xp_to_next.iter().any(|&x| !(1..=100_000_000).contains(&x)) {
+        errors.push(format!("{file}: progress.xp_to_next needs 1 to 98 entries from 1 to 100000000"));
+    }
+    let cap = p.xp_to_next.len() + 1;
+    let at = &p.skillset_at;
+    if at.first() != Some(&1) || at.windows(2).any(|w| w[1] <= w[0]) || at.iter().any(|&l| usize::from(l) > cap) || at.len() > skillsets {
+        errors.push(format!("{file}: progress.skillset_at starts at 1 and rises, within the level cap, with no more entries than skillsets"));
+    }
+    for (name, v, hi) in [("hp_per_level", p.hp_per_level, 100_000), ("mp_per_level", p.mp_per_level, 100_000)] {
+        if !(0..=hi).contains(&v) {
+            errors.push(format!("{file}: progress.{name} must be from 0 to {hi}"));
+        }
+    }
+    for (name, v, hi) in [("kill_xp", p.kill_xp, 1_000_000), ("kill_xp_per_level", p.kill_xp_per_level, 1_000_000), ("kill_xp_gap_pct", p.kill_xp_gap_pct, 100), ("death_xp_pct", p.death_xp_pct, 100)] {
+        if v > hi {
+            errors.push(format!("{file}: progress.{name} must be from 0 to {hi}"));
         }
     }
 }
@@ -1292,11 +1464,12 @@ fn canonical(c: &Content) -> String {
     for k in &c.skills {
         write!(
             s,
-            "skill\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "skill\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             k.wire,
             k.id,
             k.name,
             k.skillset,
+            k.level,
             k.target,
             k.cast_ms,
             k.cooldown_ms,
@@ -1307,12 +1480,28 @@ fn canonical(c: &Content) -> String {
         )
         .unwrap();
         for e in &k.effects {
-            write!(s, "\t{}:{}", e.kind, e.amount).unwrap();
+            write!(s, "\t{}:{}:{}:{}:{}", e.kind, e.amount, e.status, e.ms, e.when).unwrap();
         }
         s += "\n";
     }
     for k in &c.shrines {
         writeln!(s, "shrine\t{}\t{}\t{}", k.wire, k.id, k.name).unwrap();
+    }
+    let p = &c.progress;
+    writeln!(
+        s,
+        "progress\t{:?}\t{:?}\t{}\t{}\t{}\t{}\t{}\t{}",
+        p.xp_to_next, p.skillset_at, p.hp_per_level, p.mp_per_level, p.kill_xp, p.kill_xp_per_level, p.kill_xp_gap_pct, p.death_xp_pct
+    )
+    .unwrap();
+    writeln!(s, "control\t{}\t{:?}", c.control.window_s, c.control.steps_pct).unwrap();
+    for k in &c.statuses {
+        writeln!(
+            s,
+            "status\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            k.wire, k.id, k.name, k.debuff, k.control, k.speed_pct, k.dealt_pct, k.taken_pct, k.tick_ms
+        )
+        .unwrap();
     }
     s
 }
@@ -1918,7 +2107,15 @@ pub fn render_rust(c: &Content) -> String {
         writeln!(s, "    {} = {w},", pascal(k)).unwrap();
     }
     s += "}\n\n";
-    s += "#[derive(Debug, PartialEq)]\npub struct EffectData {\n    pub kind: EffectKind,\n    pub amount: i32,\n}\n\n";
+    s += "/// What a status does to movement and skills. The discriminant is the wire value.\n";
+    s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum Control {\n";
+    for (w, k) in CONTROLS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(k)).unwrap();
+    }
+    s += "}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct EffectData {\n    pub kind: EffectKind,\n    /// Damage or healing; a status's per tick.\n    pub amount: i32,\n";
+    s += "    /// A status effect's status wire, and how long it lasts.\n    pub status: Option<u8>,\n    pub ms: u32,\n";
+    s += "    /// The status the target must have for this effect to happen (a combo).\n    pub when: Option<u8>,\n}\n\n";
     s += "/// Skillsets (`content/combat.toml`, docs/design/combat.md).\n";
     s += "#[derive(Debug, PartialEq)]\npub struct SkillsetData {\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n}\n\n";
     s += "/// Every skillset, sorted by wire, which is the index.\n";
@@ -1930,22 +2127,35 @@ pub fn render_rust(c: &Content) -> String {
     s += "/// Skills (`content/combat.toml`, docs/design/combat.md).\n";
     s += "#[derive(Debug, PartialEq)]\npub struct SkillData {\n";
     s += "    /// Stored in casts and combat events.\n    pub wire: u16,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
-    s += "    /// The skillset's wire.\n    pub skillset: u8,\n    pub target: SkillTarget,\n";
+    s += "    /// The skillset's wire.\n    pub skillset: u8,\n    /// The level a character must be to use it.\n    pub level: u8,\n    pub target: SkillTarget,\n";
     s += "    /// 0 is instant.\n    pub cast_ms: u32,\n    pub cooldown_ms: u32,\n    pub range_m: f32,\n    pub cost_mp: i32,\n";
     s += "    /// 0 lands at once; otherwise a projectile's speed, m/s.\n    pub speed_mps: f32,\n";
     s += "    /// The target must be in front.\n    pub facing: bool,\n    pub effects: &'static [EffectData],\n}\n\n";
     s += "/// Every skill, sorted by wire.\n";
     writeln!(s, "pub static SKILLS: [SkillData; {}] = [", c.skills.len()).unwrap();
     for k in &c.skills {
-        let effects: Vec<String> =
-            k.effects.iter().map(|e| format!("EffectData {{ kind: EffectKind::{}, amount: {} }}", pascal(&e.kind), e.amount)).collect();
+        let effects: Vec<String> = k
+            .effects
+            .iter()
+            .map(|e| {
+                format!(
+                    "EffectData {{ kind: EffectKind::{}, amount: {}, status: {:?}, ms: {}, when: {:?} }}",
+                    pascal(&e.kind),
+                    e.amount,
+                    c.status_wire(&e.status),
+                    e.ms,
+                    c.status_wire(&e.when)
+                )
+            })
+            .collect();
         writeln!(
             s,
-            "    SkillData {{ wire: {}, id: {:?}, name: {:?}, skillset: {}, target: SkillTarget::{}, cast_ms: {}, cooldown_ms: {}, range_m: {:?}, cost_mp: {}, speed_mps: {:?}, facing: {}, effects: &[{}] }},",
+            "    SkillData {{ wire: {}, id: {:?}, name: {:?}, skillset: {}, level: {}, target: SkillTarget::{}, cast_ms: {}, cooldown_ms: {}, range_m: {:?}, cost_mp: {}, speed_mps: {:?}, facing: {}, effects: &[{}] }},",
             k.wire,
             k.id,
             k.name,
             c.skillset_wire(&k.skillset),
+            k.level,
             pascal(&k.target),
             k.cast_ms,
             k.cooldown_ms,
@@ -1973,7 +2183,53 @@ pub fn render_rust(c: &Content) -> String {
     s += "/// The Wayshrine kind stored as `wire`.\n";
     s += "pub fn shrine(wire: u8) -> Option<&'static ShrineData> {\n    SHRINES.get(usize::from(wire))\n}\n\n";
     s += "/// The Wayshrine kind with content id `id`.\n";
-    s += "pub fn shrine_by_id(id: &str) -> Option<&'static ShrineData> {\n    SHRINES.iter().find(|d| d.id == id)\n}\n";
+    s += "pub fn shrine_by_id(id: &str) -> Option<&'static ShrineData> {\n    SHRINES.iter().find(|d| d.id == id)\n}\n\n";
+    s += "/// Statuses (`content/combat.toml`, docs/design/combat.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct StatusData {\n    /// Stored in status slots.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    pub debuff: bool,\n    pub control: Control,\n    /// A snare's share of the speed limit, in percent; 100 for anything else.\n    pub speed_pct: u32,\n";
+    s += "    /// Added to direct damage dealt and taken, in percent.\n    pub dealt_pct: i32,\n    pub taken_pct: i32,\n";
+    s += "    /// How often it hurts or heals by its effect's amount, ms; 0 for never.\n    pub tick_ms: u32,\n}\n\n";
+    s += "/// Every status, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static STATUSES: [StatusData; {}] = [", c.statuses.len()).unwrap();
+    for k in &c.statuses {
+        writeln!(
+            s,
+            "    StatusData {{ wire: {}, id: {:?}, name: {:?}, debuff: {}, control: Control::{}, speed_pct: {}, dealt_pct: {}, taken_pct: {}, tick_ms: {} }},",
+            k.wire,
+            k.id,
+            k.name,
+            k.debuff,
+            pascal(&k.control),
+            k.speed_pct,
+            k.dealt_pct,
+            k.taken_pct,
+            k.tick_ms
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The status stored as `wire`.\n";
+    s += "pub fn status(wire: u8) -> Option<&'static StatusData> {\n    STATUSES.get(usize::from(wire))\n}\n\n";
+    s += "/// The status with content id `id`.\n";
+    s += "pub fn status_by_id(id: &str) -> Option<&'static StatusData> {\n    STATUSES.iter().find(|d| d.id == id)\n}\n\n";
+    let p = &c.progress;
+    s += "/// Levels, experience and skillset picks (`content/combat.toml`, docs/design/combat.md).\n#[derive(Debug, PartialEq)]\npub struct ProgressRules {\n";
+    s += "    /// Experience from each level to the next; its length plus 1 is the level cap.\n    pub xp_to_next: &'static [u32],\n";
+    s += "    /// The levels at which a skillset may be picked, one each.\n    pub skillset_at: &'static [u8],\n";
+    s += "    /// What each level adds to the HP and mana maximums.\n    pub hp_per_level: i32,\n    pub mp_per_level: i32,\n";
+    s += "    /// Experience for a level-1 kill, more per victim level, less per level the killer is above it, in percent.\n";
+    s += "    pub kill_xp: u32,\n    pub kill_xp_per_level: u32,\n    pub kill_xp_gap_pct: u32,\n";
+    s += "    /// The share of a level's experience a death to anything but a character loses, in percent.\n    pub death_xp_pct: u32,\n}\n\n";
+    writeln!(
+        s,
+        "pub static PROGRESS: ProgressRules = ProgressRules {{ xp_to_next: &{:?}, skillset_at: &{:?}, hp_per_level: {}, mp_per_level: {}, kill_xp: {}, kill_xp_per_level: {}, kill_xp_gap_pct: {}, death_xp_pct: {} }};\n",
+        p.xp_to_next, p.skillset_at, p.hp_per_level, p.mp_per_level, p.kill_xp, p.kill_xp_per_level, p.kill_xp_gap_pct, p.death_xp_pct
+    )
+    .unwrap();
+    s += "/// Crowd control's diminishing returns (`content/combat.toml`, docs/design/combat.md).\n#[derive(Debug, PartialEq)]\npub struct ControlRules {\n";
+    s += "    /// The window runs this long past the end of the last control that landed, s.\n    pub window_s: u32,\n";
+    s += "    /// The share of its duration each control in a row lands for; past the last, immune.\n    pub steps_pct: &'static [u32],\n}\n\n";
+    writeln!(s, "pub static CONTROL: ControlRules = ControlRules {{ window_s: {}, steps_pct: &{:?} }};", c.control.window_s, c.control.steps_pct).unwrap();
     s
 }
 
@@ -2125,7 +2381,28 @@ pub fn render_csharp(c: &Content) -> String {
         writeln!(s, "        {} = {w},", pascal(k)).unwrap();
     }
     s += "    }\n\n";
-    s += "    public sealed record EffectData(EffectKind Kind, int Amount);\n\n";
+    s += "    /// <summary>What a status does to movement and skills. The value is the wire value.</summary>\n";
+    s += "    public enum CrowdControl : byte\n    {\n";
+    for (w, k) in CONTROLS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(k)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <param name=\"Amount\">Damage or healing; a status's per tick.</param>\n";
+    s += "    /// <param name=\"Status\">A status effect's status wire; <paramref name=\"Ms\"/> is how long it lasts.</param>\n";
+    s += "    /// <param name=\"When\">The status the target must have for this effect to happen (a combo).</param>\n";
+    s += "    public sealed record EffectData(EffectKind Kind, int Amount, byte? Status, uint Ms, byte? When);\n\n";
+    s += "    /// <summary>Statuses (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    /// <param name=\"SpeedPct\">A snare's share of the speed limit, in percent; 100 for anything else.</param>\n";
+    s += "    /// <param name=\"DealtPct\">Added to direct damage dealt, in percent; <paramref name=\"TakenPct\"/> to damage taken.</param>\n";
+    s += "    /// <param name=\"TickMs\">How often it hurts or heals by its effect's amount; 0 for never.</param>\n";
+    s += "    public sealed record StatusData(byte Wire, string Id, string Name, bool Debuff, CrowdControl Control, uint SpeedPct, int DealtPct, int TakenPct, uint TickMs);\n\n";
+    s += "    /// <summary>Levels, experience and skillset picks (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    /// <param name=\"XpToNext\">Experience from each level to the next; its length plus 1 is the level cap.</param>\n";
+    s += "    /// <param name=\"SkillsetAt\">The levels at which a skillset may be picked, one each.</param>\n";
+    s += "    public sealed record ProgressRules(IReadOnlyList<uint> XpToNext, IReadOnlyList<byte> SkillsetAt, int HpPerLevel, int MpPerLevel, uint KillXp, uint KillXpPerLevel, uint KillXpGapPct, uint DeathXpPct);\n\n";
+    s += "    /// <summary>Crowd control's diminishing returns (content/combat.toml, docs/design/combat.md).</summary>\n";
+    s += "    /// <param name=\"StepsPct\">The share of its duration each control in a row lands for; past the last, immune.</param>\n";
+    s += "    public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);\n\n";
     s += "    /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    public sealed record SkillsetData(byte Wire, string Id, string Name);\n\n";
     s += "    /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>\n";
@@ -2134,7 +2411,8 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"CastMs\">0 is instant.</param>\n";
     s += "    /// <param name=\"SpeedMps\">0 lands at once; otherwise a projectile's speed, m/s.</param>\n";
     s += "    /// <param name=\"Facing\">The target must be in front.</param>\n";
-    s += "    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);\n\n";
+    s += "    /// <param name=\"Level\">The level a character must be to use it.</param>\n";
+    s += "    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, byte Level, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);\n\n";
     s += "    /// <summary>Wayshrine kinds (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    /// <param name=\"Wire\">Stored in shrine rows.</param>\n";
     s += "    public sealed record ShrineData(byte Wire, string Id, string Name);\n\n";
@@ -2349,14 +2627,20 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        /// <summary>Every skill, sorted by wire.</summary>\n";
     s += "        public static readonly IReadOnlyList<SkillData> Skills = new SkillData[]\n        {\n";
     for k in &c.skills {
-        let effects: Vec<String> = k.effects.iter().map(|e| format!("new(EffectKind.{}, {})", pascal(&e.kind), e.amount)).collect();
+        let byte = |w: Option<u8>| w.map_or("null".to_string(), |w| w.to_string());
+        let effects: Vec<String> = k
+            .effects
+            .iter()
+            .map(|e| format!("new(EffectKind.{}, {}, {}, {}, {})", pascal(&e.kind), e.amount, byte(c.status_wire(&e.status)), e.ms, byte(c.status_wire(&e.when))))
+            .collect();
         writeln!(
             s,
-            "            new({}, {:?}, {:?}, {}, SkillTarget.{}, {}, {}, {}, {}, {}, {}, new EffectData[] {{ {} }}),",
+            "            new({}, {:?}, {:?}, {}, {}, SkillTarget.{}, {}, {}, {}, {}, {}, {}, new EffectData[] {{ {} }}),",
             k.wire,
             k.id,
             k.name,
             c.skillset_wire(&k.skillset),
+            k.level,
             pascal(&k.target),
             k.cast_ms,
             k.cooldown_ms,
@@ -2378,7 +2662,50 @@ pub fn render_csharp(c: &Content) -> String {
     }
     s += "        };\n\n";
     s += "        /// <summary>The Wayshrine kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
-    s += "        public static ShrineData? Shrine(byte wire) => wire < Shrines.Count ? Shrines[wire] : null;\n";
+    s += "        public static ShrineData? Shrine(byte wire) => wire < Shrines.Count ? Shrines[wire] : null;\n\n";
+    s += "        /// <summary>Every status, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<StatusData> Statuses = new StatusData[]\n        {\n";
+    for k in &c.statuses {
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, {}, CrowdControl.{}, {}, {}, {}, {}),",
+            k.wire,
+            k.id,
+            k.name,
+            if k.debuff { "true" } else { "false" },
+            pascal(&k.control),
+            k.speed_pct,
+            k.dealt_pct,
+            k.taken_pct,
+            k.tick_ms
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The status stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static StatusData? Status(byte wire) => wire < Statuses.Count ? Statuses[wire] : null;\n\n";
+    let p = &c.progress;
+    let list = |v: Vec<String>| v.join(", ");
+    writeln!(
+        s,
+        "        public static readonly ProgressRules Progress = new(new uint[] {{ {} }}, new byte[] {{ {} }}, {}, {}, {}u, {}u, {}u, {}u);\n",
+        list(p.xp_to_next.iter().map(|v| format!("{v}u")).collect()),
+        list(p.skillset_at.iter().map(u8::to_string).collect()),
+        p.hp_per_level,
+        p.mp_per_level,
+        p.kill_xp,
+        p.kill_xp_per_level,
+        p.kill_xp_gap_pct,
+        p.death_xp_pct
+    )
+    .unwrap();
+    writeln!(
+        s,
+        "        public static readonly ControlRules Diminishing = new({}u, new uint[] {{ {} }});",
+        c.control.window_s,
+        list(c.control.steps_pct.iter().map(|v| format!("{v}u")).collect())
+    )
+    .unwrap();
     s += "    }\n}\n";
     s
 }
@@ -2719,6 +3046,42 @@ mod tests {
         respawn_pct = 50
         dummy_hp = 5000
 
+        [progress]
+        xp_to_next = [100, 150]
+        skillset_at = [1, 3]
+        hp_per_level = 100
+        mp_per_level = 40
+        kill_xp = 40
+        kill_xp_per_level = 20
+        kill_xp_gap_pct = 25
+        death_xp_pct = 5
+
+        [control]
+        window_s = 15
+        steps_pct = [100, 50]
+
+        [[status]]
+        wire = 1
+        id = "burning"
+        name = "Burning"
+        debuff = true
+        tick_ms = 1000
+
+        [[status]]
+        wire = 0
+        id = "chilled"
+        name = "Chilled"
+        debuff = true
+        control = "snare"
+        speed_pct = 60
+
+        [[status]]
+        wire = 2
+        id = "guarded"
+        name = "Guarded"
+        debuff = false
+        taken_pct = -30
+
         [[skillset]]
         wire = 1
         id = "frost"
@@ -2734,6 +3097,7 @@ mod tests {
         id = "mend"
         name = "Mend"
         skillset = "frost"
+        level = 1
         target = "ally"
         cast_ms = 1500
         cooldown_ms = 0
@@ -2741,13 +3105,14 @@ mod tests {
         cost_mp = 60
         speed_mps = 0.0
         facing = false
-        effects = [{ kind = "heal", amount = 260 }]
+        effects = [{ kind = "heal", amount = 260 }, { kind = "status", status = "guarded", ms = 5000 }, { kind = "cleanse" }]
 
         [[skill]]
         wire = 100
         id = "bolt"
         name = "Bolt"
         skillset = "frost"
+        level = 3
         target = "enemy"
         cast_ms = 1000
         cooldown_ms = 8000
@@ -2755,7 +3120,7 @@ mod tests {
         cost_mp = 30
         speed_mps = 30.0
         facing = true
-        effects = [{ kind = "damage", amount = 110 }, { kind = "damage", amount = 5 }]
+        effects = [{ kind = "damage", amount = 110 }, { kind = "damage", amount = 5, when = "chilled" }, { kind = "status", status = "burning", ms = 4000, amount = 12 }]
 
         [[shrine]]
         wire = 0
@@ -3538,10 +3903,16 @@ mod tests {
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains("pub static COMBAT: CombatRules = CombatRules { hp_max: 1000, mp_max: 800, hp_regen_out: 20, hp_regen_in: 4, mp_regen_out: 16, mp_regen_in: 6, combat_s: 6, gcd_ms: 1000, cast_move_m: 0.5, cast_leeway_m: 3.0, respawn_first_s: 5, respawn_step_s: 25, respawn_max_s: 180, death_stack_s: 600, respawn_pct: 50, dummy_hp: 5000 };"), "{rs}");
         assert!(rs.contains("Caster = 2,") && cs.contains("Caster = 2,") && rs.contains("Heal = 1,"), "{rs}");
-        assert!(rs.contains(r#"SkillData { wire: 100, id: "bolt", name: "Bolt", skillset: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 8000, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110 }, EffectData { kind: EffectKind::Damage, amount: 5 }] },"#), "{rs}");
+        assert!(rs.contains(r#"SkillData { wire: 100, id: "bolt", name: "Bolt", skillset: 1, level: 3, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 8000, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Damage, amount: 5, status: None, ms: 0, when: Some(0) }, EffectData { kind: EffectKind::Status, amount: 12, status: Some(1), ms: 4000, when: None }] },"#), "{rs}");
+        assert!(rs.contains(r#"StatusData { wire: 0, id: "chilled", name: "Chilled", debuff: true, control: Control::Snare, speed_pct: 60, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },"#), "{rs}");
+        assert!(rs.contains("pub static PROGRESS: ProgressRules = ProgressRules { xp_to_next: &[100, 150], skillset_at: &[1, 3], hp_per_level: 100, mp_per_level: 40, kill_xp: 40, kill_xp_per_level: 20, kill_xp_gap_pct: 25, death_xp_pct: 5 };"), "{rs}");
+        assert!(rs.contains("pub static CONTROL: ControlRules = ControlRules { window_s: 15, steps_pct: &[100, 50] };"), "{rs}");
+        assert!(cs.contains(r#"new(2, "guarded", "Guarded", false, CrowdControl.None, 100, 0, -30, 0),"#), "{cs}");
+        assert!(cs.contains("public static readonly ProgressRules Progress = new(new uint[] { 100u, 150u }, new byte[] { 1, 3 }, 100, 40, 40u, 20u, 25u, 5u);"), "{cs}");
+        assert!(cs.contains("public static readonly ControlRules Diminishing = new(15u, new uint[] { 100u, 50u });"), "{cs}");
         assert!(rs.contains(r#"ShrineData { wire: 0, id: "town_shrine", name: "Town Shrine" },"#), "{rs}");
         assert!(cs.contains("public static readonly CombatRules Combat = new(1000, 800, 20, 4, 16, 6, 6, 1000, 0.5f, 3.0f, 5, 25, 180, 600, 50, 5000);"), "{cs}");
-        assert!(cs.contains(r#"new(210, "mend", "Mend", 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260) }),"#), "{cs}");
+        assert!(cs.contains(r#"new(210, "mend", "Mend", 1, 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260, null, 0, null), new(EffectKind.Status, 0, 2, 5000, null), new(EffectKind.Cleanse, 0, null, 0, null) }),"#), "{cs}");
         assert!(cs.contains(r#"new(0, "town_shrine", "Town Shrine"),"#), "{cs}");
     }
 
@@ -3555,7 +3926,16 @@ mod tests {
             ("cast_ms = 1000", "cast_ms = 1100"),
             ("speed_mps = 30.0", "speed_mps = 31.0"),
             ("facing = true", "facing = false"),
-            ("amount = 5 }", "amount = 6 }"),
+            ("amount = 5,", "amount = 6,"),
+            ("level = 3", "level = 2"),
+            ("ms = 4000", "ms = 4100"),
+            ("when = \"chilled\"", "when = \"burning\""),
+            ("speed_pct = 60", "speed_pct = 70"),
+            ("taken_pct = -30", "taken_pct = -20"),
+            ("tick_ms = 1000", "tick_ms = 2000"),
+            ("xp_to_next = [100, 150]", "xp_to_next = [100, 160]"),
+            ("steps_pct = [100, 50]", "steps_pct = [100, 40]"),
+            ("death_xp_pct = 5", "death_xp_pct = 6"),
             ("\"Town Shrine\"", "\"Old Shrine\""),
             ("name = \"Frost\"", "name = \"Rime\""),
         ] {
@@ -3572,11 +3952,11 @@ mod tests {
             .replace("respawn_first_s = 5", "respawn_first_s = 500")
             .replace("cast_move_m = 0.5", "cast_move_m = 0.0")
             .replace("wire = 210", "wire = 99")
-            .replace("skillset = \"frost\"\n        target = \"ally\"", "skillset = \"fire\"\n        target = \"friend\"")
+            .replace("skillset = \"frost\"\n        level = 1\n        target = \"ally\"", "skillset = \"fire\"\n        level = 1\n        target = \"friend\"")
             .replace("range_m = 25.0\n        cost_mp = 30", "range_m = 90.0\n        cost_mp = 900")
             .replace("speed_mps = 30.0", "speed_mps = 2.0")
             .replace("cooldown_ms = 8000", "cooldown_ms = 80000")
-            .replace("amount = 5 }", "amount = 0 }");
+            .replace("amount = 5,", "amount = 0,");
         let e = combat_errors(&bad);
         for want in [
             "combat.hp_max must be from 1",
@@ -3589,17 +3969,59 @@ mod tests {
             "cost_mp must be from 0 to combat.mp_max",
             "speed_mps must be 0 or from 5 to 200",
             "cast_ms and cooldown_ms must be at most 60000",
-            "effect amounts must be from 1",
+            "damage and heal effects have amounts from 1",
         ] {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
-        let e = combat_errors(&COMBAT.replace("kind = \"heal\"", "kind = \"damage\"").replace("{ kind = \"damage\", amount = 5 }", "{ kind = \"heal\", amount = 5 }"));
-        for want in ["an enemy skill deals damage and doesn't heal", "an ally skill heals and doesn't deal damage"] {
+        let e = combat_errors(
+            &COMBAT
+                .replace("{ kind = \"heal\", amount = 260 }, { kind = \"status\", status = \"guarded\", ms = 5000 }, { kind = \"cleanse\" }", "{ kind = \"damage\", amount = 260 }")
+                .replace("{ kind = \"damage\", amount = 5, when = \"chilled\" }", "{ kind = \"heal\", amount = 5 }"),
+        );
+        for want in ["an enemy skill deals damage or debuffs, and doesn't heal", "an ally skill heals, buffs or cleanses, and doesn't deal damage"] {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
-        let e = combat_errors(&COMBAT.replace("wire = 210", "wire = 100").replace("name = \"Mend\"", "name = \"Bolt\"").replace("effects = [{ kind = \"heal\", amount = 260 }]", "effects = []"));
+        let e = combat_errors(&COMBAT.replace("wire = 210", "wire = 100").replace("name = \"Mend\"", "name = \"Bolt\"").replace(
+            "effects = [{ kind = \"heal\", amount = 260 }, { kind = \"status\", status = \"guarded\", ms = 5000 }, { kind = \"cleanse\" }]",
+            "effects = []",
+        ));
         for want in ["duplicate wire 100", "duplicate name \"Bolt\"", "no effects"] {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
+    }
+
+    #[test]
+    fn bad_statuses_effects_and_progress_are_reported_together() {
+        let bad = COMBAT
+            .replace("xp_to_next = [100, 150]", "xp_to_next = []")
+            .replace("skillset_at = [1, 3]", "skillset_at = [2, 1, 3]")
+            .replace("kill_xp_gap_pct = 25", "kill_xp_gap_pct = 250")
+            .replace("steps_pct = [100, 50]", "steps_pct = [50, 100]")
+            .replace("control = \"snare\"\n        speed_pct = 60", "control = \"snare\"\n        speed_pct = 100")
+            .replace("debuff = false\n        taken_pct = -30", "debuff = false\n        control = \"stun\"\n        taken_pct = -300")
+            .replace("tick_ms = 1000", "tick_ms = 10")
+            .replace("level = 3", "level = 9")
+            .replace("when = \"chilled\"", "when = \"frozen\"")
+            .replace("ms = 4000, amount = 12", "ms = 100")
+            .replace("{ kind = \"cleanse\" }", "{ kind = \"cleanse\", amount = 3 }");
+        let e = combat_errors(&bad);
+        for want in [
+            "progress.xp_to_next needs 1 to 98 entries",
+            "progress.skillset_at starts at 1 and rises",
+            "progress.kill_xp_gap_pct must be from 0 to 100",
+            "control.steps_pct needs 1 to 8 entries from 1 to 100 that never rise",
+            "status \"chilled\": speed_pct is from 1 to 99 for a snare",
+            "status \"guarded\": only debuffs control",
+            "status \"guarded\": dealt_pct and taken_pct must be from -90 to 200",
+            "status \"burning\": tick_ms must be 0 or from 250",
+            "skill \"bolt\": level must be from 1 to 1",
+            "effect condition: no status \"frozen\"",
+            "status effects last ms from 500",
+            "a status effect's amount is from 1 to 100000 if the status ticks, and 0 if not",
+            "cleanse effects have no amount or status",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(combat_errors(&COMBAT.replace("status = \"guarded\"", "status = \"warded\"")).contains("no status \"warded\""));
     }
 }

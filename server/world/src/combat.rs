@@ -1,9 +1,10 @@
 //! Combat (docs/design/combat.md): vitals, targeting, skills with casts, cooldowns and impacts,
-//! death and respawning at Wayshrines. HP and mana come from timestamps by the rules in
-//! `sim::combat`; nothing is ticked.
+//! statuses and crowd control, death and respawning at Wayshrines, levels and skillsets. HP and
+//! mana come from timestamps by the rules in `sim::combat`; nothing is ticked but the damage and
+//! healing statuses deal over time, which `world_tick` finds through `periodic`'s due-time index.
 
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp, ViewContext};
-use sim::combat::{COMBAT, Caster, EffectKind, Refusal, SkillData, SkillTarget, Target, shrine};
+use sim::combat::{COMBAT, Caster, Control, EffectKind, Refusal, SkillData, SkillTarget, Slot, Target, shrine};
 use sim::movement::MoveMode;
 
 use crate::session::{Presence, entity, entity_kind, presence, require_admin, transform};
@@ -25,8 +26,11 @@ pub struct CombatEvent {
     pub target: u64,
     /// A skill's wire (100 and up), or one of `skill`'s.
     pub skill_id: u32,
+    /// HP for a hit or heal; a status's duration in ms; experience gained; the new level.
     pub amount: i32,
     pub flags: u16,
+    /// The status put on the target, with `STATUS` or `IMMUNE`.
+    pub status: u8,
 }
 
 /// `combat_event.skill_id` for what isn't a skill from content.
@@ -42,6 +46,35 @@ pub mod flags {
     pub const HIT: u16 = 1;
     pub const HEAL: u16 = 2;
     pub const KILL: u16 = 4;
+    /// `status` landed on the target for `amount` ms.
+    pub const STATUS: u16 = 8;
+    /// The target was immune to `status`, a control (diminishing returns).
+    pub const IMMUNE: u16 = 16;
+    /// The source gained `amount` experience.
+    pub const XP: u16 = 32;
+    /// The source reached level `amount`.
+    pub const LEVEL: u16 = 64;
+    /// A status's damage or healing over time.
+    pub const TICK: u16 = 128;
+}
+
+/// A status on a fighter, from `start` until `until`. `amount` is what it deals or heals per tick.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub struct StatusSlot {
+    pub status: u8,
+    pub source: u64,
+    pub start: Timestamp,
+    pub until: Timestamp,
+    pub amount: i32,
+}
+
+/// How many controls of a diminishing-returns group have landed in a row, and when the group's
+/// window runs out.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub struct Resist {
+    pub group: u8,
+    pub count: u8,
+    pub until: Timestamp,
 }
 
 /// Warm and public (Near tier): what anyone nearby may know about a fighter's health, target and
@@ -67,6 +100,11 @@ pub struct Vitals {
     pub cast_start: Timestamp,
     pub cast_end: Timestamp,
     pub dead_at: Option<Timestamp>,
+    pub level: u8,
+    /// Buffs and debuffs. Ones past `until` are dropped on the next write.
+    pub statuses: Vec<StatusSlot>,
+    /// Diminishing returns on crowd control.
+    pub resists: Vec<Resist>,
 }
 
 /// When one skill can be used again.
@@ -95,6 +133,32 @@ pub struct Fighter {
     pub mp: i32,
     pub at: Timestamp,
     pub dead_at: Option<Timestamp>,
+    pub level: u8,
+    /// Experience into the level.
+    pub xp: u32,
+    /// The skillsets picked, in the order they were.
+    pub skillsets: Vec<u8>,
+}
+
+/// Private: a status that deals or heals over time, due at `due` (µs of game time), which
+/// `world_tick` finds through the index. One per fighter and status.
+#[spacetimedb::table(accessor = periodic)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Periodic {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub entity_id: u64,
+    pub status: u8,
+    /// The skill that put it there, for events.
+    pub skill: u16,
+    pub source: u64,
+    pub amount: i32,
+    pub start: Timestamp,
+    pub until: Timestamp,
+    #[index(btree)]
+    pub due: i64,
 }
 
 /// Private: a timed cast, due when it finishes. One per caster at most.
@@ -192,13 +256,50 @@ fn no_cast(v: Vitals) -> Vitals {
     Vitals { cast_skill: 0, cast_target: 0, ..v }
 }
 
+/// `v`'s statuses as the rules see them.
+fn slots(v: &Vitals) -> Vec<Slot> {
+    v.statuses.iter().map(|s| Slot { status: s.status, start: micros(s.start), until: micros(s.until) }).collect()
+}
+
+fn resists(v: &Vitals) -> Vec<sim::combat::Resist> {
+    v.resists.iter().map(|r| sim::combat::Resist { group: r.group, count: r.count, until: micros(r.until) }).collect()
+}
+
+/// Stunned or knocked down now.
+pub fn controlled(ctx: &ReducerContext, entity_id: u64) -> bool {
+    ctx.db.vitals().entity_id().find(entity_id).is_some_and(|v| sim::combat::controlled(&slots(&v), micros(now(ctx))))
+}
+
+/// The speed limit's factor from controls for a move over `from` to `to` (`sim::combat::move_scale`).
+pub fn move_scale(ctx: &ReducerContext, entity_id: u64, from: Timestamp, to: Timestamp) -> f32 {
+    ctx.db.vitals().entity_id().find(entity_id).map_or(1.0, |v| sim::combat::move_scale(&slots(&v), micros(from), micros(to)))
+}
+
+fn event(ctx: &ReducerContext, cell: u64, source: u64, target: u64, skill_id: u32, amount: i32, flags: u16) {
+    ctx.db.combat_event().insert(CombatEvent { cell, source, target, skill_id, amount, flags, status: 0 });
+}
+
+/// End every status on `entity_id` and stop what it deals over time.
+fn clear_statuses(ctx: &ReducerContext, entity_id: u64) {
+    for row in ctx.db.periodic().entity_id().filter(entity_id).collect::<Vec<_>>() {
+        ctx.db.periodic().id().delete(row.id);
+    }
+}
+
 pub fn alive(ctx: &ReducerContext, entity_id: u64) -> bool {
     ctx.db.vitals().entity_id().find(entity_id).is_some_and(|v| v.dead_at.is_none())
 }
 
-/// For reducers the dead can't use.
-pub fn require_alive(ctx: &ReducerContext, p: &Presence) -> Result<(), String> {
+/// For moving: the dead can't.
+pub fn require_living(ctx: &ReducerContext, p: &Presence) -> Result<(), String> {
     if alive(ctx, p.entity_id) { Ok(()) } else { Err(Refusal::Dead.message().into()) }
+}
+
+/// For reducers that act in the world, which neither the dead nor the stunned or knocked down can
+/// use.
+pub fn require_alive(ctx: &ReducerContext, p: &Presence) -> Result<(), String> {
+    require_living(ctx, p)?;
+    if controlled(ctx, p.entity_id) { Err(Refusal::Controlled.message().into()) } else { Ok(()) }
 }
 
 /// Where an entity is in world coordinates: a character wherever it stands, anything else where
@@ -231,15 +332,18 @@ pub fn enter(ctx: &ReducerContext, owner: Identity, char_id: u64, entity_id: u64
             mp: COMBAT.mp_max,
             at,
             dead_at: None,
+            level: 1,
+            xp: 0,
+            skillsets: Vec::new(),
         }),
     };
     ctx.db.vitals().insert(Vitals {
         entity_id,
         cell,
         hp: f.hp,
-        hp_max: COMBAT.hp_max,
+        hp_max: sim::combat::hp_max_at(f.level),
         mp: f.mp,
-        mp_max: COMBAT.mp_max,
+        mp_max: sim::combat::mp_max_at(f.level),
         at: f.at,
         combat_until: f.at,
         target: 0,
@@ -248,6 +352,9 @@ pub fn enter(ctx: &ReducerContext, owner: Identity, char_id: u64, entity_id: u64
         cast_start: at,
         cast_end: at,
         dead_at: f.dead_at,
+        level: f.level,
+        statuses: Vec::new(),
+        resists: Vec::new(),
     });
 }
 
@@ -255,6 +362,7 @@ pub fn enter(ctx: &ReducerContext, owner: Identity, char_id: u64, entity_id: u64
 /// fighter row.
 pub fn leave(ctx: &ReducerContext, char_id: u64, entity_id: u64) {
     ctx.db.cast_job().entity_id().delete(entity_id);
+    clear_statuses(ctx, entity_id);
     let Some(v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
     let v = settled(&v, now(ctx));
     if let Some(f) = ctx.db.fighter().char_id().find(char_id) {
@@ -346,6 +454,8 @@ pub fn use_skill(ctx: &ReducerContext, skill: u16, target: u64) -> Result<(), St
         at: me,
         yaw: sim::ship::yaw_from_u16(p.yaw) + yaw_of_frame(ctx, p.parent),
         alive: true,
+        controlled: sim::combat::controlled(&slots(&v), t),
+        knows: sim::combat::knows(s, f.level, &f.skillsets),
         casting: v.cast_skill != 0,
         mp: mine.mp,
         ready_at: micros(cooldown),
@@ -456,13 +566,125 @@ pub fn skill_lands(ctx: &ReducerContext, impact: SkillImpact) -> Result<(), Stri
     Ok(())
 }
 
-/// Apply a skill's effects to `target`, if it's alive, with an event for each.
+/// Apply a skill's effects to `target`, if it's alive, with an event for each. An effect with a
+/// condition (a combo) happens only if the target had that status as the skill landed, so a skill
+/// never combos off its own statuses.
 fn land(ctx: &ReducerContext, source: u64, target: u64, s: &SkillData) {
+    let t = micros(now(ctx));
+    let Some(had) = ctx.db.vitals().entity_id().find(target).map(|v| slots(&v)) else { return };
     for e in s.effects {
+        if e.when.is_some_and(|w| !sim::combat::has(&had, w, t)) {
+            continue;
+        }
         let Some(tv) = ctx.db.vitals().entity_id().find(target).filter(|v| v.dead_at.is_none()) else { return };
         match e.kind {
-            EffectKind::Damage => harm(ctx, source, tv, u32::from(s.wire), e.amount),
-            EffectKind::Heal => heal(ctx, source, tv, s.wire, e.amount),
+            EffectKind::Damage => {
+                let dealt = ctx.db.vitals().entity_id().find(source).map_or(0, |v| sim::combat::modifier(&slots(&v), t, false));
+                let amount = sim::combat::scaled_damage(e.amount, dealt, sim::combat::modifier(&had, t, true));
+                harm(ctx, source, tv, u32::from(s.wire), amount, flags::HIT);
+            }
+            EffectKind::Heal => heal(ctx, source, tv, s.wire, e.amount, flags::HEAL),
+            EffectKind::Status => {
+                if let Some(status) = e.status {
+                    afflict(ctx, source, tv, s.wire, status, e.ms, e.amount);
+                }
+            }
+            EffectKind::Cleanse => cleanse(ctx, tv),
+        }
+    }
+}
+
+/// Put status `status` on `tv` for `ms`, replacing any it had. A control lands for less, or not
+/// at all, by the diminishing returns, and stops the target's cast; a stun or knockdown also
+/// stops its gathering and crafting.
+fn afflict(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, status: u8, ms: u32, amount: i32) {
+    let Some(d) = sim::combat::status(status) else { return };
+    let at = now(ctx);
+    let t = micros(at);
+    let mut v = tv;
+    let mut lasts = i64::from(ms) * 1000;
+    if let Some(group) = sim::combat::control_group(d.control) {
+        let Some(pct) = sim::combat::diminished(&resists(&v), group, t) else {
+            ctx.db.combat_event().insert(CombatEvent { cell: v.cell, source, target: v.entity_id, skill_id: u32::from(skill), amount: 0, flags: flags::IMMUNE, status });
+            return;
+        };
+        lasts = sim::combat::control_micros(ms, pct);
+        v.resists = sim::combat::resisted(&resists(&v), group, t, lasts)
+            .into_iter()
+            .map(|r| Resist { group: r.group, count: r.count, until: Timestamp::from_micros_since_unix_epoch(r.until) })
+            .collect();
+    }
+    let until = after(at, lasts);
+    v.statuses.retain(|s| s.until > at && s.status != status);
+    v.statuses.push(StatusSlot { status, source, start: at, until, amount });
+    let entity_id = v.entity_id;
+    ctx.db.combat_event().insert(CombatEvent {
+        cell: v.cell,
+        source,
+        target: entity_id,
+        skill_id: u32::from(skill),
+        amount: i32::try_from(lasts / 1000).unwrap_or(i32::MAX),
+        flags: flags::STATUS,
+        status,
+    });
+    ctx.db.vitals().entity_id().update(v);
+    if let Some(old) = ctx.db.periodic().entity_id().filter(entity_id).find(|r| r.status == status) {
+        ctx.db.periodic().id().delete(old.id);
+    }
+    if let Some(due) = sim::combat::next_tick(t, micros(until), d.tick_ms, t) {
+        ctx.db.periodic().insert(Periodic { id: 0, entity_id, status, skill, source, amount, start: at, until, due });
+    }
+    if d.control != Control::None {
+        cancel(ctx, entity_id);
+    }
+    if matches!(d.control, Control::Stun | Control::Knockdown)
+        && let Some(p) = ctx.db.presence().entity_id().find(entity_id)
+    {
+        crate::gathering::cancel(ctx, p.char_id);
+        crate::crafting::cancel(ctx, p.char_id);
+    }
+}
+
+/// End `tv`'s crowd control: every debuff that stuns, knocks down or snares.
+fn cleanse(ctx: &ReducerContext, tv: Vitals) {
+    let controls = |s: &StatusSlot| sim::combat::status(s.status).is_some_and(|d| d.control != Control::None);
+    if !tv.statuses.iter().any(controls) {
+        return;
+    }
+    let statuses = tv.statuses.iter().filter(|s| !controls(s)).cloned().collect();
+    ctx.db.vitals().entity_id().update(Vitals { statuses, ..tv });
+}
+
+/// Deal and heal what statuses do over time, for every tick due by now. Called by `world_tick`;
+/// a dev clock jump catches up on every tick it skipped.
+pub fn run_periodic(ctx: &ReducerContext) {
+    let t = micros(now(ctx));
+    for mut row in ctx.db.periodic().due().filter(..=t).collect::<Vec<_>>() {
+        let Some(d) = sim::combat::status(row.status) else {
+            ctx.db.periodic().id().delete(row.id);
+            continue;
+        };
+        loop {
+            let Some(tv) = ctx.db.vitals().entity_id().find(row.entity_id).filter(|v| v.dead_at.is_none()) else {
+                ctx.db.periodic().id().delete(row.id);
+                break;
+            };
+            if d.debuff {
+                harm(ctx, row.source, tv, u32::from(row.skill), row.amount, flags::HIT | flags::TICK);
+            } else {
+                heal(ctx, row.source, tv, row.skill, row.amount, flags::HEAL | flags::TICK);
+            }
+            match sim::combat::next_tick(micros(row.start), micros(row.until), d.tick_ms, row.due) {
+                Some(due) if due <= t => row.due = due,
+                Some(due) => {
+                    ctx.db.periodic().id().update(Periodic { due, ..row });
+                    break;
+                }
+                None => {
+                    ctx.db.periodic().id().delete(row.id);
+                    break;
+                }
+            }
         }
     }
 }
@@ -477,14 +699,14 @@ fn engage(ctx: &ReducerContext, entity_id: u64, at: Timestamp) {
 }
 
 /// Take `amount` HP from `tv`, putting both sides in combat; at 0 it dies.
-fn harm(ctx: &ReducerContext, source: u64, tv: Vitals, skill_id: u32, amount: i32) {
+fn harm(ctx: &ReducerContext, source: u64, tv: Vitals, skill_id: u32, amount: i32, hit: u16) {
     let at = now(ctx);
     engage(ctx, source, at);
     let v = settled(&tv, at);
     let until = Timestamp::from_micros_since_unix_epoch(sim::combat::combat_until(micros(at)));
     let hp = (v.hp - amount).max(0);
-    let flags = if hp == 0 { flags::HIT | flags::KILL } else { flags::HIT };
-    ctx.db.combat_event().insert(CombatEvent { cell: v.cell, source, target: v.entity_id, skill_id, amount, flags });
+    let flags = if hp == 0 { hit | flags::KILL } else { hit };
+    event(ctx, v.cell, source, v.entity_id, skill_id, amount, flags);
     ctx.db.vitals().entity_id().update(Vitals { hp, combat_until: later(v.combat_until, until), ..v.clone() });
     if hp == 0 {
         die(ctx, v.entity_id, source);
@@ -492,11 +714,11 @@ fn harm(ctx: &ReducerContext, source: u64, tv: Vitals, skill_id: u32, amount: i3
 }
 
 /// Give `tv` up to `amount` HP; healing someone in combat puts the healer in it too.
-fn heal(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, amount: i32) {
+fn heal(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, amount: i32, flags: u16) {
     let at = now(ctx);
     let v = settled(&tv, at);
     let hp = (v.hp + amount).min(v.hp_max).max(v.hp);
-    ctx.db.combat_event().insert(CombatEvent { cell: v.cell, source, target: v.entity_id, skill_id: u32::from(skill), amount: hp - v.hp, flags: flags::HEAL });
+    event(ctx, v.cell, source, v.entity_id, u32::from(skill), hp - v.hp, flags);
     let fighting = v.combat_until > at;
     ctx.db.vitals().entity_id().update(Vitals { hp, ..v });
     if fighting && source != tv.entity_id {
@@ -508,22 +730,81 @@ fn heal(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, amount: i32) 
 fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     let at = now(ctx);
     let Some(v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
+    clear_statuses(ctx, entity_id);
+    let character = |id: u64| ctx.db.entity().id().find(id).is_some_and(|e| e.kind == entity_kind::CHARACTER);
+    if !character(entity_id) && killer != entity_id {
+        reward(ctx, killer, v.level);
+    }
     if ctx.db.entity().id().find(entity_id).is_some_and(|e| e.kind == entity_kind::DUMMY) {
-        ctx.db.vitals().entity_id().update(Vitals { hp: v.hp_max, at, combat_until: at, ..v });
+        ctx.db.vitals().entity_id().update(Vitals { hp: v.hp_max, at, combat_until: at, statuses: Vec::new(), resists: Vec::new(), ..v });
         return;
     }
     ctx.db.cast_job().entity_id().delete(entity_id);
-    ctx.db.vitals().entity_id().update(no_cast(Vitals { hp: 0, at, dead_at: Some(at), ..v }));
+    ctx.db.vitals().entity_id().update(no_cast(Vitals { hp: 0, at, dead_at: Some(at), statuses: Vec::new(), resists: Vec::new(), ..v }));
     let Some(p) = ctx.db.presence().entity_id().find(entity_id) else { return };
+    let pve = killer == entity_id || !character(killer);
     crate::gathering::cancel(ctx, p.char_id);
     crate::crafting::cancel(ctx, p.char_id);
     crate::ship::let_go(ctx, p.parent, entity_id);
     crate::trade::drop_on_death(ctx, &p);
     if let Some(f) = ctx.db.fighter().char_id().find(p.char_id) {
         let deaths = sim::combat::deaths_after(f.deaths, f.last_death_at.map(micros), micros(at));
-        ctx.db.fighter().char_id().update(Fighter { deaths, last_death_at: Some(at), ..f });
+        let xp = if pve { sim::combat::xp_after_death(f.level, f.xp) } else { f.xp };
+        ctx.db.fighter().char_id().update(Fighter { deaths, last_death_at: Some(at), xp, ..f });
     }
     log::info!("char {} died to entity {killer}", p.char_id);
+}
+
+/// A character's kill of a foe at `victim` that isn't a character: experience, and maybe levels.
+fn reward(ctx: &ReducerContext, killer: u64, victim: u8) {
+    let Some(p) = ctx.db.presence().entity_id().find(killer) else { return };
+    let Some(f) = ctx.db.fighter().char_id().find(p.char_id) else { return };
+    let gained = sim::combat::kill_xp(victim, f.level);
+    if gained == 0 {
+        return;
+    }
+    let (level, xp) = sim::combat::gain_xp(f.level, f.xp, gained);
+    let cell = ctx.db.vitals().entity_id().find(killer).map_or(0, |v| v.cell);
+    event(ctx, cell, killer, killer, 0, i32::try_from(gained).unwrap_or(i32::MAX), flags::XP);
+    let was = f.level;
+    ctx.db.fighter().char_id().update(Fighter { level, xp, ..f });
+    if level != was {
+        set_level(ctx, killer, level);
+        event(ctx, cell, killer, killer, 0, i32::from(level), flags::LEVEL);
+    }
+}
+
+/// Give `entity_id`'s vitals the maximums of `level`, keeping what it had below them and adding
+/// what the maximums grew by.
+fn set_level(ctx: &ReducerContext, entity_id: u64, level: u8) {
+    let Some(v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
+    let v = settled(&v, now(ctx));
+    let (hp_max, mp_max) = (sim::combat::hp_max_at(level), sim::combat::mp_max_at(level));
+    let grow = |value: i32, old: i32, new: i32| if v.dead_at.is_some() { value.min(new) } else { (value + (new - old).max(0)).min(new) };
+    let (hp, mp) = (grow(v.hp, v.hp_max, hp_max), grow(v.mp, v.mp_max, mp_max));
+    ctx.db.vitals().entity_id().update(Vitals { level, hp, hp_max, mp, mp_max, ..v });
+}
+
+/// Pick a skillset: one at each of `progress.skillset_at`'s levels. Its skills open by level.
+#[spacetimedb::reducer]
+pub fn pick_skillset(ctx: &ReducerContext, skillset: u8) -> Result<(), String> {
+    let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    if usize::from(skillset) >= sim::combat::SKILLSETS.len() {
+        return Err("no such skillset".into());
+    }
+    let mut f = ctx.db.fighter().char_id().find(p.char_id).ok_or("no fighter")?;
+    if f.skillsets.contains(&skillset) {
+        return Err("already picked".into());
+    }
+    if f.skillsets.len() >= sim::combat::skillset_slots(f.level) {
+        return Err(match sim::combat::PROGRESS.skillset_at.get(f.skillsets.len()) {
+            Some(l) => format!("you can pick another skillset at level {l}"),
+            None => "every skillset slot is taken".into(),
+        });
+    }
+    f.skillsets.push(skillset);
+    ctx.db.fighter().char_id().update(f);
+    Ok(())
 }
 
 /// When `f`'s character, dead since `dead_at`, may respawn.
@@ -639,6 +920,9 @@ pub fn dev_spawn_dummy(ctx: &ReducerContext, x: f32, z: f32) -> Result<(), Strin
         cast_start: at,
         cast_end: at,
         dead_at: None,
+        level: 1,
+        statuses: Vec::new(),
+        resists: Vec::new(),
     });
     log::info!("Straw Dummy {} at ({x:.1}, {z:.1})", e.id);
     Ok(())
@@ -670,6 +954,26 @@ pub fn dev_set_vitals(ctx: &ReducerContext, hp: i32, mp: i32) -> Result<(), Stri
     ctx.db.vitals().entity_id().update(Vitals { hp, mp, at, dead_at, ..v.clone() });
     if hp == 0 && v.dead_at.is_none() {
         die(ctx, p.entity_id, p.entity_id);
+    }
+    Ok(())
+}
+
+/// Dev builds only: set the caller's level, with no experience into it, and its HP and mana to the
+/// new maximums. Skillsets picked beyond the level's slots are forgotten, the latest first.
+#[cfg(feature = "dev")]
+#[spacetimedb::reducer]
+pub fn dev_set_level(ctx: &ReducerContext, level: u8) -> Result<(), String> {
+    let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    if !(1..=sim::combat::level_max()).contains(&level) {
+        return Err(format!("levels are 1 to {}", sim::combat::level_max()));
+    }
+    let mut f = ctx.db.fighter().char_id().find(p.char_id).ok_or("no fighter")?;
+    f.skillsets.truncate(sim::combat::skillset_slots(level));
+    ctx.db.fighter().char_id().update(Fighter { level, xp: 0, ..f });
+    set_level(ctx, p.entity_id, level);
+    let v = ctx.db.vitals().entity_id().find(p.entity_id).ok_or("not in the world")?;
+    if v.dead_at.is_none() {
+        ctx.db.vitals().entity_id().update(Vitals { hp: v.hp_max, mp: v.mp_max, at: now(ctx), ..v });
     }
     Ok(())
 }

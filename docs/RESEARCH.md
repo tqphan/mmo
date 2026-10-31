@@ -164,6 +164,7 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 - Jump height, gravity and the fall-damage threshold (§2A.4)
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (§2A.4)
 - The global cooldown, HP and mana regeneration in and out of combat, HP on respawning, and how long combat lasts (§2A.6)
+- How crowd control diminished, and the experience table (§2A.7)
 
 ### 2A.4 Movement and ship numbers (searched 2026-10-26)
 Fan wikis on Fandom sit behind a bot check, so these come from search extracts of them and from one item database. Wikis for private servers and emulators were left out on purpose (CLAUDE.md), and a wiki titled for *ArcheAge Chronicles*, a different game, was not relied on.
@@ -208,6 +209,18 @@ From search extracts of the Fandom wiki (behind a bot check), an item database a
 | Resurrection items | A scroll revives at 5% of max HP and mana; a bound self-resurrection scroll at 80% on the spot, 30-minute cooldown | B | [Fandom: Scroll: Resurrection](https://archeage.fandom.com/wiki/Scroll:_Resurrection), [Codex item 34021](https://archeagecodex.com/us/item/34021/) |
 | Packs and death | A carried pack can be lost on death, and the killer can pick it up | B | [Ten Ton Hammer: trade packs](https://www.tentonhammer.com/guide/archeage/archeage-trade-pack-guide) |
 | Global cooldown, HP and mana regeneration, HP on respawning, how long "in combat" lasts | Not found | — | — |
+
+### 2A.7 Statuses and crowd control (searched 2026-10-31)
+From search extracts of the Fandom wiki's status-effect page and player forums (docs/design/combat.md).
+
+| Fact | Value | Conf. | Source |
+|---|---|---|---|
+| Statuses that combos key off | Shaken (slower, less damage and healing), Snared, Stunned (no actions), Tripped, Impaled, among others; skills from several skillsets apply and consume each | B | [Fandom: Status effect](https://archeage.fandom.com/wiki/Status_effect) |
+| A combo chain | Triple Slash's first hit trips the Snared, its second deals 48% more to the Tripped | B | Fandom: Status effect, [Fandom: Triple Slash](https://archeage.fandom.com/wiki/Triple_Slash) |
+| Counters to control | Skills that end a stun or impale (Auramancy's Shrug It Off, Songcraft's Alarm Call), one or two kinds each | B | Fandom: Status effect, [ArcheRage forum](https://na.archerage.to/forums/threads/lets-talk-about-cc-abilities.6733/) |
+| Diminishing returns | Disputed: one player describes immunity for 30 s after three stuns, counted from when the first ended; another says each control left about 1 s of immunity to its kind; a third says there were none | C | [Official forum archive](http://forums.archeagegame.com/archive/index.php/t-78736.html), [FFXIV forum](https://forum.square-enix.com/ffxiv/threads/487145-Crowd-Control-is...-out-of-control.), ArcheRage forum |
+| Level cap at launch | 50, later 55, then ancestral levels | C | §2.2 |
+| Experience table, kill experience | Not found | — | — |
 
 ---
 

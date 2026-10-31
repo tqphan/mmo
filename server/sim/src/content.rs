@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xf2c15f765b7e838e;
+pub const CONTENT_HASH: u64 = 0x4cd490ff1fd62ab6;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -738,12 +738,30 @@ pub enum SkillTarget {
 pub enum EffectKind {
     Damage = 0,
     Heal = 1,
+    Status = 2,
+    Cleanse = 3,
+}
+
+/// What a status does to movement and skills. The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Control {
+    None = 0,
+    Stun = 1,
+    Knockdown = 2,
+    Snare = 3,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct EffectData {
     pub kind: EffectKind,
+    /// Damage or healing; a status's per tick.
     pub amount: i32,
+    /// A status effect's status wire, and how long it lasts.
+    pub status: Option<u8>,
+    pub ms: u32,
+    /// The status the target must have for this effect to happen (a combo).
+    pub when: Option<u8>,
 }
 
 /// Skillsets (`content/combat.toml`, docs/design/combat.md).
@@ -772,6 +790,8 @@ pub struct SkillData {
     pub name: &'static str,
     /// The skillset's wire.
     pub skillset: u8,
+    /// The level a character must be to use it.
+    pub level: u8,
     pub target: SkillTarget,
     /// 0 is instant.
     pub cast_ms: u32,
@@ -786,16 +806,31 @@ pub struct SkillData {
 }
 
 /// Every skill, sorted by wire.
-pub static SKILLS: [SkillData; 9] = [
-    SkillData { wire: 100, id: "cinder_dart", name: "Cinder Dart", skillset: 0, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110 }] },
-    SkillData { wire: 101, id: "frostspike", name: "Frostspike", skillset: 0, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 8000, range_m: 20.0, cost_mp: 45, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80 }] },
-    SkillData { wire: 102, id: "flare_burst", name: "Flare Burst", skillset: 0, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 12000, range_m: 25.0, cost_mp: 80, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 240 }] },
-    SkillData { wire: 200, id: "threefold_cut", name: "Threefold Cut", skillset: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 0, range_m: 4.0, cost_mp: 20, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 70 }] },
-    SkillData { wire: 201, id: "rending_blow", name: "Rending Blow", skillset: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 6000, range_m: 4.0, cost_mp: 40, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 140 }] },
-    SkillData { wire: 202, id: "sundering_cleave", name: "Sundering Cleave", skillset: 1, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 10000, range_m: 5.0, cost_mp: 60, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 230 }] },
-    SkillData { wire: 300, id: "mending_word", name: "Mending Word", skillset: 2, target: SkillTarget::Ally, cast_ms: 1500, cooldown_ms: 0, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 260 }] },
-    SkillData { wire: 301, id: "quick_balm", name: "Quick Balm", skillset: 2, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 6000, range_m: 25.0, cost_mp: 50, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 120 }] },
-    SkillData { wire: 302, id: "brine_lash", name: "Brine Lash", skillset: 2, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 20.0, cost_mp: 30, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80 }] },
+pub static SKILLS: [SkillData; 24] = [
+    SkillData { wire: 100, id: "cinder_dart", name: "Cinder Dart", skillset: 0, level: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110, status: None, ms: 0, when: None }] },
+    SkillData { wire: 101, id: "frostspike", name: "Frostspike", skillset: 0, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 8000, range_m: 20.0, cost_mp: 45, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 4000, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 2000, when: Some(3) }] },
+    SkillData { wire: 102, id: "flare_burst", name: "Flare Burst", skillset: 0, level: 3, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 12000, range_m: 25.0, cost_mp: 80, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 240, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Damage, amount: 120, status: None, ms: 0, when: Some(1) }] },
+    SkillData { wire: 103, id: "kindle", name: "Kindle", skillset: 0, level: 5, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 10000, range_m: 25.0, cost_mp: 40, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Status, amount: 30, status: Some(4), ms: 8000, when: None }] },
+    SkillData { wire: 104, id: "rime_snare", name: "Rime Snare", skillset: 0, level: 7, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 15000, range_m: 20.0, cost_mp: 50, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 40, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 6000, when: None }] },
+    SkillData { wire: 105, id: "ember_focus", name: "Ember Focus", skillset: 0, level: 9, target: SkillTarget::Caster, cast_ms: 0, cooldown_ms: 30000, range_m: 0.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(7), ms: 10000, when: None }] },
+    SkillData { wire: 106, id: "searing_lance", name: "Searing Lance", skillset: 0, level: 12, target: SkillTarget::Enemy, cast_ms: 2500, cooldown_ms: 20000, range_m: 30.0, cost_mp: 100, speed_mps: 40.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 320, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Damage, amount: 100, status: None, ms: 0, when: Some(4) }] },
+    SkillData { wire: 107, id: "frostbind", name: "Frostbind", skillset: 0, level: 14, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 30000, range_m: 20.0, cost_mp: 70, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 3000, when: None }, EffectData { kind: EffectKind::Damage, amount: 80, status: None, ms: 0, when: Some(0) }] },
+    SkillData { wire: 200, id: "threefold_cut", name: "Threefold Cut", skillset: 1, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 0, range_m: 4.0, cost_mp: 20, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 70, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(2), ms: 1500, when: Some(0) }] },
+    SkillData { wire: 201, id: "rending_blow", name: "Rending Blow", skillset: 1, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 6000, range_m: 4.0, cost_mp: 40, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 140, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Damage, amount: 100, status: None, ms: 0, when: Some(2) }] },
+    SkillData { wire: 202, id: "sundering_cleave", name: "Sundering Cleave", skillset: 1, level: 3, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 10000, range_m: 5.0, cost_mp: 60, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 230, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(5), ms: 8000, when: None }] },
+    SkillData { wire: 203, id: "shield_bash", name: "Shield Bash", skillset: 1, level: 5, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 15000, range_m: 4.0, cost_mp: 50, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 50, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 2000, when: None }] },
+    SkillData { wire: 204, id: "hamstring", name: "Hamstring", skillset: 1, level: 7, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 12000, range_m: 4.0, cost_mp: 30, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 40, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 6000, when: None }] },
+    SkillData { wire: 205, id: "war_cry", name: "War Cry", skillset: 1, level: 9, target: SkillTarget::Caster, cast_ms: 0, cooldown_ms: 30000, range_m: 0.0, cost_mp: 50, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(7), ms: 10000, when: None }] },
+    SkillData { wire: 206, id: "iron_hide", name: "Iron Hide", skillset: 1, level: 12, target: SkillTarget::Caster, cast_ms: 0, cooldown_ms: 45000, range_m: 0.0, cost_mp: 40, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(8), ms: 8000, when: None }] },
+    SkillData { wire: 207, id: "overhead_smash", name: "Overhead Smash", skillset: 1, level: 14, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 20000, range_m: 5.0, cost_mp: 90, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 300, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(2), ms: 2000, when: Some(1) }] },
+    SkillData { wire: 300, id: "mending_word", name: "Mending Word", skillset: 2, level: 1, target: SkillTarget::Ally, cast_ms: 1500, cooldown_ms: 0, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 260, status: None, ms: 0, when: None }] },
+    SkillData { wire: 301, id: "quick_balm", name: "Quick Balm", skillset: 2, level: 1, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 6000, range_m: 25.0, cost_mp: 50, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Heal, amount: 120, status: None, ms: 0, when: None }] },
+    SkillData { wire: 302, id: "brine_lash", name: "Brine Lash", skillset: 2, level: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 20.0, cost_mp: 30, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(3), ms: 8000, when: None }] },
+    SkillData { wire: 303, id: "renewing_tide", name: "Renewing Tide", skillset: 2, level: 3, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 12000, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 40, status: Some(9), ms: 10000, when: None }] },
+    SkillData { wire: 304, id: "undertow", name: "Undertow", skillset: 2, level: 5, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 15000, range_m: 20.0, cost_mp: 50, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 60, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 5000, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(2), ms: 1500, when: Some(3) }] },
+    SkillData { wire: 305, id: "cleansing_spring", name: "Cleansing Spring", skillset: 2, level: 7, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 20000, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Cleanse, amount: 0, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Heal, amount: 60, status: None, ms: 0, when: None }] },
+    SkillData { wire: 306, id: "wavebreak", name: "Wavebreak", skillset: 2, level: 9, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 15000, range_m: 20.0, cost_mp: 70, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 160, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(6), ms: 6000, when: None }] },
+    SkillData { wire: 307, id: "tidal_ward", name: "Tidal Ward", skillset: 2, level: 12, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 30000, range_m: 25.0, cost_mp: 70, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(8), ms: 6000, when: None }] },
 ];
 
 /// The skill stored as `wire`.
@@ -835,3 +870,77 @@ pub fn shrine(wire: u8) -> Option<&'static ShrineData> {
 pub fn shrine_by_id(id: &str) -> Option<&'static ShrineData> {
     SHRINES.iter().find(|d| d.id == id)
 }
+
+/// Statuses (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct StatusData {
+    /// Stored in status slots.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    pub debuff: bool,
+    pub control: Control,
+    /// A snare's share of the speed limit, in percent; 100 for anything else.
+    pub speed_pct: u32,
+    /// Added to direct damage dealt and taken, in percent.
+    pub dealt_pct: i32,
+    pub taken_pct: i32,
+    /// How often it hurts or heals by its effect's amount, ms; 0 for never.
+    pub tick_ms: u32,
+}
+
+/// Every status, sorted by wire, which is the index.
+pub static STATUSES: [StatusData; 10] = [
+    StatusData { wire: 0, id: "slowed", name: "Slowed", debuff: true, control: Control::Snare, speed_pct: 60, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 1, id: "stunned", name: "Stunned", debuff: true, control: Control::Stun, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 2, id: "felled", name: "Felled", debuff: true, control: Control::Knockdown, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 3, id: "soaked", name: "Soaked", debuff: true, control: Control::None, speed_pct: 100, dealt_pct: -10, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 4, id: "scorched", name: "Scorched", debuff: true, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 1000 },
+    StatusData { wire: 5, id: "sundered", name: "Sundered", debuff: true, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: 15, tick_ms: 0 },
+    StatusData { wire: 6, id: "shaken", name: "Shaken", debuff: true, control: Control::None, speed_pct: 100, dealt_pct: -20, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 7, id: "fervor", name: "Fervor", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 20, taken_pct: 0, tick_ms: 0 },
+    StatusData { wire: 8, id: "bulwark", name: "Bulwark", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: -30, tick_ms: 0 },
+    StatusData { wire: 9, id: "renewal", name: "Renewal", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 1000 },
+];
+
+/// The status stored as `wire`.
+pub fn status(wire: u8) -> Option<&'static StatusData> {
+    STATUSES.get(usize::from(wire))
+}
+
+/// The status with content id `id`.
+pub fn status_by_id(id: &str) -> Option<&'static StatusData> {
+    STATUSES.iter().find(|d| d.id == id)
+}
+
+/// Levels, experience and skillset picks (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct ProgressRules {
+    /// Experience from each level to the next; its length plus 1 is the level cap.
+    pub xp_to_next: &'static [u32],
+    /// The levels at which a skillset may be picked, one each.
+    pub skillset_at: &'static [u8],
+    /// What each level adds to the HP and mana maximums.
+    pub hp_per_level: i32,
+    pub mp_per_level: i32,
+    /// Experience for a level-1 kill, more per victim level, less per level the killer is above it, in percent.
+    pub kill_xp: u32,
+    pub kill_xp_per_level: u32,
+    pub kill_xp_gap_pct: u32,
+    /// The share of a level's experience a death to anything but a character loses, in percent.
+    pub death_xp_pct: u32,
+}
+
+pub static PROGRESS: ProgressRules = ProgressRules { xp_to_next: &[100, 150, 220, 300, 400, 520, 660, 820, 1000, 1200, 1450, 1750, 2100, 2500], skillset_at: &[1, 5, 10], hp_per_level: 100, mp_per_level: 40, kill_xp: 40, kill_xp_per_level: 20, kill_xp_gap_pct: 25, death_xp_pct: 5 };
+
+/// Crowd control's diminishing returns (`content/combat.toml`, docs/design/combat.md).
+#[derive(Debug, PartialEq)]
+pub struct ControlRules {
+    /// The window runs this long past the end of the last control that landed, s.
+    pub window_s: u32,
+    /// The share of its duration each control in a row lands for; past the last, immune.
+    pub steps_pct: &'static [u32],
+}
+
+pub static CONTROL: ControlRules = ControlRules { window_s: 15, steps_pct: &[100, 50, 25] };

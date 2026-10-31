@@ -1,10 +1,11 @@
 # Combat (docs/design/combat.md): vitals, skills and where the dead respawn. Skill `wire`s are stored
 # in casts and combat events, 100 to 999 (below 100 are the cannon and dev swing); skillset and
 # shrine wires run 0, 1, 2, … like hulls. Names come from docs/world/. Every number is ours, for the
-# M1 playtest to tune: the original's regeneration, global cooldown and respawn HP weren't found.
+# M1 playtest to tune: the original's regeneration, global cooldown and respawn HP weren't found,
+# nor its experience table or how its crowd control diminished.
 
 [combat]
-# Every character's, until levels and gear.
+# A level-1 character's; each level adds `progress.hp_per_level` and `mp_per_level`.
 hp_max = 1000
 mp_max = 800
 # Points per second, out of combat and in it.
@@ -31,6 +32,107 @@ respawn_pct = 50
 # A dev Straw Dummy's HP.
 dummy_hp = 5000
 
+# Levels, experience and skillset picks (combat B).
+[progress]
+# Experience to go from each level to the next, levels 1 to 14; its length plus 1 is the cap.
+xp_to_next = [100, 150, 220, 300, 400, 520, 660, 820, 1000, 1200, 1450, 1750, 2100, 2500]
+# The levels at which a character may pick a skillset, one each.
+skillset_at = [1, 5, 10]
+# What each level adds to the HP and mana maximums.
+hp_per_level = 100
+mp_per_level = 40
+# Experience for killing a level-1 foe that isn't a character, plus this per level above 1; less by
+# `kill_xp_gap_pct` percent per level the killer is above it, down to nothing.
+kill_xp = 40
+kill_xp_per_level = 20
+kill_xp_gap_pct = 25
+# A death to anything but another character loses this share of the experience the level needs,
+# never below the level's start.
+death_xp_pct = 5
+
+# Crowd control's diminishing returns (combat B). Each control lands for a share of its duration by
+# how many of its group landed since the group's window last ran out: stuns and knockdowns are one
+# group, snares another. The window runs `window_s` past the end of the last one that landed.
+# Past the last step the target is immune until it runs out.
+[control]
+window_s = 15
+steps_pct = [100, 50, 25]
+
+# Statuses, the buffs and debuffs skills put on fighters, kept in their `vitals` row. `control` is
+# none, stun or knockdown (no moving or skills) or snare (`speed_pct` of the speed limit). `dealt_pct`
+# and `taken_pct` change direct damage dealt and taken. A status with `tick_ms` hurts (a debuff) or
+# heals (a buff) by its effect's amount that often.
+[[status]]
+wire = 0
+id = "slowed"
+name = "Slowed"
+debuff = true
+control = "snare"
+speed_pct = 60
+
+[[status]]
+wire = 1
+id = "stunned"
+name = "Stunned"
+debuff = true
+control = "stun"
+
+[[status]]
+wire = 2
+id = "felled"
+name = "Felled"
+debuff = true
+control = "knockdown"
+
+[[status]]
+wire = 3
+id = "soaked"
+name = "Soaked"
+debuff = true
+dealt_pct = -10
+
+[[status]]
+wire = 4
+id = "scorched"
+name = "Scorched"
+debuff = true
+tick_ms = 1000
+
+[[status]]
+wire = 5
+id = "sundered"
+name = "Sundered"
+debuff = true
+taken_pct = 15
+
+[[status]]
+wire = 6
+id = "shaken"
+name = "Shaken"
+debuff = true
+dealt_pct = -20
+
+[[status]]
+wire = 7
+id = "fervor"
+name = "Fervor"
+debuff = false
+dealt_pct = 20
+
+[[status]]
+wire = 8
+id = "bulwark"
+name = "Bulwark"
+debuff = false
+taken_pct = -30
+
+[[status]]
+wire = 9
+id = "renewal"
+name = "Renewal"
+debuff = false
+tick_ms = 1000
+
 [[skillset]]
 wire = 0
 id = "emberlore"
@@ -46,12 +148,14 @@ wire = 2
 id = "wellspring"
 name = "Wellspring"
 
-# Emberlore: fire and frost at range.
+# Emberlore: fire and frost at range. Frostspike stuns the Soaked (Wellspring's Brine Lash), and
+# its Slowed lets Ironvow's Threefold Cut fell.
 [[skill]]
 wire = 100
 id = "cinder_dart"
 name = "Cinder Dart"
 skillset = "emberlore"
+level = 1
 target = "enemy"
 cast_ms = 1000
 cooldown_ms = 0
@@ -66,6 +170,7 @@ wire = 101
 id = "frostspike"
 name = "Frostspike"
 skillset = "emberlore"
+level = 1
 target = "enemy"
 cast_ms = 0
 cooldown_ms = 8000
@@ -73,13 +178,14 @@ range_m = 20.0
 cost_mp = 45
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 80 }]
+effects = [{ kind = "damage", amount = 80 }, { kind = "status", status = "slowed", ms = 4000 }, { kind = "status", status = "stunned", ms = 2000, when = "soaked" }]
 
 [[skill]]
 wire = 102
 id = "flare_burst"
 name = "Flare Burst"
 skillset = "emberlore"
+level = 3
 target = "enemy"
 cast_ms = 2000
 cooldown_ms = 12000
@@ -87,7 +193,82 @@ range_m = 25.0
 cost_mp = 80
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 240 }]
+effects = [{ kind = "damage", amount = 240 }, { kind = "damage", amount = 120, when = "stunned" }]
+
+[[skill]]
+wire = 103
+id = "kindle"
+name = "Kindle"
+skillset = "emberlore"
+level = 5
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 10000
+range_m = 25.0
+cost_mp = 40
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "status", status = "scorched", ms = 8000, amount = 30 }]
+
+[[skill]]
+wire = 104
+id = "rime_snare"
+name = "Rime Snare"
+skillset = "emberlore"
+level = 7
+target = "enemy"
+cast_ms = 1000
+cooldown_ms = 15000
+range_m = 20.0
+cost_mp = 50
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 40 }, { kind = "status", status = "slowed", ms = 6000 }]
+
+[[skill]]
+wire = 105
+id = "ember_focus"
+name = "Ember Focus"
+skillset = "emberlore"
+level = 9
+target = "caster"
+cast_ms = 0
+cooldown_ms = 30000
+range_m = 0.0
+cost_mp = 60
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "status", status = "fervor", ms = 10000 }]
+
+[[skill]]
+wire = 106
+id = "searing_lance"
+name = "Searing Lance"
+skillset = "emberlore"
+level = 12
+target = "enemy"
+cast_ms = 2500
+cooldown_ms = 20000
+range_m = 30.0
+cost_mp = 100
+speed_mps = 40.0
+facing = true
+effects = [{ kind = "damage", amount = 320 }, { kind = "damage", amount = 100, when = "scorched" }]
+
+[[skill]]
+wire = 107
+id = "frostbind"
+name = "Frostbind"
+skillset = "emberlore"
+level = 14
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 30000
+range_m = 20.0
+cost_mp = 70
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "status", status = "stunned", ms = 3000 }, { kind = "damage", amount = 80, when = "slowed" }]
 
 # Ironvow: weapons and fury up close.
 [[skill]]
@@ -95,6 +276,7 @@ wire = 200
 id = "threefold_cut"
 name = "Threefold Cut"
 skillset = "ironvow"
+level = 1
 target = "enemy"
 cast_ms = 0
 cooldown_ms = 0
@@ -102,13 +284,14 @@ range_m = 4.0
 cost_mp = 20
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 70 }]
+effects = [{ kind = "damage", amount = 70 }, { kind = "status", status = "felled", ms = 1500, when = "slowed" }]
 
 [[skill]]
 wire = 201
 id = "rending_blow"
 name = "Rending Blow"
 skillset = "ironvow"
+level = 1
 target = "enemy"
 cast_ms = 0
 cooldown_ms = 6000
@@ -116,13 +299,14 @@ range_m = 4.0
 cost_mp = 40
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 140 }]
+effects = [{ kind = "damage", amount = 140 }, { kind = "damage", amount = 100, when = "felled" }]
 
 [[skill]]
 wire = 202
 id = "sundering_cleave"
 name = "Sundering Cleave"
 skillset = "ironvow"
+level = 3
 target = "enemy"
 cast_ms = 1500
 cooldown_ms = 10000
@@ -130,7 +314,82 @@ range_m = 5.0
 cost_mp = 60
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 230 }]
+effects = [{ kind = "damage", amount = 230 }, { kind = "status", status = "sundered", ms = 8000 }]
+
+[[skill]]
+wire = 203
+id = "shield_bash"
+name = "Shield Bash"
+skillset = "ironvow"
+level = 5
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 15000
+range_m = 4.0
+cost_mp = 50
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 50 }, { kind = "status", status = "stunned", ms = 2000 }]
+
+[[skill]]
+wire = 204
+id = "hamstring"
+name = "Hamstring"
+skillset = "ironvow"
+level = 7
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 12000
+range_m = 4.0
+cost_mp = 30
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 40 }, { kind = "status", status = "slowed", ms = 6000 }]
+
+[[skill]]
+wire = 205
+id = "war_cry"
+name = "War Cry"
+skillset = "ironvow"
+level = 9
+target = "caster"
+cast_ms = 0
+cooldown_ms = 30000
+range_m = 0.0
+cost_mp = 50
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "status", status = "fervor", ms = 10000 }]
+
+[[skill]]
+wire = 206
+id = "iron_hide"
+name = "Iron Hide"
+skillset = "ironvow"
+level = 12
+target = "caster"
+cast_ms = 0
+cooldown_ms = 45000
+range_m = 0.0
+cost_mp = 40
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "status", status = "bulwark", ms = 8000 }]
+
+[[skill]]
+wire = 207
+id = "overhead_smash"
+name = "Overhead Smash"
+skillset = "ironvow"
+level = 14
+target = "enemy"
+cast_ms = 2000
+cooldown_ms = 20000
+range_m = 5.0
+cost_mp = 90
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 300 }, { kind = "status", status = "felled", ms = 2000, when = "stunned" }]
 
 # Wellspring: healing, and a little harm.
 [[skill]]
@@ -138,6 +397,7 @@ wire = 300
 id = "mending_word"
 name = "Mending Word"
 skillset = "wellspring"
+level = 1
 target = "ally"
 cast_ms = 1500
 cooldown_ms = 0
@@ -152,6 +412,7 @@ wire = 301
 id = "quick_balm"
 name = "Quick Balm"
 skillset = "wellspring"
+level = 1
 target = "ally"
 cast_ms = 0
 cooldown_ms = 6000
@@ -166,6 +427,7 @@ wire = 302
 id = "brine_lash"
 name = "Brine Lash"
 skillset = "wellspring"
+level = 1
 target = "enemy"
 cast_ms = 1000
 cooldown_ms = 0
@@ -173,7 +435,82 @@ range_m = 20.0
 cost_mp = 30
 speed_mps = 0.0
 facing = true
-effects = [{ kind = "damage", amount = 80 }]
+effects = [{ kind = "damage", amount = 80 }, { kind = "status", status = "soaked", ms = 8000 }]
+
+[[skill]]
+wire = 303
+id = "renewing_tide"
+name = "Renewing Tide"
+skillset = "wellspring"
+level = 3
+target = "ally"
+cast_ms = 0
+cooldown_ms = 12000
+range_m = 25.0
+cost_mp = 60
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "status", status = "renewal", ms = 10000, amount = 40 }]
+
+[[skill]]
+wire = 304
+id = "undertow"
+name = "Undertow"
+skillset = "wellspring"
+level = 5
+target = "enemy"
+cast_ms = 1500
+cooldown_ms = 15000
+range_m = 20.0
+cost_mp = 50
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 60 }, { kind = "status", status = "slowed", ms = 5000 }, { kind = "status", status = "felled", ms = 1500, when = "soaked" }]
+
+[[skill]]
+wire = 305
+id = "cleansing_spring"
+name = "Cleansing Spring"
+skillset = "wellspring"
+level = 7
+target = "ally"
+cast_ms = 0
+cooldown_ms = 20000
+range_m = 25.0
+cost_mp = 60
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "cleanse" }, { kind = "heal", amount = 60 }]
+
+[[skill]]
+wire = 306
+id = "wavebreak"
+name = "Wavebreak"
+skillset = "wellspring"
+level = 9
+target = "enemy"
+cast_ms = 2000
+cooldown_ms = 15000
+range_m = 20.0
+cost_mp = 70
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 160 }, { kind = "status", status = "shaken", ms = 6000 }]
+
+[[skill]]
+wire = 307
+id = "tidal_ward"
+name = "Tidal Ward"
+skillset = "wellspring"
+level = 12
+target = "ally"
+cast_ms = 0
+cooldown_ms = 30000
+range_m = 25.0
+cost_mp = 70
+speed_mps = 0.0
+facing = false
+effects = [{ kind = "status", status = "bulwark", ms = 6000 }]
 
 # Wayshrines, where the dead respawn. Each is placed once, from world/shrines.tsv.
 [[shrine]]

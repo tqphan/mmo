@@ -74,7 +74,12 @@ pub fn generate() -> String {
          # combat_settle <value> <max> <at> <combat until> <now> <rate in> <rate out> <settled>\n\
          # combat_deaths <deaths> <last death at, or none> <now> <deaths after> <respawn wait µs>\n\
          # combat_front <yaw> <from x y z> <to x y z> <in front: 1 or 0> <moved off: 1 or 0> <impact µs at 30 m/s>\n\
-         # combat_check <skill wire> <at x y z> <yaw> <alive> <casting> <mp> <ready at> <target x y z> <target alive> <is caster> <now> <0, or the error code> <finish: 0, or the error code>\n",
+         # combat_check <skill wire> <at x y z> <yaw> <alive> <controlled> <knows> <casting> <mp> <ready at> <target x y z> <target alive> <is caster> <now> <0, or the error code> <finish: 0, or the error code>\n\
+         # combat_level <level> <xp> <gained> <victim level> <hp max> <mp max> <skillset slots> <level after> <xp after> <xp after a death> <kill xp>\n\
+         # combat_slots <n> (<status> <start> <until>)×n <now> <move from> <move to> <has the first> <controlled> <move scale> <dealt pct> <taken pct>\n\
+         # combat_dr <n> (<group> <count> <until>)×n <group> <now> <lasts µs> <pct, or none> <count after> <until after>\n\
+         # combat_damage <amount> <dealt pct> <taken pct> <damage>\n\
+         # combat_tick <start> <until> <tick ms> <last> <next, or none>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -229,6 +234,8 @@ fn combat(out: &mut String, rng: &mut Lcg) {
             at,
             yaw: rng.range(0.0, std::f32::consts::TAU),
             alive: k % 17 != 0,
+            controlled: k % 31 == 5,
+            knows: k % 37 != 7,
             casting: k % 19 == 0,
             mp: if k % 11 == 0 { s.cost_mp - 1 } else { 800 },
             ready_at: if k % 13 == 0 { t0 + S } else { t0 - S },
@@ -236,13 +243,15 @@ fn combat(out: &mut String, rng: &mut Lcg) {
         let t = Target { at: to, alive: k % 23 != 0, is_caster: k % 29 == 0 };
         let code = |r: Result<(), crate::combat::Refusal>| r.map_or_else(|e| e as u8, |()| 0);
         out.push_str(&format!(
-            "combat_check {} {} {} {} {} {} {} {} {} {} {} {} {} {} {t0} {} {}\n",
+            "combat_check {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {t0} {} {}\n",
             s.wire,
             f(at[0]),
             f(at[1]),
             f(at[2]),
             f(c.yaw),
             u8::from(c.alive),
+            u8::from(c.controlled),
+            u8::from(c.knows),
             u8::from(c.casting),
             c.mp,
             c.ready_at,
@@ -254,6 +263,81 @@ fn combat(out: &mut String, rng: &mut Lcg) {
             code(check(s, &c, &t, t0)),
             code(check_finish(s, at, &t))
         ));
+    }
+    combat_b(out, rng, t0);
+}
+
+/// Combat B's levels, statuses, diminishing returns, damage modifiers and ticks.
+fn combat_b(out: &mut String, rng: &mut Lcg, t0: i64) {
+    use crate::combat::{
+        CONTROL, Resist, STATUSES, Slot, control_micros, controlled, diminished, gain_xp, has, hp_max_at, kill_xp, level_max, modifier, move_scale,
+        mp_max_at, next_tick, resisted, scaled_damage, skillset_slots, xp_after_death, xp_to_next,
+    };
+    const S: i64 = 1_000_000;
+    let pick = |rng: &mut Lcg, n: usize| ((rng.next() * n as f32) as usize).min(n - 1);
+    for k in 0..40u32 {
+        let level = 1 + pick(rng, usize::from(level_max())) as u8;
+        let xp = (rng.next() * xp_to_next(level).max(1) as f32) as u32;
+        let gained = if k % 5 == 0 { 0 } else { (rng.next() * 3000.0) as u32 };
+        let victim = 1 + pick(rng, usize::from(level_max())) as u8;
+        let (l2, x2) = gain_xp(level, xp, gained);
+        out.push_str(&format!(
+            "combat_level {level} {xp} {gained} {victim} {} {} {} {l2} {x2} {} {}\n",
+            hp_max_at(level),
+            mp_max_at(level),
+            skillset_slots(level),
+            xp_after_death(level, xp),
+            kill_xp(victim, level)
+        ));
+    }
+    let span = |rng: &mut Lcg| t0 + (rng.range(-5.0, 20.0) as f64 * S as f64) as i64;
+    for k in 0..60 {
+        let n = 1 + k % 3;
+        let slots: Vec<Slot> = (0..n)
+            .map(|_| {
+                let start = span(rng);
+                Slot { status: STATUSES[pick(rng, STATUSES.len())].wire, start, until: start + (rng.range(0.5, 10.0) as f64 * S as f64) as i64 }
+            })
+            .collect();
+        let now = span(rng);
+        let from = span(rng);
+        let to = from + (rng.range(0.0, 2.0) as f64 * S as f64) as i64;
+        let listed: Vec<String> = slots.iter().map(|s| format!("{} {} {}", s.status, s.start, s.until)).collect();
+        out.push_str(&format!(
+            "combat_slots {n} {} {now} {from} {to} {} {} {} {} {}\n",
+            listed.join(" "),
+            u8::from(has(&slots, slots[0].status, now)),
+            u8::from(controlled(&slots, now)),
+            f(move_scale(&slots, from, to)),
+            modifier(&slots, now, false),
+            modifier(&slots, now, true)
+        ));
+    }
+    for k in 0..40 {
+        let n = k % 3;
+        let resists: Vec<Resist> =
+            (0..n).map(|g| Resist { group: g as u8, count: pick(rng, CONTROL.steps_pct.len() + 2) as u8, until: span(rng) }).collect();
+        let group = pick(rng, 2) as u8;
+        let now = span(rng);
+        let lasts = control_micros(2000, 50 + 50 * (k % 2) as u32);
+        let pct = diminished(&resists, group, now).map_or("none".to_string(), |p| p.to_string());
+        let after = resisted(&resists, group, now, lasts);
+        let r = after.iter().find(|r| r.group == group).unwrap();
+        let listed: Vec<String> = resists.iter().map(|r| format!("{} {} {}", r.group, r.count, r.until)).collect();
+        out.push_str(&format!("combat_dr {n} {} {group} {now} {lasts} {pct} {} {}\n", listed.join(" "), r.count, r.until).replace("  ", " "));
+    }
+    for _ in 0..30 {
+        let amount = (rng.next() * 500.0) as i32;
+        let (dealt, taken) = ((rng.range(-120.0, 80.0)) as i32, (rng.range(-120.0, 80.0)) as i32);
+        out.push_str(&format!("combat_damage {amount} {dealt} {taken} {}\n", scaled_damage(amount, dealt, taken)));
+    }
+    for k in 0..30 {
+        let start = t0;
+        let until = start + (rng.range(0.0, 12.0) as f64 * S as f64) as i64;
+        let tick = [0u32, 1000, 750, 2000][k % 4];
+        let last = start + (rng.range(-1.0, 13.0) as f64 * S as f64) as i64;
+        let next = next_tick(start, until, tick, last).map_or("none".to_string(), |t| t.to_string());
+        out.push_str(&format!("combat_tick {start} {until} {tick} {last} {next}\n"));
     }
 }
 

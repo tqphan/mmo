@@ -9,9 +9,11 @@ using Mmo.World;
 namespace Mmo.UI
 {
     /// <summary>
-    /// <c>--combat-demo</c> (dev builds, docs/design/combat.md): once in the world, puts a Straw
-    /// Dummy 9 m ahead and targets it, casts the Emberlore skills from range, runs in and works
-    /// through Ironvow's, has a Brine Lash interrupted by a step, runs off and lets the hotbar turn
+    /// <c>--combat-demo</c> (dev builds, docs/design/combat.md): once in the world, goes to the top
+    /// level and picks the skillsets it lacks through the picker, puts a Straw Dummy 9 m ahead and
+    /// targets it, buffs itself (Fervor, Bulwark), soaks the dummy with Brine Lash so Frostspike
+    /// stuns it as a combo, scorches it with Kindle, runs in and fells it with Threefold Cut off the
+    /// Slowed, works through Ironvow, has a Brine Lash interrupted by a step, runs off and lets the hotbar turn
     /// us back to face the dummy, heals with a Quick Balm aimed at the dummy (it lands on us) and a
     /// Mending Word, then dies by <c>dev_set_vitals</c>, waits out the countdown and respawns at the
     /// nearest Wayshrine. It pauses at each step for captures, and logs what it saw.
@@ -51,6 +53,19 @@ namespace Mmo.UI
                 conn.Reducers.DevSetVitals(1000, 800);
                 await Wait(1.0);
             }
+            // The top level, and every skillset through the picker.
+            conn.Reducers.DevSetLevel(Sim.Combat.LevelMax);
+            await Until(() => combat.Level == Sim.Combat.LevelMax, 5);
+            combat.Picking = true;
+            await Wait(2.0);
+            foreach (var set in Content.GameContent.Skillsets.Where(s => !combat.Picks.Contains(s.Wire)))
+            {
+                combat.PickSkillset(set.Wire);
+                await Wait(0.8);
+            }
+            await Wait(1.0);
+            combat.Picking = false;
+            session.Log($"combat demo: level {combat.Level}, skillsets {string.Join(", ", combat.Picks)}");
             // An open patch of the town south of spawn, clear of the Wayshrine and the stations.
             player.DevTeleport(Spot.X, Spot.Y);
             await Wait(2.0);
@@ -66,22 +81,29 @@ namespace Mmo.UI
             session.Log($"combat demo: Straw Dummy {dummy} placed 9 m ahead and targeted");
             await Wait(1.5);
 
-            // Emberlore from range: a bolt, a spike and a burst.
-            await Cast(1, 2.2);
-            await Cast(2, 1.3);
-            await Cast(3, 2.8);
+            // A bolt from range; the combo: Brine Lash soaks it and Frostspike stuns the Soaked, with
+            // our buffs going up between; then Kindle scorches it.
+            await Cast("cinder_dart", 2.2);
+            await Cast("brine_lash", 2.0);
+            await Cast("war_cry", 1.1);
+            await Cast("frostspike", 1.1);
+            await Cast("iron_hide", 1.1);
+            await Cast("kindle", 1.1);
+            session.Log($"combat demo: the dummy is {Statuses(dummy)}; we are {Statuses(combat.Me)}");
+            await Cast("flare_burst", 2.8);
             Report("after Emberlore", dummy);
 
-            // Run in and work through Ironvow.
+            // Run in, hamstring it and fell it off the Slowed, then hit the Felled hard.
             if (!await RunTo(dummy, 2.5f))
                 return;
-            await Cast(4, 1.3);
-            await Cast(5, 1.3);
-            await Cast(6, 2.4);
+            await Cast("hamstring", 1.1);
+            await Cast("threefold_cut", 1.1);
+            await Cast("rending_blow", 1.3);
+            await Cast("sundering_cleave", 2.4);
             Report("after Ironvow", dummy);
 
             // A cast cut short by a step.
-            combat.Use(9);
+            combat.Use(Skill("brine_lash"));
             await Wait(0.4);
             var (bx, bz) = Sim.Yaw.Facing(player.Facing);
             player.DemoWish = new Vector2(-bx, -bz);
@@ -96,13 +118,14 @@ namespace Mmo.UI
             player.DemoWish = null;
             await Wait(1.0);
             session.Log("combat demo: our back is to the dummy; Brine Lash turns us to face it");
-            await Cast(9, 2.2);
+            await Cast("brine_lash", 2.2);
 
-            // Heals: a Quick Balm aimed at the dummy lands on us, then a Mending Word.
+            // Heals: a Quick Balm aimed at the dummy lands on us, then a Mending Word and Renewing Tide.
             conn.Reducers.DevSetVitals(350, combat.Mine?.MpNow(combat.Now) ?? 800);
             await Wait(1.2);
-            await Cast(8, 1.4);
-            await Cast(7, 2.5);
+            await Cast("quick_balm", 1.4);
+            await Cast("mending_word", 2.5);
+            await Cast("renewing_tide", 3.0);
             session.Log($"combat demo: healed to {combat.Mine?.HpNow(combat.Now)} HP");
 
             // Die, wait out the countdown and get up at a Wayshrine.
@@ -123,12 +146,18 @@ namespace Mmo.UI
             session.Log($"combat demo: done; {combat.Accepted} skills accepted, {combat.EventsSeen} combat events seen");
         }
 
-        private async Task Cast(int key, double wait)
+        private static Content.SkillData Skill(string id) => Content.GameContent.Skills.First(s => s.Id == id);
+
+        private string Statuses(ulong id) =>
+            combat.Info(id) is { } v ? string.Join(", ", CombatModel.Chips(v.Slots, combat.Now).Select(c => c.Text)) is { Length: > 0 } t ? t : "clear" : "unseen";
+
+        private async Task Cast(string id, double wait)
         {
             int before = combat.Accepted;
-            combat.Use(key);
+            var s = Skill(id);
+            combat.Use(s);
             await Wait(wait);
-            var name = CombatModel.Slot(key)?.Name;
+            var name = s.Name;
             session.Log(combat.Accepted > before ? $"combat demo: used {name}" : $"combat demo: {name} not used: {combat.Message}");
         }
 

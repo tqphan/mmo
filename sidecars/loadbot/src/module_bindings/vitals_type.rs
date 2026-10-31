@@ -4,6 +4,9 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::resist_type::Resist;
+use super::status_slot_type::StatusSlot;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct Vitals {
@@ -21,6 +24,9 @@ pub struct Vitals {
     pub cast_start: __sdk::Timestamp,
     pub cast_end: __sdk::Timestamp,
     pub dead_at: Option<__sdk::Timestamp>,
+    pub level: u8,
+    pub statuses: Vec<StatusSlot>,
+    pub resists: Vec<Resist>,
 }
 
 impl __sdk::InModule for Vitals {
@@ -45,6 +51,9 @@ pub struct VitalsCols {
     pub cast_start: __sdk::__query_builder::Col<Vitals, __sdk::Timestamp>,
     pub cast_end: __sdk::__query_builder::Col<Vitals, __sdk::Timestamp>,
     pub dead_at: __sdk::__query_builder::Col<Vitals, Option<__sdk::Timestamp>>,
+    pub level: __sdk::__query_builder::Col<Vitals, u8>,
+    pub statuses: __sdk::__query_builder::Col<Vitals, Vec<StatusSlot>>,
+    pub resists: __sdk::__query_builder::Col<Vitals, Vec<Resist>>,
 }
 
 impl __sdk::__query_builder::HasCols for Vitals {
@@ -65,6 +74,9 @@ impl __sdk::__query_builder::HasCols for Vitals {
             cast_start: __sdk::__query_builder::Col::new(table_name, "cast_start"),
             cast_end: __sdk::__query_builder::Col::new(table_name, "cast_end"),
             dead_at: __sdk::__query_builder::Col::new(table_name, "dead_at"),
+            level: __sdk::__query_builder::Col::new(table_name, "level"),
+            statuses: __sdk::__query_builder::Col::new(table_name, "statuses"),
+            resists: __sdk::__query_builder::Col::new(table_name, "resists"),
         }
     }
 }

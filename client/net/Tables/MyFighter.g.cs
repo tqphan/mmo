@@ -37,6 +37,9 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Fighter, int> Mp { get; }
         public global::SpacetimeDB.Col<Fighter, SpacetimeDB.Timestamp> At { get; }
         public global::SpacetimeDB.Col<Fighter, SpacetimeDB.Timestamp> DeadAt { get; }
+        public global::SpacetimeDB.Col<Fighter, byte> Level { get; }
+        public global::SpacetimeDB.Col<Fighter, uint> Xp { get; }
+        public global::SpacetimeDB.Col<Fighter, System.Collections.Generic.List<byte>> Skillsets { get; }
 
         public MyFighterCols(string tableName)
         {
@@ -50,6 +53,9 @@ namespace SpacetimeDB.Types
             Mp = new global::SpacetimeDB.Col<Fighter, int>(tableName, "mp");
             At = new global::SpacetimeDB.Col<Fighter, SpacetimeDB.Timestamp>(tableName, "at");
             DeadAt = new global::SpacetimeDB.Col<Fighter, SpacetimeDB.Timestamp>(tableName, "dead_at");
+            Level = new global::SpacetimeDB.Col<Fighter, byte>(tableName, "level");
+            Xp = new global::SpacetimeDB.Col<Fighter, uint>(tableName, "xp");
+            Skillsets = new global::SpacetimeDB.Col<Fighter, System.Collections.Generic.List<byte>>(tableName, "skillsets");
         }
     }
 

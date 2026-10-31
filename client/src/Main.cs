@@ -248,9 +248,7 @@ namespace Mmo
             Bind("target_self", Key.F1);
             Bind("target_clear", Key.Escape);
             Bind("respawn", Key.R);
-            Key[] digits = { Key.Key1, Key.Key2, Key.Key3, Key.Key4, Key.Key5, Key.Key6, Key.Key7, Key.Key8, Key.Key9 };
-            for (int k = 0; k < digits.Length; k++)
-                Bind($"skill_{k + 1}", digits[k]);
+            Bind("skillsets", Key.K);
         }
     }
 }

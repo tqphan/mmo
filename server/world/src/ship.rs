@@ -190,7 +190,7 @@ pub fn cannon_impact(ctx: &ReducerContext, shot: CannonShot) -> Result<(), Strin
         .min_by(|a, b| distance2(a, landing).total_cmp(&distance2(b, landing)));
     let damage = Hull::from_u8(ctx.db.vehicle().entity_id().find(shot.ship).map_or(0, |v| v.hull))
         .map_or(0, |h| h.data().cannon.damage);
-    let event = |target, amount, flags| CombatEvent { cell, source: shot.gunner, target, skill_id: skill::CANNON, amount, flags };
+    let event = |target, amount, flags| CombatEvent { cell, source: shot.gunner, target, skill_id: skill::CANNON, amount, flags, status: 0 };
     match target.and_then(|d| ctx.db.vehicle().entity_id().find(d.ship)) {
         Some(v) => {
             ctx.db.combat_event().insert(event(v.entity_id, damage, flags::HIT));

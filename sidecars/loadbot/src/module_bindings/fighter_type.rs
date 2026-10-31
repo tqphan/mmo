@@ -19,6 +19,9 @@ pub struct Fighter {
     pub mp: i32,
     pub at: __sdk::Timestamp,
     pub dead_at: Option<__sdk::Timestamp>,
+    pub level: u8,
+    pub xp: u32,
+    pub skillsets: Vec<u8>,
 }
 
 impl __sdk::InModule for Fighter {
@@ -39,6 +42,9 @@ pub struct FighterCols {
     pub mp: __sdk::__query_builder::Col<Fighter, i32>,
     pub at: __sdk::__query_builder::Col<Fighter, __sdk::Timestamp>,
     pub dead_at: __sdk::__query_builder::Col<Fighter, Option<__sdk::Timestamp>>,
+    pub level: __sdk::__query_builder::Col<Fighter, u8>,
+    pub xp: __sdk::__query_builder::Col<Fighter, u32>,
+    pub skillsets: __sdk::__query_builder::Col<Fighter, Vec<u8>>,
 }
 
 impl __sdk::__query_builder::HasCols for Fighter {
@@ -55,6 +61,9 @@ impl __sdk::__query_builder::HasCols for Fighter {
             mp: __sdk::__query_builder::Col::new(table_name, "mp"),
             at: __sdk::__query_builder::Col::new(table_name, "at"),
             dead_at: __sdk::__query_builder::Col::new(table_name, "dead_at"),
+            level: __sdk::__query_builder::Col::new(table_name, "level"),
+            xp: __sdk::__query_builder::Col::new(table_name, "xp"),
+            skillsets: __sdk::__query_builder::Col::new(table_name, "skillsets"),
         }
     }
 }

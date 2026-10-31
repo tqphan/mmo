@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Mmo.Content;
 using Mmo.Gameplay;
@@ -11,21 +12,71 @@ namespace Mmo.Tests
     public class CombatTests
     {
         private const long S = 1_000_000;
-        private static readonly SkillData Dart = GameContent.Skills[0];
-        private static readonly SkillData Spike = GameContent.Skills[1];
-        private static readonly SkillData Mend = GameContent.Skills[6];
+        private static SkillData Skill(string id) => GameContent.Skills.First(s => s.Id == id);
+        private static byte Status(string id) => GameContent.Statuses.First(s => s.Id == id).Wire;
 
-        private static readonly Caster Ready = new(Vector3.Zero, 0, Alive: true, Casting: false, Mp: 800, ReadyAt: 0);
+        private static readonly SkillData Dart = Skill("cinder_dart");
+        private static readonly SkillData Spike = Skill("frostspike");
+        private static readonly SkillData Mend = Skill("mending_word");
+
+        private static readonly Caster Ready = new(Vector3.Zero, 0, Alive: true, Controlled: false, Knows: true, Casting: false, Mp: 800, ReadyAt: 0);
 
         [Fact]
-        public void TheHotbarIsTheSkillsInContentOrder()
+        public void TheHotbarHasARowPerSkillsetInTheOrderPicked()
         {
-            Assert.Equal(9, CombatModel.Hotbar.Count);
-            Assert.Equal("cinder_dart", CombatModel.Slot(1)!.Id);
-            Assert.Equal("brine_lash", CombatModel.Slot(9)!.Id);
-            Assert.Null(CombatModel.Slot(0));
-            Assert.Null(CombatModel.Slot(10));
+            var picks = new byte[] { 2, 0 };
+            var rows = CombatModel.Rows(picks);
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, r => Assert.Equal(CombatModel.RowKeys, r.Count));
+            Assert.Equal("mending_word", CombatModel.Slot(picks, 0, 1)!.Id);
+            Assert.Equal("cinder_dart", CombatModel.Slot(picks, 1, 1)!.Id);
+            Assert.Equal("frostspike", CombatModel.Slot(picks, 1, 2)!.Id);
+            Assert.Null(CombatModel.Slot(picks, 2, 1));
+            Assert.Null(CombatModel.Slot(picks, 0, 0));
+            Assert.Null(CombatModel.Slot(picks, 0, 9));
+            Assert.Empty(CombatModel.Rows(new byte[0]));
+            Assert.Equal((0, 1, 2, 2), (CombatModel.RowOf(false, false), CombatModel.RowOf(true, false), CombatModel.RowOf(false, true), CombatModel.RowOf(true, true)));
+            Assert.Equal(("4", "S-4", "C-4"), (CombatModel.KeyLabel(0, 4), CombatModel.KeyLabel(1, 4), CombatModel.KeyLabel(2, 4)));
             Assert.Equal(SkillTarget.Ally, Mend.Target);
+        }
+
+        [Fact]
+        public void SkillsetPicksAndLevelsAreSpelledOut()
+        {
+            Assert.Equal("K: pick a skillset", CombatModel.PickLine(1, 0));
+            Assert.Equal("next skillset at level 5", CombatModel.PickLine(4, 1));
+            Assert.Equal("K: pick 2 skillsets", CombatModel.PickLine(10, 1));
+            Assert.Equal("", CombatModel.PickLine(15, 3));
+            Assert.Equal("Level 3 · 120 / 220 xp", CombatModel.LevelLine(3, 120));
+            Assert.Equal("Level 15 (top)", CombatModel.LevelLine(15, 0));
+            Assert.False(Sim.Combat.Knows(Skill("shield_bash"), 4, new byte[] { 1 }));
+            Assert.True(Sim.Combat.Knows(Skill("shield_bash"), 5, new byte[] { 1 }));
+            Assert.Equal(CombatRefusal.Unlearned, CombatModel.Plan(Spike, Ready with { Knows = false }, new CombatTarget(new Vector3(0, 0, -5), true, false), 0).Refusal);
+            Assert.Equal(CombatRefusal.Controlled, CombatModel.Plan(Spike, Ready with { Controlled = true }, new CombatTarget(new Vector3(0, 0, -5), true, false), 0).Refusal);
+        }
+
+        [Fact]
+        public void FramesShowBuffsThenDebuffsWithSecondsLeftAndControlsSlowOrStopUs()
+        {
+            var slots = new List<Slot>
+            {
+                new(Status("slowed"), 0, 4 * S),
+                new(Status("stunned"), 0, 2 * S - 1),
+                new(Status("fervor"), 0, 10 * S),
+                new(Status("scorched"), 5 * S, 8 * S),
+            };
+            Assert.Equal(new[] { ("Fervor 10", false), ("Stunned 2", true), ("Slowed 4", true) }, CombatModel.Chips(slots, 0));
+            var v = new VitalsInfo(500, 1000, 100, 800, 0, 0, null, 0, 0, 0, 3, slots);
+            Assert.True(v.Controlled(S));
+            Assert.Equal(0.0f, v.MoveScale(S));
+            Assert.Equal(GameContent.Statuses[Status("slowed")].SpeedPct / 100.0f, v.MoveScale(3 * S));
+            Assert.Equal(1.0f, v.MoveScale(5 * S));
+            Assert.False(v.KnockedDown(S));
+            Assert.Equal(3, v.Level);
+            Assert.Equal("Stunned", CombatModel.Floating(2000, EventFlags.Status, Status("stunned")));
+            Assert.Equal("immune to Felled", CombatModel.Floating(0, EventFlags.Immune, Status("felled")));
+            Assert.Equal("+40 xp", CombatModel.Floating(40, EventFlags.Xp));
+            Assert.Equal("level 5!", CombatModel.Floating(5, EventFlags.Level));
         }
 
         [Fact]

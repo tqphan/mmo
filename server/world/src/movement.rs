@@ -53,7 +53,7 @@ pub fn move_event(
     if seq <= p.last_seq {
         return Ok(()); // stale or duplicate; ordering is the client's job, not an error
     }
-    crate::combat::require_alive(ctx, &p)?;
+    crate::combat::require_living(ctx, &p)?;
     let mode = MoveMode::from_u8(mode).ok_or("unknown movement mode")?;
     let at = now(ctx);
     let entity_id = p.entity_id;
@@ -61,7 +61,7 @@ pub fn move_event(
     // A ship that has gone takes its frame with it; its passengers were moved off already.
     let from = Frame::of(ctx, p.parent).unwrap_or(Frame::World);
     let to = [x, y, z];
-    let scale = crate::trade::speed_scale(ctx, p.char_id, p.last_move_at);
+    let scale = crate::trade::speed_scale(ctx, p.char_id, p.last_move_at) * crate::combat::move_scale(ctx, entity_id, p.last_move_at, at);
     let move_ = Move { p: &p, to, dt: secs_between(p.last_move_at, at), since_contact: secs_between(p.contact_at, at), mode, scale };
 
     match Frame::of(ctx, parent).ok_or_else(|| "no such ship".to_string()).and_then(|f| judge(&mut terrain, &move_, from, f)) {
@@ -212,7 +212,8 @@ struct Move<'a> {
     dt: f32,
     since_contact: f32,
     mode: MoveMode,
-    /// The speed limit's factor: below 1 while carrying a pack (docs/design/trade.md).
+    /// The speed limit's factor: below 1 while carrying a pack (docs/design/trade.md) or snared, 0
+    /// while stunned or knocked down (docs/design/combat.md).
     scale: f32,
 }
 

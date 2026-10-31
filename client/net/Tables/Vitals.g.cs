@@ -63,6 +63,9 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp> CastStart { get; }
         public global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp> CastEnd { get; }
         public global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp> DeadAt { get; }
+        public global::SpacetimeDB.Col<Vitals, byte> Level { get; }
+        public global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<StatusSlot>> Statuses { get; }
+        public global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<Resist>> Resists { get; }
 
         public VitalsCols(string tableName)
         {
@@ -80,6 +83,9 @@ namespace SpacetimeDB.Types
             CastStart = new global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp>(tableName, "cast_start");
             CastEnd = new global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp>(tableName, "cast_end");
             DeadAt = new global::SpacetimeDB.Col<Vitals, SpacetimeDB.Timestamp>(tableName, "dead_at");
+            Level = new global::SpacetimeDB.Col<Vitals, byte>(tableName, "level");
+            Statuses = new global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<StatusSlot>>(tableName, "statuses");
+            Resists = new global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<Resist>>(tableName, "resists");
         }
     }
 

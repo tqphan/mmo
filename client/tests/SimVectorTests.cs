@@ -538,16 +538,100 @@ namespace Mmo.Tests
             {
                 var skill = GameContent.Skill(ushort.Parse(v[1]))!;
                 var at = new System.Numerics.Vector3(F(v[2]), F(v[3]), F(v[4]));
-                var c = new Caster(at, F(v[5]), v[6] == "1", v[7] == "1", int.Parse(v[8]), long.Parse(v[9]));
-                var t = new CombatTarget(new System.Numerics.Vector3(F(v[10]), F(v[11]), F(v[12])), v[13] == "1", v[14] == "1");
-                byte code = (byte?)Combat.Check(skill, c, t, long.Parse(v[15])) ?? 0;
-                Assert.True(byte.Parse(v[16]) == code, $"combat_check {string.Join(' ', v[1..16])}: want {v[16]}, got {code}");
-                Assert.Equal(byte.Parse(v[17]), (byte?)Combat.CheckFinish(skill, at, t) ?? 0);
+                var c = new Caster(at, F(v[5]), v[6] == "1", v[7] == "1", v[8] == "1", v[9] == "1", int.Parse(v[10]), long.Parse(v[11]));
+                var t = new CombatTarget(new System.Numerics.Vector3(F(v[12]), F(v[13]), F(v[14])), v[15] == "1", v[16] == "1");
+                byte code = (byte?)Combat.Check(skill, c, t, long.Parse(v[17])) ?? 0;
+                Assert.True(byte.Parse(v[18]) == code, $"combat_check {string.Join(' ', v[1..18])}: want {v[18]}, got {code}");
+                Assert.Equal(byte.Parse(v[19]), (byte?)Combat.CheckFinish(skill, at, t) ?? 0);
                 if (code != 0)
                     refused++;
                 n++;
             }
             Assert.True(n >= 120 && refused > 20 && refused < n, $"{n} vectors, {refused} refused");
+        }
+
+        [Fact]
+        public void CombatLevels()
+        {
+            int n = 0;
+            foreach (var v in Lines("combat_level"))
+            {
+                byte level = byte.Parse(v[1]), victim = byte.Parse(v[4]);
+                uint xp = uint.Parse(v[2]), gained = uint.Parse(v[3]);
+                string what = $"combat_level {string.Join(' ', v[1..5])}";
+                Assert.True(int.Parse(v[5]) == Combat.HpMaxAt(level), what);
+                Assert.True(int.Parse(v[6]) == Combat.MpMaxAt(level), what);
+                Assert.True(int.Parse(v[7]) == Combat.SkillsetSlots(level), what);
+                Assert.True((byte.Parse(v[8]), uint.Parse(v[9])) == Combat.GainXp(level, xp, gained), what);
+                Assert.True(uint.Parse(v[10]) == Combat.XpAfterDeath(level, xp), what);
+                Assert.True(uint.Parse(v[11]) == Combat.KillXp(victim, level), what);
+                n++;
+            }
+            Assert.True(n >= 40, $"only {n} vectors");
+        }
+
+        [Fact]
+        public void CombatSlots()
+        {
+            int n = 0, controlled = 0;
+            foreach (var v in Lines("combat_slots"))
+            {
+                int count = int.Parse(v[1]);
+                var slots = Enumerable.Range(0, count).Select(i => new Slot(byte.Parse(v[2 + 3 * i]), long.Parse(v[3 + 3 * i]), long.Parse(v[4 + 3 * i]))).ToList();
+                int k = 2 + 3 * count;
+                long now = long.Parse(v[k]), from = long.Parse(v[k + 1]), to = long.Parse(v[k + 2]);
+                string what = string.Join(' ', v);
+                Assert.True((v[k + 3] == "1") == Combat.Has(slots, slots[0].Status, now), what);
+                Assert.True((v[k + 4] == "1") == Combat.Controlled(slots, now), what);
+                Assert.True(F(v[k + 5]) == Combat.MoveScale(slots, from, to), what);
+                Assert.True(int.Parse(v[k + 6]) == Combat.Modifier(slots, now, false), what);
+                Assert.True(int.Parse(v[k + 7]) == Combat.Modifier(slots, now, true), what);
+                if (v[k + 4] == "1")
+                    controlled++;
+                n++;
+            }
+            Assert.True(n >= 60 && controlled > 0, $"{n} vectors, {controlled} controlled");
+        }
+
+        [Fact]
+        public void CombatDiminishing()
+        {
+            int n = 0, immune = 0;
+            foreach (var v in Lines("combat_dr"))
+            {
+                int count = int.Parse(v[1]);
+                var resists = Enumerable.Range(0, count).Select(i => new ResistWindow(byte.Parse(v[2 + 3 * i]), byte.Parse(v[3 + 3 * i]), long.Parse(v[4 + 3 * i]))).ToList();
+                int k = 2 + 3 * count;
+                byte group = byte.Parse(v[k]);
+                long now = long.Parse(v[k + 1]), lasts = long.Parse(v[k + 2]);
+                string what = string.Join(' ', v);
+                uint? pct = Combat.Diminished(resists, group, now);
+                Assert.True(v[k + 3] == (pct?.ToString() ?? "none"), what);
+                var after = Combat.Resisted(resists, group, now, lasts).Single(r => r.Group == group);
+                Assert.True((byte.Parse(v[k + 4]), long.Parse(v[k + 5])) == (after.Count, after.Until), what);
+                if (pct is null)
+                    immune++;
+                n++;
+            }
+            Assert.True(n >= 40 && immune > 0, $"{n} vectors, {immune} immune");
+        }
+
+        [Fact]
+        public void CombatDamageAndTicks()
+        {
+            int n = 0;
+            foreach (var v in Lines("combat_damage"))
+            {
+                Assert.True(int.Parse(v[4]) == Combat.ScaledDamage(int.Parse(v[1]), int.Parse(v[2]), int.Parse(v[3])), string.Join(' ', v));
+                n++;
+            }
+            foreach (var v in Lines("combat_tick"))
+            {
+                long? next = Combat.NextTick(long.Parse(v[1]), long.Parse(v[2]), uint.Parse(v[3]), long.Parse(v[4]));
+                Assert.True(v[5] == (next?.ToString() ?? "none"), string.Join(' ', v));
+                n++;
+            }
+            Assert.True(n >= 60, $"only {n} vectors");
         }
     }
 }

@@ -33,6 +33,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<CombatEvent, uint> SkillId { get; }
         public global::SpacetimeDB.Col<CombatEvent, int> Amount { get; }
         public global::SpacetimeDB.Col<CombatEvent, ushort> Flags { get; }
+        public global::SpacetimeDB.Col<CombatEvent, byte> Status { get; }
 
         public CombatEventCols(string tableName)
         {
@@ -42,6 +43,7 @@ namespace SpacetimeDB.Types
             SkillId = new global::SpacetimeDB.Col<CombatEvent, uint>(tableName, "skill_id");
             Amount = new global::SpacetimeDB.Col<CombatEvent, int>(tableName, "amount");
             Flags = new global::SpacetimeDB.Col<CombatEvent, ushort>(tableName, "flags");
+            Status = new global::SpacetimeDB.Col<CombatEvent, byte>(tableName, "status");
         }
     }
 

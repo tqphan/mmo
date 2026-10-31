@@ -33,6 +33,12 @@ namespace SpacetimeDB.Types
         public SpacetimeDB.Timestamp At;
         [DataMember(Name = "dead_at")]
         public SpacetimeDB.Timestamp? DeadAt;
+        [DataMember(Name = "level")]
+        public byte Level;
+        [DataMember(Name = "xp")]
+        public uint Xp;
+        [DataMember(Name = "skillsets")]
+        public System.Collections.Generic.List<byte> Skillsets;
 
         public Fighter(
             ulong CharId,
@@ -44,7 +50,10 @@ namespace SpacetimeDB.Types
             int Hp,
             int Mp,
             SpacetimeDB.Timestamp At,
-            SpacetimeDB.Timestamp? DeadAt
+            SpacetimeDB.Timestamp? DeadAt,
+            byte Level,
+            uint Xp,
+            System.Collections.Generic.List<byte> Skillsets
         )
         {
             this.CharId = CharId;
@@ -57,11 +66,15 @@ namespace SpacetimeDB.Types
             this.Mp = Mp;
             this.At = At;
             this.DeadAt = DeadAt;
+            this.Level = Level;
+            this.Xp = Xp;
+            this.Skillsets = Skillsets;
         }
 
         public Fighter()
         {
             this.Cooldowns = new();
+            this.Skillsets = new();
         }
     }
 }

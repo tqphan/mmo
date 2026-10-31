@@ -1,0 +1,22 @@
+# 0029: Statuses live in `vitals`; damage over time ticks from a due-time index; controls diminish per group; levels and skillsets live in `fighter`
+
+- **Status:** Accepted, 2026-10-31
+- **Context:**
+  - Combat B (M1 task 1, second half) needs buffs and debuffs that others can see, crowd control, combos, damage and healing over time, levels with experience, and skillset picks. ADR 0028 planned statuses as slots in `vitals`.
+  - How the original diminished crowd control isn't known for certain (RESEARCH §2A.7): players describe anything from none to immunity after three stuns.
+  - A status's expiry can be computed from a timestamp, but its damage over time can kill and must be seen, so something has to apply it when it's due (PLAN §4.4).
+  - SpacetimeDB tables are sets: identical event rows inserted in one transaction become one row.
+- **Decision:**
+  - **Statuses are a list in the public `vitals` row:** status, source, start, until and per-tick amount. Nothing removes an expired slot; readers ignore it and the next write drops it. One slot per status: reapplying replaces it. Leaving the world, dying and respawning clear them.
+  - **Damage and healing over time** go in a private `periodic` row per fighter and status, with its next due time in µs in a btree index. `world_tick` reads `due <= now` through the index, applies every tick due (catching up after a dev clock jump), and moves `due` on or deletes the row. Ticks aren't changed by damage modifiers.
+  - **Direct damage** is scaled by the sum of the dealer's `dealt_pct` and the target's `taken_pct`, each floored at −100%.
+  - **Combos** are effect conditions (`when`) checked against the target's statuses as the skill lands, before any of its own effects, so a skill never combos off itself.
+  - **Crowd control:** stun and knockdown stop moves and every action reducer. A snare scales the speed limit. Movement checks multiply the pack factor by a control factor that counts only controls that held before the move began and still hold at its end. Diminishing returns are per group (stun and knockdown together, snares apart), in `vitals.resists`: 100%, 50%, 25%, then immune, with the window running 15 s past the end of the last control that landed (`content/combat.toml` `[control]`).
+  - **Levels, experience and picks** are in the private `fighter` row. The level is copied into `vitals` with the maximums it gives. Experience comes from killing what isn't a character, and a death to anything but another character costs 5% of the level's need, never a level. `pick_skillset` adds one skillset at each of levels 1, 5 and 10; skills need their skillset picked and their level.
+  - **Events** gain a `status` column and flags for a status, an immunity, experience, a level and a tick. Clients tolerate identical events collapsing.
+  - The client's hotbar has one row per skillset picked: 1–8, Shift+1–8, Ctrl+1–8, read from key events rather than actions so modifiers can't double-fire.
+- **Consequences:**
+  - Every reducer that acts in the world now refuses the stunned through `require_alive`; movement uses `require_living` and the control factor instead, so a stunned client that moved is corrected rather than refused.
+  - Existing characters start at level 1 with no skillsets and must pick one (K) before their skills work.
+  - Statuses don't survive logging out (deviation, docs/design/combat.md §3).
+  - The schema changed (`vitals`, `fighter`, `combat_event`, new `periodic`), so `cargo xtask publish --clear` and `cargo xtask world` once.

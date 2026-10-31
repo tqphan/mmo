@@ -54,6 +54,7 @@ pub mod dev_remove_dummy_reducer;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
+pub mod dev_set_level_reducer;
 pub mod dev_set_vitals_reducer;
 pub mod dev_spawn_dummy_reducer;
 pub mod dev_spawn_ship_reducer;
@@ -95,6 +96,8 @@ pub mod node_placement_type;
 pub mod owner_type;
 pub mod pack_type;
 pub mod pay_tax_reducer;
+pub mod periodic_type;
+pub mod pick_skillset_reducer;
 pub mod pick_up_pack_reducer;
 pub mod place_plot_reducer;
 pub mod plant_reducer;
@@ -104,6 +107,7 @@ pub mod plot_type;
 pub mod post_placement_type;
 pub mod presence_type;
 pub mod purse_type;
+pub mod resist_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
 pub mod respawn_reducer;
@@ -119,6 +123,7 @@ pub mod split_item_reducer;
 pub mod station_placement_type;
 pub mod station_table;
 pub mod station_type;
+pub mod status_slot_type;
 pub mod suspicion_type;
 pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
@@ -187,6 +192,7 @@ pub use dev_remove_dummy_reducer::dev_remove_dummy;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
+pub use dev_set_level_reducer::dev_set_level;
 pub use dev_set_vitals_reducer::dev_set_vitals;
 pub use dev_spawn_dummy_reducer::dev_spawn_dummy;
 pub use dev_spawn_ship_reducer::dev_spawn_ship;
@@ -228,6 +234,8 @@ pub use node_placement_type::NodePlacement;
 pub use owner_type::Owner;
 pub use pack_type::Pack;
 pub use pay_tax_reducer::pay_tax;
+pub use periodic_type::Periodic;
+pub use pick_skillset_reducer::pick_skillset;
 pub use pick_up_pack_reducer::pick_up_pack;
 pub use place_plot_reducer::place_plot;
 pub use plant_reducer::plant;
@@ -237,6 +245,7 @@ pub use plot_type::Plot;
 pub use post_placement_type::PostPlacement;
 pub use presence_type::Presence;
 pub use purse_type::Purse;
+pub use resist_type::Resist;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
 pub use respawn_reducer::respawn;
@@ -252,6 +261,7 @@ pub use split_item_reducer::split_item;
 pub use station_placement_type::StationPlacement;
 pub use station_table::*;
 pub use station_type::Station;
+pub use status_slot_type::StatusSlot;
 pub use suspicion_type::Suspicion;
 pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
@@ -372,6 +382,9 @@ pub enum Reducer {
     DevSetLabor {
         points: i32,
     },
+    DevSetLevel {
+        level: u8,
+    },
     DevSetVitals {
         hp: i32,
         mp: i32,
@@ -435,6 +448,9 @@ pub enum Reducer {
     },
     PayTax {
         plot_id: u64,
+    },
+    PickSkillset {
+        skillset: u8,
     },
     PickUpPack {
         id: u64,
@@ -519,6 +535,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
+            Reducer::DevSetLevel { .. } => "dev_set_level",
             Reducer::DevSetVitals { .. } => "dev_set_vitals",
             Reducer::DevSpawnDummy { .. } => "dev_spawn_dummy",
             Reducer::DevSpawnShip { .. } => "dev_spawn_ship",
@@ -536,6 +553,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
             Reducer::PayTax { .. } => "pay_tax",
+            Reducer::PickSkillset { .. } => "pick_skillset",
             Reducer::PickUpPack { .. } => "pick_up_pack",
             Reducer::PlacePlot { .. } => "place_plot",
             Reducer::Plant { .. } => "plant",
@@ -717,6 +735,11 @@ impl __sdk::Reducer for Reducer {
                     points: points.clone(),
                 })
             }
+            Reducer::DevSetLevel { level } => {
+                __sats::bsatn::to_vec(&dev_set_level_reducer::DevSetLevelArgs {
+                    level: level.clone(),
+                })
+            }
             Reducer::DevSetVitals { hp, mp } => {
                 __sats::bsatn::to_vec(&dev_set_vitals_reducer::DevSetVitalsArgs {
                     hp: hp.clone(),
@@ -808,6 +831,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::PayTax { plot_id } => __sats::bsatn::to_vec(&pay_tax_reducer::PayTaxArgs {
                 plot_id: plot_id.clone(),
             }),
+            Reducer::PickSkillset { skillset } => {
+                __sats::bsatn::to_vec(&pick_skillset_reducer::PickSkillsetArgs {
+                    skillset: skillset.clone(),
+                })
+            }
             Reducer::PickUpPack { id } => {
                 __sats::bsatn::to_vec(&pick_up_pack_reducer::PickUpPackArgs { id: id.clone() })
             }

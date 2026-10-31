@@ -41,6 +41,12 @@ namespace SpacetimeDB.Types
         public SpacetimeDB.Timestamp CastEnd;
         [DataMember(Name = "dead_at")]
         public SpacetimeDB.Timestamp? DeadAt;
+        [DataMember(Name = "level")]
+        public byte Level;
+        [DataMember(Name = "statuses")]
+        public System.Collections.Generic.List<StatusSlot> Statuses;
+        [DataMember(Name = "resists")]
+        public System.Collections.Generic.List<Resist> Resists;
 
         public Vitals(
             ulong EntityId,
@@ -56,7 +62,10 @@ namespace SpacetimeDB.Types
             ulong CastTarget,
             SpacetimeDB.Timestamp CastStart,
             SpacetimeDB.Timestamp CastEnd,
-            SpacetimeDB.Timestamp? DeadAt
+            SpacetimeDB.Timestamp? DeadAt,
+            byte Level,
+            System.Collections.Generic.List<StatusSlot> Statuses,
+            System.Collections.Generic.List<Resist> Resists
         )
         {
             this.EntityId = EntityId;
@@ -73,10 +82,15 @@ namespace SpacetimeDB.Types
             this.CastStart = CastStart;
             this.CastEnd = CastEnd;
             this.DeadAt = DeadAt;
+            this.Level = Level;
+            this.Statuses = Statuses;
+            this.Resists = Resists;
         }
 
         public Vitals()
         {
+            this.Statuses = new();
+            this.Resists = new();
         }
     }
 }

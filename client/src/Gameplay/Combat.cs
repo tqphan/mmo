@@ -13,8 +13,9 @@ namespace Mmo.Gameplay
 {
     /// <summary>
     /// Combat (docs/design/combat.md): Tab cycles targets, F1 targets ourselves and Escape clears;
-    /// keys 1–9 use the hotbar's skills, turning us to face the target first when it's behind us;
-    /// R respawns when the wait is over. What the client can see is wrong is refused here by the
+    /// keys 1–8 use the first hotbar row's skills, with Shift the second's and with Ctrl the
+    /// third's (one row per skillset picked), turning us to face the target first when it's behind
+    /// us; K opens the skillset picker; R respawns when the wait is over. What the client can see is wrong is refused here by the
     /// same rules as the server's (<see cref="CombatModel"/>); the server decides. A ring marks the
     /// target, and each combat event in view floats its number above whoever it hit.
     /// </summary>
@@ -54,6 +55,22 @@ namespace Mmo.Gameplay
         public VitalsInfo? Mine => Info(Me);
 
         public bool Dead => Mine?.Dead == true;
+
+        /// <summary>Stunned or knocked down: no moving.</summary>
+        public bool Controlled => Mine?.Controlled(Now) == true;
+
+        public bool KnockedDown => Mine?.KnockedDown(Now) == true;
+
+        /// <summary>The factor on our speed from snares and stuns.</summary>
+        public float MoveScale => Mine?.MoveScale(Now) ?? 1.0f;
+
+        /// <summary>Our skillsets, in the order picked.</summary>
+        public IReadOnlyList<byte> Picks => Fighter?.Skillsets ?? new List<byte>();
+
+        public byte Level => Fighter?.Level ?? 1;
+
+        /// <summary>The skillset picker is open.</summary>
+        public bool Picking { get; set; }
 
         /// <summary>Our fighter row: cooldowns and deaths.</summary>
         public Fighter? Fighter =>
@@ -97,6 +114,14 @@ namespace Mmo.Gameplay
                 if (ctx.Event.Status is Status.Failed(var reason))
                     Say($"target: {reason}");
             };
+            conn.Reducers.OnPickSkillset += (ctx, set) =>
+            {
+                string name = set < GameContent.Skillsets.Count ? GameContent.Skillsets[set].Name : "skillset";
+                if (ctx.Event.Status is Status.Failed(var reason))
+                    Say($"{name}: {reason}");
+                else
+                    Say($"picked {name}");
+            };
         }
 
         public override void _Process(double delta)
@@ -109,9 +134,8 @@ namespace Mmo.Gameplay
                 SetTarget(Me);
             if (Input.IsActionJustPressed("target_clear"))
                 SetTarget(0);
-            for (int k = 1; k <= CombatModel.Hotbar.Count; k++)
-                if (Input.IsActionJustPressed($"skill_{k}"))
-                    Use(k);
+            if (Input.IsActionJustPressed("skillsets"))
+                Picking = !Picking;
             if (Dead && Input.IsActionJustPressed("respawn"))
                 Respawn();
             if (Target != 0 && Info(Target) is null)
@@ -122,13 +146,28 @@ namespace Mmo.Gameplay
             Drift();
         }
 
+        /// <summary>Digits use the hotbar: the row by Shift and Ctrl, read off the key itself.</summary>
+        public override void _UnhandledKeyInput(InputEvent e)
+        {
+            if (session.Me is null || e is not InputEventKey { Pressed: true, Echo: false } k)
+                return;
+            int key = (int)(k.PhysicalKeycode - Key.Key0);
+            if (key < 1 || key > CombatModel.RowKeys)
+                return;
+            Use(CombatModel.RowOf(k.ShiftPressed, k.CtrlPressed), key);
+            GetViewport().SetInputAsHandled();
+        }
+
+        public void PickSkillset(byte set) => session.Conn?.Reducers.PickSkillset(set);
+
         /// <summary>An entity's vitals, if it has any in view.</summary>
         public VitalsInfo? Info(ulong id)
         {
             if (id == 0 || session.Conn?.Db.Vitals.EntityId.Find(id) is not { } v)
                 return null;
             return new VitalsInfo(v.Hp, v.HpMax, v.Mp, v.MpMax, v.At.MicrosecondsSinceUnixEpoch, v.CombatUntil.MicrosecondsSinceUnixEpoch,
-                v.DeadAt?.MicrosecondsSinceUnixEpoch, v.CastSkill, v.CastStart.MicrosecondsSinceUnixEpoch, v.CastEnd.MicrosecondsSinceUnixEpoch);
+                v.DeadAt?.MicrosecondsSinceUnixEpoch, v.CastSkill, v.CastStart.MicrosecondsSinceUnixEpoch, v.CastEnd.MicrosecondsSinceUnixEpoch,
+                v.Level, v.Statuses.Select(s => new Slot(s.Status, s.Start.MicrosecondsSinceUnixEpoch, s.Until.MicrosecondsSinceUnixEpoch)).ToList());
         }
 
         /// <summary>Where an entity is drawn: us, or another we can see.</summary>
@@ -172,10 +211,10 @@ namespace Mmo.Gameplay
             SetTarget(next);
         }
 
-        /// <summary>Use hotbar key <paramref name="key"/> on the target.</summary>
-        public void Use(int key)
+        /// <summary>Use row <paramref name="row"/>'s key <paramref name="key"/> on the target.</summary>
+        public void Use(int row, int key)
         {
-            if (CombatModel.Slot(key) is { } s)
+            if (CombatModel.Slot(Picks, row, key) is { } s)
                 Use(s);
         }
 
@@ -194,7 +233,7 @@ namespace Mmo.Gameplay
             long ready = f is null ? 0 : CombatModel.ReadyAt(s.Wire, f.GcdUntil.MicrosecondsSinceUnixEpoch,
                 f.Cooldowns.Select(c => (c.Skill, c.ReadyAt.MicrosecondsSinceUnixEpoch)));
             var here = PlayerController.ToNumerics(player.GlobalPosition);
-            var caster = new Caster(here, player.Facing, !mine.Dead, mine.CastSkill != 0, mine.MpNow(now), ready);
+            var caster = new Caster(here, player.Facing, !mine.Dead, mine.Controlled(now), Sim.Combat.Knows(s, Level, Picks), mine.CastSkill != 0, mine.MpNow(now), ready);
             var plan = CombatModel.Plan(s, caster, new CombatTarget(PlayerController.ToNumerics(where), !them.Dead, to == Me), now);
             if (plan.Refusal is { } r)
             {
@@ -219,25 +258,33 @@ namespace Mmo.Gameplay
         private void Float(CombatEvent e)
         {
             EventsSeen++;
-            if (e.Target == 0 || PositionOf(e.Target) is not { } at || e.SkillId < 100)
+            bool progress = (e.Flags & (EventFlags.Xp | EventFlags.Level)) != 0;
+            if (e.Target == 0 || PositionOf(e.Target) is not { } at || (e.SkillId < 100 && !progress))
                 return;
             bool heal = (e.Flags & EventFlags.Heal) != 0;
+            bool status = (e.Flags & (EventFlags.Status | EventFlags.Immune)) != 0;
+            var color = progress ? new Color(1.0f, 0.9f, 0.35f)
+                : status ? (GameContent.Status(e.Status)?.Debuff == false ? new Color(0.5f, 0.9f, 1.0f) : new Color(0.85f, 0.55f, 1.0f))
+                : heal ? new Color(0.45f, 1.0f, 0.5f)
+                : e.Target == Me ? new Color(1.0f, 0.3f, 0.25f) : new Color(1.0f, 0.75f, 0.3f);
             var label = new Label3D
             {
-                Text = CombatModel.Floating(e.Amount, e.Flags),
+                Text = CombatModel.Floating(e.Amount, e.Flags, e.Status),
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 FixedSize = true,
                 FontSize = 44,
                 PixelSize = 0.0011f,
                 OutlineSize = 10,
                 NoDepthTest = true,
-                Modulate = heal ? new Color(0.45f, 1.0f, 0.5f) : e.Target == Me ? new Color(1.0f, 0.3f, 0.25f) : new Color(1.0f, 0.75f, 0.3f),
+                Modulate = color,
             };
             AddChild(label);
             // Above the nameplate, spread a little so several hits in a row don't stack on one spot.
             label.GlobalPosition = at + new Vector3((floating.Count % 3 - 1) * 0.4f, 2.9f, 0);
             floating.Add((label, Clock.Now));
-            if (GameContent.Skill((ushort)e.SkillId) is { } s)
+            if (status || progress)
+                session.Log($"combat: {NameOf(e.Target)}: {CombatModel.Floating(e.Amount, e.Flags, e.Status)}");
+            else if (GameContent.Skill((ushort)e.SkillId) is { } s)
                 session.Log($"combat: {NameOf(e.Source)} {(heal ? "healed" : "hit")} {NameOf(e.Target)} with {s.Name} for {e.Amount}{((e.Flags & EventFlags.Kill) != 0 ? ", killing them" : "")}");
         }
 

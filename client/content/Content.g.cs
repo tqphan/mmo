@@ -216,9 +216,38 @@ namespace Mmo.Content
     {
         Damage = 0,
         Heal = 1,
+        Status = 2,
+        Cleanse = 3,
     }
 
-    public sealed record EffectData(EffectKind Kind, int Amount);
+    /// <summary>What a status does to movement and skills. The value is the wire value.</summary>
+    public enum CrowdControl : byte
+    {
+        None = 0,
+        Stun = 1,
+        Knockdown = 2,
+        Snare = 3,
+    }
+
+    /// <param name="Amount">Damage or healing; a status's per tick.</param>
+    /// <param name="Status">A status effect's status wire; <paramref name="Ms"/> is how long it lasts.</param>
+    /// <param name="When">The status the target must have for this effect to happen (a combo).</param>
+    public sealed record EffectData(EffectKind Kind, int Amount, byte? Status, uint Ms, byte? When);
+
+    /// <summary>Statuses (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="SpeedPct">A snare's share of the speed limit, in percent; 100 for anything else.</param>
+    /// <param name="DealtPct">Added to direct damage dealt, in percent; <paramref name="TakenPct"/> to damage taken.</param>
+    /// <param name="TickMs">How often it hurts or heals by its effect's amount; 0 for never.</param>
+    public sealed record StatusData(byte Wire, string Id, string Name, bool Debuff, CrowdControl Control, uint SpeedPct, int DealtPct, int TakenPct, uint TickMs);
+
+    /// <summary>Levels, experience and skillset picks (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="XpToNext">Experience from each level to the next; its length plus 1 is the level cap.</param>
+    /// <param name="SkillsetAt">The levels at which a skillset may be picked, one each.</param>
+    public sealed record ProgressRules(IReadOnlyList<uint> XpToNext, IReadOnlyList<byte> SkillsetAt, int HpPerLevel, int MpPerLevel, uint KillXp, uint KillXpPerLevel, uint KillXpGapPct, uint DeathXpPct);
+
+    /// <summary>Crowd control's diminishing returns (content/combat.toml, docs/design/combat.md).</summary>
+    /// <param name="StepsPct">The share of its duration each control in a row lands for; past the last, immune.</param>
+    public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);
 
     /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>
     public sealed record SkillsetData(byte Wire, string Id, string Name);
@@ -229,7 +258,8 @@ namespace Mmo.Content
     /// <param name="CastMs">0 is instant.</param>
     /// <param name="SpeedMps">0 lands at once; otherwise a projectile's speed, m/s.</param>
     /// <param name="Facing">The target must be in front.</param>
-    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);
+    /// <param name="Level">The level a character must be to use it.</param>
+    public sealed record SkillData(ushort Wire, string Id, string Name, byte Skillset, byte Level, SkillTarget Target, uint CastMs, uint CooldownMs, float RangeM, int CostMp, float SpeedMps, bool Facing, IReadOnlyList<EffectData> Effects);
 
     /// <summary>Wayshrine kinds (content/combat.toml, docs/design/combat.md).</summary>
     /// <param name="Wire">Stored in shrine rows.</param>
@@ -252,7 +282,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xf2c15f765b7e838eUL;
+        public const ulong Hash = 0x4cd490ff1fd62ab6UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -502,15 +532,30 @@ namespace Mmo.Content
         /// <summary>Every skill, sorted by wire.</summary>
         public static readonly IReadOnlyList<SkillData> Skills = new SkillData[]
         {
-            new(100, "cinder_dart", "Cinder Dart", 0, SkillTarget.Enemy, 1000, 0, 25.0f, 30, 30.0f, true, new EffectData[] { new(EffectKind.Damage, 110) }),
-            new(101, "frostspike", "Frostspike", 0, SkillTarget.Enemy, 0, 8000, 20.0f, 45, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80) }),
-            new(102, "flare_burst", "Flare Burst", 0, SkillTarget.Enemy, 2000, 12000, 25.0f, 80, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 240) }),
-            new(200, "threefold_cut", "Threefold Cut", 1, SkillTarget.Enemy, 0, 0, 4.0f, 20, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 70) }),
-            new(201, "rending_blow", "Rending Blow", 1, SkillTarget.Enemy, 0, 6000, 4.0f, 40, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 140) }),
-            new(202, "sundering_cleave", "Sundering Cleave", 1, SkillTarget.Enemy, 1500, 10000, 5.0f, 60, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 230) }),
-            new(300, "mending_word", "Mending Word", 2, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260) }),
-            new(301, "quick_balm", "Quick Balm", 2, SkillTarget.Ally, 0, 6000, 25.0f, 50, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 120) }),
-            new(302, "brine_lash", "Brine Lash", 2, SkillTarget.Enemy, 1000, 0, 20.0f, 30, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80) }),
+            new(100, "cinder_dart", "Cinder Dart", 0, 1, SkillTarget.Enemy, 1000, 0, 25.0f, 30, 30.0f, true, new EffectData[] { new(EffectKind.Damage, 110, null, 0, null) }),
+            new(101, "frostspike", "Frostspike", 0, 1, SkillTarget.Enemy, 0, 8000, 20.0f, 45, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80, null, 0, null), new(EffectKind.Status, 0, 0, 4000, null), new(EffectKind.Status, 0, 1, 2000, 3) }),
+            new(102, "flare_burst", "Flare Burst", 0, 3, SkillTarget.Enemy, 2000, 12000, 25.0f, 80, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 240, null, 0, null), new(EffectKind.Damage, 120, null, 0, 1) }),
+            new(103, "kindle", "Kindle", 0, 5, SkillTarget.Enemy, 0, 10000, 25.0f, 40, 0.0f, true, new EffectData[] { new(EffectKind.Status, 30, 4, 8000, null) }),
+            new(104, "rime_snare", "Rime Snare", 0, 7, SkillTarget.Enemy, 1000, 15000, 20.0f, 50, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 40, null, 0, null), new(EffectKind.Status, 0, 0, 6000, null) }),
+            new(105, "ember_focus", "Ember Focus", 0, 9, SkillTarget.Caster, 0, 30000, 0.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Status, 0, 7, 10000, null) }),
+            new(106, "searing_lance", "Searing Lance", 0, 12, SkillTarget.Enemy, 2500, 20000, 30.0f, 100, 40.0f, true, new EffectData[] { new(EffectKind.Damage, 320, null, 0, null), new(EffectKind.Damage, 100, null, 0, 4) }),
+            new(107, "frostbind", "Frostbind", 0, 14, SkillTarget.Enemy, 0, 30000, 20.0f, 70, 0.0f, true, new EffectData[] { new(EffectKind.Status, 0, 1, 3000, null), new(EffectKind.Damage, 80, null, 0, 0) }),
+            new(200, "threefold_cut", "Threefold Cut", 1, 1, SkillTarget.Enemy, 0, 0, 4.0f, 20, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 70, null, 0, null), new(EffectKind.Status, 0, 2, 1500, 0) }),
+            new(201, "rending_blow", "Rending Blow", 1, 1, SkillTarget.Enemy, 0, 6000, 4.0f, 40, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 140, null, 0, null), new(EffectKind.Damage, 100, null, 0, 2) }),
+            new(202, "sundering_cleave", "Sundering Cleave", 1, 3, SkillTarget.Enemy, 1500, 10000, 5.0f, 60, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 230, null, 0, null), new(EffectKind.Status, 0, 5, 8000, null) }),
+            new(203, "shield_bash", "Shield Bash", 1, 5, SkillTarget.Enemy, 0, 15000, 4.0f, 50, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 50, null, 0, null), new(EffectKind.Status, 0, 1, 2000, null) }),
+            new(204, "hamstring", "Hamstring", 1, 7, SkillTarget.Enemy, 0, 12000, 4.0f, 30, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 40, null, 0, null), new(EffectKind.Status, 0, 0, 6000, null) }),
+            new(205, "war_cry", "War Cry", 1, 9, SkillTarget.Caster, 0, 30000, 0.0f, 50, 0.0f, false, new EffectData[] { new(EffectKind.Status, 0, 7, 10000, null) }),
+            new(206, "iron_hide", "Iron Hide", 1, 12, SkillTarget.Caster, 0, 45000, 0.0f, 40, 0.0f, false, new EffectData[] { new(EffectKind.Status, 0, 8, 8000, null) }),
+            new(207, "overhead_smash", "Overhead Smash", 1, 14, SkillTarget.Enemy, 2000, 20000, 5.0f, 90, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 300, null, 0, null), new(EffectKind.Status, 0, 2, 2000, 1) }),
+            new(300, "mending_word", "Mending Word", 2, 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260, null, 0, null) }),
+            new(301, "quick_balm", "Quick Balm", 2, 1, SkillTarget.Ally, 0, 6000, 25.0f, 50, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 120, null, 0, null) }),
+            new(302, "brine_lash", "Brine Lash", 2, 1, SkillTarget.Enemy, 1000, 0, 20.0f, 30, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 80, null, 0, null), new(EffectKind.Status, 0, 3, 8000, null) }),
+            new(303, "renewing_tide", "Renewing Tide", 2, 3, SkillTarget.Ally, 0, 12000, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Status, 40, 9, 10000, null) }),
+            new(304, "undertow", "Undertow", 2, 5, SkillTarget.Enemy, 1500, 15000, 20.0f, 50, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 60, null, 0, null), new(EffectKind.Status, 0, 0, 5000, null), new(EffectKind.Status, 0, 2, 1500, 3) }),
+            new(305, "cleansing_spring", "Cleansing Spring", 2, 7, SkillTarget.Ally, 0, 20000, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Cleanse, 0, null, 0, null), new(EffectKind.Heal, 60, null, 0, null) }),
+            new(306, "wavebreak", "Wavebreak", 2, 9, SkillTarget.Enemy, 2000, 15000, 20.0f, 70, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 160, null, 0, null), new(EffectKind.Status, 0, 6, 6000, null) }),
+            new(307, "tidal_ward", "Tidal Ward", 2, 12, SkillTarget.Ally, 0, 30000, 25.0f, 70, 0.0f, false, new EffectData[] { new(EffectKind.Status, 0, 8, 6000, null) }),
         };
 
         /// <summary>The skill stored as <paramref name="wire"/>, if it exists.</summary>
@@ -527,5 +572,27 @@ namespace Mmo.Content
 
         /// <summary>The Wayshrine kind stored as <paramref name="wire"/>, if it exists.</summary>
         public static ShrineData? Shrine(byte wire) => wire < Shrines.Count ? Shrines[wire] : null;
+
+        /// <summary>Every status, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<StatusData> Statuses = new StatusData[]
+        {
+            new(0, "slowed", "Slowed", true, CrowdControl.Snare, 60, 0, 0, 0),
+            new(1, "stunned", "Stunned", true, CrowdControl.Stun, 100, 0, 0, 0),
+            new(2, "felled", "Felled", true, CrowdControl.Knockdown, 100, 0, 0, 0),
+            new(3, "soaked", "Soaked", true, CrowdControl.None, 100, -10, 0, 0),
+            new(4, "scorched", "Scorched", true, CrowdControl.None, 100, 0, 0, 1000),
+            new(5, "sundered", "Sundered", true, CrowdControl.None, 100, 0, 15, 0),
+            new(6, "shaken", "Shaken", true, CrowdControl.None, 100, -20, 0, 0),
+            new(7, "fervor", "Fervor", false, CrowdControl.None, 100, 20, 0, 0),
+            new(8, "bulwark", "Bulwark", false, CrowdControl.None, 100, 0, -30, 0),
+            new(9, "renewal", "Renewal", false, CrowdControl.None, 100, 0, 0, 1000),
+        };
+
+        /// <summary>The status stored as <paramref name="wire"/>, if it exists.</summary>
+        public static StatusData? Status(byte wire) => wire < Statuses.Count ? Statuses[wire] : null;
+
+        public static readonly ProgressRules Progress = new(new uint[] { 100u, 150u, 220u, 300u, 400u, 520u, 660u, 820u, 1000u, 1200u, 1450u, 1750u, 2100u, 2500u }, new byte[] { 1, 5, 10 }, 100, 40, 40u, 20u, 25u, 5u);
+
+        public static readonly ControlRules Diminishing = new(15u, new uint[] { 100u, 50u, 25u });
     }
 }

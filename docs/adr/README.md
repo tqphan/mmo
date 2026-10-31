@@ -32,3 +32,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0026](0026-plantings-staged-from-timestamps-with-instant-harvest.md) | Crops, trees and livestock are public rows staged from timestamps; harvests are instant; gone plantings are cleared lazily | Accepted |
 | [0027](0027-packs-carried-privately-dropped-publicly-priced-by-distance.md) | Packs are carried in a private table and dropped into a public one; prices come from distance and timestamps; carriers' moves are judged slower | Accepted |
 | [0028](0028-vitals-from-timestamps-casts-as-scheduled-rows.md) | Vitals are a public row settled from timestamps; casts and projectiles are scheduled rows; the client turns to face before a skill | Accepted |
+| [0029](0029-statuses-in-vitals-ticks-by-due-index.md) | Statuses live in `vitals`; damage over time ticks from a due-time index; controls diminish per group; levels and skillsets live in `fighter` | Accepted |

@@ -13,6 +13,7 @@ pub struct CombatEvent {
     pub skill_id: u32,
     pub amount: i32,
     pub flags: u16,
+    pub status: u8,
 }
 
 impl __sdk::InModule for CombatEvent {
@@ -29,6 +30,7 @@ pub struct CombatEventCols {
     pub skill_id: __sdk::__query_builder::Col<CombatEvent, u32>,
     pub amount: __sdk::__query_builder::Col<CombatEvent, i32>,
     pub flags: __sdk::__query_builder::Col<CombatEvent, u16>,
+    pub status: __sdk::__query_builder::Col<CombatEvent, u8>,
 }
 
 impl __sdk::__query_builder::HasCols for CombatEvent {
@@ -41,6 +43,7 @@ impl __sdk::__query_builder::HasCols for CombatEvent {
             skill_id: __sdk::__query_builder::Col::new(table_name, "skill_id"),
             amount: __sdk::__query_builder::Col::new(table_name, "amount"),
             flags: __sdk::__query_builder::Col::new(table_name, "flags"),
+            status: __sdk::__query_builder::Col::new(table_name, "status"),
         }
     }
 }

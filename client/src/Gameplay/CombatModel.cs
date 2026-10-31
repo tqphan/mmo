@@ -8,9 +8,21 @@ using Mmo.Sim;
 namespace Mmo.Gameplay
 {
     /// <summary>A fighter's <c>vitals</c> row as the rules need it, in µs of game time.</summary>
-    public readonly record struct VitalsInfo(int Hp, int HpMax, int Mp, int MpMax, long At, long CombatUntil, long? DeadAt, ushort CastSkill, long CastStart, long CastEnd)
+    public readonly record struct VitalsInfo(int Hp, int HpMax, int Mp, int MpMax, long At, long CombatUntil, long? DeadAt, ushort CastSkill, long CastStart, long CastEnd,
+        byte Level = 1, IReadOnlyList<Slot>? Statuses = null)
     {
         public bool Dead => DeadAt is not null;
+
+        public IReadOnlyList<Slot> Slots => Statuses ?? Array.Empty<Slot>();
+
+        /// <summary>Stunned or knocked down.</summary>
+        public bool Controlled(long now) => Sim.Combat.Controlled(Slots, now);
+
+        public bool KnockedDown(long now) => Slots.Any(s => s.Active(now) && s.Data?.Control == CrowdControl.Knockdown);
+
+        /// <summary>The factor on our speed from controls now: 0 stunned or knocked down, a snare's share snared.</summary>
+        public float MoveScale(long now) =>
+            Slots.Where(s => s.Active(now) && s.Data is not null).Select(s => Sim.Combat.SpeedFactor(s.Data!)).DefaultIfEmpty(1.0f).Min();
 
         public int HpNow(long now) => Sim.Combat.HpNow(Hp, HpMax, At, CombatUntil, now, Dead);
 
@@ -42,11 +54,48 @@ namespace Mmo.Gameplay
         /// <summary>Tab picks targets this close.</summary>
         public const float TabRangeM = 40.0f;
 
-        /// <summary>Keys 1–9 use the skills in content order.</summary>
-        public static IReadOnlyList<SkillData> Hotbar => GameContent.Skills;
+        /// <summary>Keys per hotbar row: 1–8, with Shift on the second row and Ctrl on the third.</summary>
+        public const int RowKeys = 8;
 
-        /// <summary>The skill on hotbar key <paramref name="key"/> (1 for the first), if any.</summary>
-        public static SkillData? Slot(int key) => key >= 1 && key <= Hotbar.Count ? Hotbar[key - 1] : null;
+        /// <summary>One hotbar row per skillset picked, in the order picked, each its skills in content order.</summary>
+        public static IReadOnlyList<IReadOnlyList<SkillData>> Rows(IEnumerable<byte> picks) =>
+            picks.Select(p => (IReadOnlyList<SkillData>)GameContent.Skills.Where(s => s.Skillset == p).Take(RowKeys).ToList()).ToList();
+
+        /// <summary>The row a digit key uses: Ctrl the third, Shift the second, otherwise the first.</summary>
+        public static int RowOf(bool shift, bool ctrl) => ctrl ? 2 : shift ? 1 : 0;
+
+        /// <summary>The skill on row <paramref name="row"/>'s key <paramref name="key"/> (1 for the first), if any.</summary>
+        public static SkillData? Slot(IEnumerable<byte> picks, int row, int key)
+        {
+            var rows = Rows(picks);
+            return row >= 0 && row < rows.Count && key >= 1 && key <= rows[row].Count ? rows[row][key - 1] : null;
+        }
+
+        /// <summary>What a hotbar slot's key reads: <c>4</c>, <c>S-4</c> or <c>C-4</c>.</summary>
+        public static string KeyLabel(int row, int key) => row switch { 0 => $"{key}", 1 => $"S-{key}", _ => $"C-{key}" };
+
+        /// <summary>The line about skillsets: a free pick, the level of the next, or nothing once all are picked.</summary>
+        public static string PickLine(byte level, int picked)
+        {
+            int free = Sim.Combat.SkillsetSlots(level) - picked;
+            if (free > 0)
+                return free == 1 ? "K: pick a skillset" : $"K: pick {free} skillsets";
+            var at = GameContent.Progress.SkillsetAt;
+            return picked < at.Count ? $"next skillset at level {at[picked]}" : "";
+        }
+
+        /// <summary><c>Level 3 · 120 / 220 xp</c>, or <c>Level 15 (top)</c>.</summary>
+        public static string LevelLine(byte level, uint xp) =>
+            level >= Sim.Combat.LevelMax ? $"Level {level} (top)" : $"Level {level} · {xp} / {Sim.Combat.XpToNext(level)} xp";
+
+        /// <summary>The statuses a frame shows: active ones, buffs before debuffs, soonest to end first, each with its name and seconds left.</summary>
+        public static IReadOnlyList<(string Text, bool Debuff)> Chips(IEnumerable<Sim.Slot> slots, long now) =>
+            slots
+                .Where(s => s.Active(now) && s.Data is not null)
+                .OrderBy(s => s.Data!.Debuff)
+                .ThenBy(s => s.Until)
+                .Select(s => ($"{s.Data!.Name} {(s.Until - now + 999_999) / 1_000_000}", s.Data.Debuff))
+                .ToList();
 
         /// <summary>
         /// Whom a skill used on <paramref name="target"/> lands on, as the server decides: an ally
@@ -132,8 +181,17 @@ namespace Mmo.Gameplay
         public static string Amounts(int now, int max) => FormattableString.Invariant($"{now:N0} / {max:N0}");
 
         /// <summary>What a floating number says for a combat event.</summary>
-        public static string Floating(int amount, ushort flags)
+        public static string Floating(int amount, ushort flags, byte status = 0)
         {
+            string name = GameContent.Status(status)?.Name ?? "status";
+            if ((flags & EventFlags.Immune) != 0)
+                return $"immune to {name}";
+            if ((flags & EventFlags.Status) != 0)
+                return name;
+            if ((flags & EventFlags.Level) != 0)
+                return $"level {amount}!";
+            if ((flags & EventFlags.Xp) != 0)
+                return $"+{amount} xp";
             bool heal = (flags & EventFlags.Heal) != 0;
             string text = heal ? $"+{amount}" : $"{amount}";
             return (flags & EventFlags.Kill) != 0 ? text + " killed" : text;
@@ -146,5 +204,10 @@ namespace Mmo.Gameplay
         public const ushort Hit = 1;
         public const ushort Heal = 2;
         public const ushort Kill = 4;
+        public const ushort Status = 8;
+        public const ushort Immune = 16;
+        public const ushort Xp = 32;
+        public const ushort Level = 64;
+        public const ushort Tick = 128;
     }
 }

@@ -25,6 +25,8 @@ namespace SpacetimeDB.Types
         public int Amount;
         [DataMember(Name = "flags")]
         public ushort Flags;
+        [DataMember(Name = "status")]
+        public byte Status;
 
         public CombatEvent(
             ulong Cell,
@@ -32,7 +34,8 @@ namespace SpacetimeDB.Types
             ulong Target,
             uint SkillId,
             int Amount,
-            ushort Flags
+            ushort Flags,
+            byte Status
         )
         {
             this.Cell = Cell;
@@ -41,6 +44,7 @@ namespace SpacetimeDB.Types
             this.SkillId = SkillId;
             this.Amount = Amount;
             this.Flags = Flags;
+            this.Status = Status;
         }
 
         public CombatEvent()

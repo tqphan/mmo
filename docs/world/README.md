@@ -75,9 +75,11 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Skillset | Emberlore | Fire and frost at range (`emberlore`, `content/combat.toml`) |
 | Skillset | Ironvow | Weapons and fury up close (`ironvow`) |
 | Skillset | Wellspring | Healing, and a little harm (`wellspring`) |
-| Skill: Emberlore | Cinder Dart, Frostspike, Flare Burst | (`cinder_dart`, `frostspike`, `flare_burst`) |
-| Skill: Ironvow | Threefold Cut, Rending Blow, Sundering Cleave | (`threefold_cut`, `rending_blow`, `sundering_cleave`) |
-| Skill: Wellspring | Mending Word, Quick Balm, Brine Lash | (`mending_word`, `quick_balm`, `brine_lash`) |
+| Skill: Emberlore | Cinder Dart, Frostspike, Flare Burst, Kindle, Rime Snare, Ember Focus, Searing Lance, Frostbind | (`cinder_dart`, `frostspike`, `flare_burst`, `kindle`, `rime_snare`, `ember_focus`, `searing_lance`, `frostbind`) |
+| Skill: Ironvow | Threefold Cut, Rending Blow, Sundering Cleave, Shield Bash, Hamstring, War Cry, Iron Hide, Overhead Smash | (`threefold_cut`, `rending_blow`, `sundering_cleave`, `shield_bash`, `hamstring`, `war_cry`, `iron_hide`, `overhead_smash`) |
+| Skill: Wellspring | Mending Word, Quick Balm, Brine Lash, Renewing Tide, Undertow, Cleansing Spring, Wavebreak, Tidal Ward | (`mending_word`, `quick_balm`, `brine_lash`, `renewing_tide`, `undertow`, `cleansing_spring`, `wavebreak`, `tidal_ward`) |
+| Debuff | Slowed, Stunned, Felled, Soaked, Scorched, Sundered, Shaken | Statuses skills put on foes: a snare, a stun, a knockdown, a combo mark, burning over time, more damage taken, less dealt (`content/combat.toml`) |
+| Buff | Fervor, Bulwark, Renewal | More damage dealt, less taken, healing over time (`content/combat.toml`) |
 | Wayshrine | Gullhaven Wayshrine, Furrowdale Wayshrine, Cairnwick Wayshrine, Redfen Wayshrine | Standing stones where the dead get up again, one in each town (`content/combat.toml`) |
 | Dev target | Straw Dummy | A practice target on a post, dev builds only, until NPCs |
 

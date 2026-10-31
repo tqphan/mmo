@@ -163,7 +163,7 @@ namespace Mmo.Gameplay
             var carried = ship is null ? GlobalPosition : ToGodot(ship.Pose.ToWorld(ToNumerics(local)));
             GlobalPosition = carried;
             bool dead = Combat?.Dead == true;
-            Views.Lie(body, FrameYaw + heading, dead);
+            Views.Lie(body, FrameYaw + heading, dead || Combat?.KnockedDown == true);
             if (dead)
             {
                 // Lying where we fell until the respawn's correction snaps us to a Wayshrine.
@@ -189,8 +189,9 @@ namespace Mmo.Gameplay
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;
             // A pick-up on its way holds us still, so our next move is already at the carrier's speed.
-            var wish = Controls?.Manning is not null || Trade?.Halted == true ? Vector2.Zero : DemoWish ?? Wish(order, ship);
-            float maxSpeed = Mode.Data().MaxSpeedMps * (Trade?.SpeedScale ?? 1.0f);
+            var wish = Controls?.Manning is not null || Trade?.Halted == true || Combat?.Controlled == true ? Vector2.Zero : DemoWish ?? Wish(order, ship);
+            // Snares slow us and stuns stop us, as the server judges our moves (docs/design/combat.md).
+            float maxSpeed = Mode.Data().MaxSpeedMps * (Trade?.SpeedScale ?? 1.0f) * (Combat?.MoveScale ?? 1.0f);
             Views.SetBackPack(body, Trade?.Carried?.Def ?? 0, ref packShown);
             var v = Velocity;
             v.X = wish.X * maxSpeed;
@@ -202,7 +203,7 @@ namespace Mmo.Gameplay
             }
             else if (IsOnFloor())
             {
-                bool jump = options.Autopilot is null ? Controls?.Manning is null && Input.IsActionJustPressed("jump") : order.Jump;
+                bool jump = Combat?.Controlled != true && (options.Autopilot is null ? Controls?.Manning is null && Input.IsActionJustPressed("jump") : order.Jump);
                 if (jump)
                 {
                     v.Y = JumpSpeed;
