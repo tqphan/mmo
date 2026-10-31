@@ -365,6 +365,37 @@ output_count = 1
 labor = 40
 craft_s = 6.0
 
+# Material packs for shipyards (docs/design/vehicles.md §2B): 25 labor each (B).
+[[recipe]]
+wire = 35
+id = "timber_bundle"
+station = "packwright_bench"
+inputs = [{ item = "hollowoak_beam", count = 4 }, { item = "driftpine_plank", count = 20 }]
+output = "timber_bundle"
+output_count = 1
+labor = 25
+craft_s = 10.0
+
+[[recipe]]
+wire = 36
+id = "ironwork_crate"
+station = "packwright_bench"
+inputs = [{ item = "rustiron_bar", count = 20 }, { item = "rustiron_fittings", count = 4 }]
+output = "ironwork_crate"
+output_count = 1
+labor = 25
+craft_s = 10.0
+
+[[recipe]]
+wire = 37
+id = "sailcloth_bale"
+station = "packwright_bench"
+inputs = [{ item = "sailcloth", count = 6 }, { item = "saltrope", count = 6 }]
+output = "sailcloth_bale"
+output_count = 1
+labor = 25
+craft_s = 10.0
+
 # Vehicles (docs/design/vehicles.md), at the Joiner's Bench. The Swiftgull comes from the shipyard.
 [[recipe]]
 wire = 33
@@ -385,3 +416,25 @@ output = "driftpine_skiff"
 output_count = 1
 labor = 30
 craft_s = 10.0
+
+# The Swiftgull's design, crafted where the original's was bought (docs/design/vehicles.md §3).
+[[recipe]]
+wire = 38
+id = "swiftgull_design"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_plank", count = 10 }, { item = "sailcloth", count = 2 }, { item = "saltrope", count = 4 }]
+output = "swiftgull_design"
+output_count = 1
+labor = 50
+craft_s = 10.0
+
+# Mends wrecks and repairs hulls (docs/design/vehicles.md §2B).
+[[recipe]]
+wire = 39
+id = "hullmenders_kit"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_plank", count = 4 }, { item = "rustiron_nails", count = 4 }, { item = "saltrope", count = 1 }]
+output = "hullmenders_kit"
+output_count = 1
+labor = 10
+craft_s = 4.0

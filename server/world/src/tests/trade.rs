@@ -202,13 +202,8 @@ fn dropping_and_picking_up() {
     let d = dropped(&t).pop().unwrap();
     assert_eq!(call(&t, 1, |ctx| pick_up_pack(ctx, d.id + 100)), Err("no such pack".into()));
 
-    // Aboard and swimming are refused.
+    // Aboard is refused. Swimmers may take packs (floating ones, from wrecks: tests/shipyard.rs).
     place_at(&t, 1, 11.0, 10.0);
-    read(&t, |ctx| {
-        let p = ctx.db.presence().identity().find(identity(1)).unwrap();
-        ctx.db.presence().identity().update(Presence { mode: MoveMode::Swim as u8, ..p });
-    });
-    assert_eq!(call(&t, 1, |ctx| pick_up_pack(ctx, d.id)), Err("can't pick up a pack while swimming".into()));
     read(&t, |ctx| {
         let p = ctx.db.presence().identity().find(identity(1)).unwrap();
         ctx.db.presence().identity().update(Presence { mode: 1, parent: 7, ..p });

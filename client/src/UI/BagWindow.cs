@@ -36,6 +36,9 @@ namespace Mmo.UI
         /// <summary>Right-click on a stack: use it. True if it was used, which closes the bag; set by <see cref="Main"/>.</summary>
         public System.Func<BagStack, bool>? Use { get; set; }
 
+        /// <summary>A note for a stack, shown in place of its count: a wreck's state (docs/design/vehicles.md §2B).</summary>
+        public System.Func<BagStack, string>? Note { get; set; }
+
         public BagStack?[] Grid { get; private set; } = new BagStack?[GameContent.BagSlots];
 
         public bool Open
@@ -110,7 +113,7 @@ namespace Mmo.UI
             Model.Refresh(Grid);
             var held = Model.Holding;
             for (int i = 0; i < slots.Length; i++)
-                slots[i].Show(Grid[i], held is { } h && h.Slot == i ? h : null);
+                slots[i].Show(Grid[i], held is { } h && h.Slot == i ? h : null, Grid[i] is { } st && Note is { } note ? note(st) : "");
             int used = Grid.Count(s => s is not null);
             title.Text = held is { } hh
                 ? $"Bag  {used} / {Grid.Length}   holding {(hh.Split is uint n ? $"{n} (split)" : "a stack")}"
@@ -220,14 +223,15 @@ namespace Mmo.UI
 
             public ushort Index { get; }
 
-            public void Show(BagStack? stack, BagModel.Held? held)
+            /// <param name="note">Shown in place of the count, such as a wreck's state.</param>
+            public void Show(BagStack? stack, BagModel.Held? held, string note)
             {
                 var def = stack is { } s ? GameContent.Item(s.Def) : null;
                 style.BgColor = stack is null ? new Color(0.16f, 0.17f, 0.19f) : KindColor(def?.Kind);
                 style.BorderColor = held is not null ? new Color(1.0f, 0.85f, 0.3f) : new Color(0.28f, 0.29f, 0.32f);
                 name.Text = stack is { } st ? def?.Name ?? $"item {st.Def}" : "";
-                count.Text = stack is { Count: > 1 } c ? (held?.Split is uint n ? $"{n}/{c.Count}" : c.Count.ToString()) : "";
-                TooltipText = stack is { } t ? $"{name.Text} × {t.Count}" : "";
+                count.Text = note.Length > 0 ? note : stack is { Count: > 1 } c ? (held?.Split is uint n ? $"{n}/{c.Count}" : c.Count.ToString()) : "";
+                TooltipText = stack is { } t ? $"{name.Text} × {t.Count}" + (note.Length > 0 ? $" ({note})" : "") : "";
             }
 
             private static Color KindColor(ItemKind? kind) => kind switch

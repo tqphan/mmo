@@ -43,8 +43,11 @@ namespace SpacetimeDB.Types
             AddTable(MyPack = new(conn));
             AddTable(MyPresence = new(conn));
             AddTable(MyPurse = new(conn));
+            AddTable(MyVehicles = new(conn));
+            AddTable(MyWrecks = new(conn));
             AddTable(Plot = new(conn));
             AddTable(ResourceNode = new(conn));
+            AddTable(Shipyard = new(conn));
             AddTable(Shrine = new(conn));
             AddTable(Station = new(conn));
             AddTable(TerrainInfo = new(conn));
@@ -565,8 +568,11 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.MyPack().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
             new QueryBuilder().From.MyPurse().ToSql(),
+            new QueryBuilder().From.MyVehicles().ToSql(),
+            new QueryBuilder().From.MyWrecks().ToSql(),
             new QueryBuilder().From.Plot().ToSql(),
             new QueryBuilder().From.ResourceNode().ToSql(),
+            new QueryBuilder().From.Shipyard().ToSql(),
             new QueryBuilder().From.Shrine().ToSql(),
             new QueryBuilder().From.Station().ToSql(),
             new QueryBuilder().From.TerrainInfo().ToSql(),
@@ -597,8 +603,11 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Pack, MyPackCols, MyPackIxCols> MyPack() => new("my_pack", new MyPackCols("my_pack"), new MyPackIxCols("my_pack"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
         public global::SpacetimeDB.Table<Purse, MyPurseCols, MyPurseIxCols> MyPurse() => new("my_purse", new MyPurseCols("my_purse"), new MyPurseIxCols("my_purse"));
+        public global::SpacetimeDB.Table<Vehicle, MyVehiclesCols, MyVehiclesIxCols> MyVehicles() => new("my_vehicles", new MyVehiclesCols("my_vehicles"), new MyVehiclesIxCols("my_vehicles"));
+        public global::SpacetimeDB.Table<Wreck, MyWrecksCols, MyWrecksIxCols> MyWrecks() => new("my_wrecks", new MyWrecksCols("my_wrecks"), new MyWrecksIxCols("my_wrecks"));
         public global::SpacetimeDB.Table<Plot, PlotCols, PlotIxCols> Plot() => new("plot", new PlotCols("plot"), new PlotIxCols("plot"));
         public global::SpacetimeDB.Table<ResourceNode, ResourceNodeCols, ResourceNodeIxCols> ResourceNode() => new("resource_node", new ResourceNodeCols("resource_node"), new ResourceNodeIxCols("resource_node"));
+        public global::SpacetimeDB.Table<Shipyard, ShipyardCols, ShipyardIxCols> Shipyard() => new("shipyard", new ShipyardCols("shipyard"), new ShipyardIxCols("shipyard"));
         public global::SpacetimeDB.Table<Shrine, ShrineCols, ShrineIxCols> Shrine() => new("shrine", new ShrineCols("shrine"), new ShrineIxCols("shrine"));
         public global::SpacetimeDB.Table<Station, StationCols, StationIxCols> Station() => new("station", new StationCols("station"), new StationIxCols("station"));
         public global::SpacetimeDB.Table<TerrainInfo, TerrainInfoCols, TerrainInfoIxCols> TerrainInfo() => new("terrain_info", new TerrainInfoCols("terrain_info"), new TerrainInfoIxCols("terrain_info"));
@@ -689,6 +698,7 @@ namespace SpacetimeDB.Types
             return reducer switch
             {
                 Reducer.AbandonPlot args => Reducers.InvokeAbandonPlot(eventContext, args),
+                Reducer.AbandonShipyard args => Reducers.InvokeAbandonShipyard(eventContext, args),
                 Reducer.AdminClearLand args => Reducers.InvokeAdminClearLand(eventContext, args),
                 Reducer.AdminClearNodes args => Reducers.InvokeAdminClearNodes(eventContext, args),
                 Reducer.AdminClearPosts args => Reducers.InvokeAdminClearPosts(eventContext, args),
@@ -720,6 +730,7 @@ namespace SpacetimeDB.Types
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
                 Reducer.DestroyItem args => Reducers.InvokeDestroyItem(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
+                Reducer.DevDamageVehicle args => Reducers.InvokeDevDamageVehicle(eventContext, args),
                 Reducer.DevDiscardPack args => Reducers.InvokeDevDiscardPack(eventContext, args),
                 Reducer.DevGivePack args => Reducers.InvokeDevGivePack(eventContext, args),
                 Reducer.DevGrantItem args => Reducers.InvokeDevGrantItem(eventContext, args),
@@ -746,13 +757,16 @@ namespace SpacetimeDB.Types
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.LoadPack args => Reducers.InvokeLoadPack(eventContext, args),
                 Reducer.LootCorpse args => Reducers.InvokeLootCorpse(eventContext, args),
+                Reducer.MendVehicle args => Reducers.InvokeMendVehicle(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
                 Reducer.PayTax args => Reducers.InvokePayTax(eventContext, args),
                 Reducer.PickSkillset args => Reducers.InvokePickSkillset(eventContext, args),
                 Reducer.PickUpPack args => Reducers.InvokePickUpPack(eventContext, args),
                 Reducer.PlacePlot args => Reducers.InvokePlacePlot(eventContext, args),
+                Reducer.PlaceShipyard args => Reducers.InvokePlaceShipyard(eventContext, args),
                 Reducer.Plant args => Reducers.InvokePlant(eventContext, args),
+                Reducer.RepairVehicle args => Reducers.InvokeRepairVehicle(eventContext, args),
                 Reducer.Respawn args => Reducers.InvokeRespawn(eventContext, args),
                 Reducer.SellPack args => Reducers.InvokeSellPack(eventContext, args),
                 Reducer.SetPlotAccess args => Reducers.InvokeSetPlotAccess(eventContext, args),
@@ -764,6 +778,7 @@ namespace SpacetimeDB.Types
                 Reducer.UnloadPack args => Reducers.InvokeUnloadPack(eventContext, args),
                 Reducer.Uproot args => Reducers.InvokeUproot(eventContext, args),
                 Reducer.UseSkill args => Reducers.InvokeUseSkill(eventContext, args),
+                Reducer.WorkShipyard args => Reducers.InvokeWorkShipyard(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

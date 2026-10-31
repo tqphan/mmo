@@ -182,6 +182,27 @@ namespace Mmo.Tests
         }
 
         [Fact]
+        public void YardAndRepairReach()
+        {
+            int n = 0;
+            foreach (var v in Lines("yard_reach"))
+            {
+                var hull = GameContent.Hulls[int.Parse(v[1])];
+                var m = new ShipMotion(F(v[2]), F(v[3]), F(v[4]), 0);
+                var at = new System.Numerics.Vector3(F(v[5]), 0, F(v[6]));
+                string what = $"reach {string.Join(' ', v[1..7])}";
+                Assert.True((v[7] == "1") == Ship.YardReach(hull, m, at), what);
+                Assert.True((v[8] == "1") == Ship.RepairReach(hull, m, at), what);
+                n++;
+            }
+            Assert.True(n >= 100, $"{n} vectors");
+            foreach (var v in Lines("vehicle_repair"))
+                Assert.Equal(int.Parse(v[3]), Ship.RepairedHp(GameContent.Hulls[int.Parse(v[1])], int.Parse(v[2])));
+            foreach (var v in Lines("vehicle_fire"))
+                Assert.Equal(v[3] == "1", Ship.UnderFire(long.Parse(v[1]), long.Parse(v[2])));
+        }
+
+        [Fact]
         public void VehicleStand()
         {
             var map = Mmo.World.HeightMap.Parse(Hex(Lines("land_mmoh").Single()[1]));

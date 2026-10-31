@@ -36,6 +36,19 @@ value = 15000
 item = "preserves_crate"
 value = 18000
 
+# Shipyard material packs: worth less sold than built into a ship.
+[[pack]]
+item = "timber_bundle"
+value = 6000
+
+[[pack]]
+item = "ironwork_crate"
+value = 6000
+
+[[pack]]
+item = "sailcloth_bale"
+value = 6000
+
 # Post kinds. Each is placed once, from world/posts.tsv. `bonus_pct` is added to the route
 # factor: overseas posts pay more.
 [[post]]

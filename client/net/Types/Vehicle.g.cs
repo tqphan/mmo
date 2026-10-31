@@ -33,6 +33,8 @@ namespace SpacetimeDB.Types
         public ulong Owner;
         [DataMember(Name = "cargo")]
         public System.Collections.Generic.List<ushort> Cargo;
+        [DataMember(Name = "hit_at")]
+        public SpacetimeDB.Timestamp HitAt;
 
         public Vehicle(
             ulong EntityId,
@@ -44,7 +46,8 @@ namespace SpacetimeDB.Types
             ulong Helm,
             System.Collections.Generic.List<SpacetimeDB.Timestamp> CannonReadyAt,
             ulong Owner,
-            System.Collections.Generic.List<ushort> Cargo
+            System.Collections.Generic.List<ushort> Cargo,
+            SpacetimeDB.Timestamp HitAt
         )
         {
             this.EntityId = EntityId;
@@ -57,6 +60,7 @@ namespace SpacetimeDB.Types
             this.CannonReadyAt = CannonReadyAt;
             this.Owner = Owner;
             this.Cargo = Cargo;
+            this.HitAt = HitAt;
         }
 
         public Vehicle()

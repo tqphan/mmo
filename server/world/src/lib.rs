@@ -13,6 +13,7 @@ mod movement;
 mod npc;
 mod session;
 mod ship;
+mod shipyard;
 mod terrain;
 mod tick;
 mod time;

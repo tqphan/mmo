@@ -21,11 +21,11 @@ use spacetimedb_sdk::{DbContext, Table};
 /// Our own test shore when the server has no terrain: 3 × 3 cells in the north-east corner, the
 /// same as the land scenario's corner. Land 3 m up for 100 m from its west edge, then a 0.4 slope
 /// into the sea.
-const OWN_CELL: u16 = 225;
-const OWN_CELLS: u16 = 3;
+pub(crate) const OWN_CELL: u16 = 225;
+pub(crate) const OWN_CELLS: u16 = 3;
 const DRIVE_S: f32 = 5.0;
 
-fn own_height(x: f32, _z: f32) -> f32 {
+pub(crate) fn own_height(x: f32, _z: f32) -> f32 {
     let lx = x - (f32::from(OWN_CELL) * sim::cell::CELL_SIZE_M - sim::cell::WORLD_HALF_M);
     if lx < 100.0 { 3.0 } else { (3.0 - 0.4 * (lx - 100.0)).max(-6.0) }
 }
@@ -33,13 +33,13 @@ fn own_height(x: f32, _z: f32) -> f32 {
 /// Where a bot standing at (x, z) facing `yaw` summons a vehicle of `hull` that can stand there and
 /// for `ahead` metres straight on.
 #[derive(Clone, Copy, Debug)]
-struct Spot {
-    x: f32,
-    z: f32,
-    yaw: f32,
+pub(crate) struct Spot {
+    pub x: f32,
+    pub z: f32,
+    pub yaw: f32,
 }
 
-fn find(file: &HeightFile, hull: &HullData, near: (f32, f32), ahead: f32) -> Option<Spot> {
+pub(crate) fn find(file: &HeightFile, hull: &HullData, near: (f32, f32), ahead: f32) -> Option<Spot> {
     let mut chunks = FileChunks::new(file);
     // On known ground only: unknown terrain would float a boat.
     let mut ok = |m: &Motion| ground(&mut chunks, m.x, m.z).is_some() && stand(hull, m, |x, z| ground(&mut chunks, x, z)).is_some();
@@ -67,21 +67,21 @@ fn find(file: &HeightFile, hull: &HullData, near: (f32, f32), ahead: f32) -> Opt
 }
 
 /// Face `yaw` where we stand, so a summon lands ahead of us.
-fn face(bot: &Bot, yaw: f32) -> Check {
+pub(crate) fn face(bot: &Bot, yaw: f32) -> Check {
     let p = bot.presence().ok_or("left the world")?;
     call(bot, |tx| bot.conn.reducers.move_event_then(p.last_seq + 1, 0, p.x, p.y, p.z, yaw_to_u16(yaw), 0, p.mode, tx))?;
     wait_for("the turn", || bot.presence().is_some_and(|q| q.yaw == yaw_to_u16(yaw)))
 }
 
 /// The world position of a deck point of `v` as the bot sees it now.
-fn deck_point(bot: &Bot, v: u64, l: [f32; 3]) -> Result<[f32; 3], String> {
+pub(crate) fn deck_point(bot: &Bot, v: u64, l: [f32; 3]) -> Result<[f32; 3], String> {
     let t = bot.conn.db.transform().entity_id().find(&v).ok_or("can't see the vehicle")?;
     let pose = sim::ship::Pose { x: t.x, y: t.y, z: t.z, yaw: sim::ship::yaw_from_u16(t.yaw) };
     Ok(pose.to_world(l))
 }
 
 /// Stand beside deck point (x, z) of `v` and step onto it.
-fn board(bot: &Bot, v: u64, x: f32, z: f32) -> Check {
+pub(crate) fn board(bot: &Bot, v: u64, x: f32, z: f32) -> Check {
     let w = deck_point(bot, v, [x, 0.0, z])?;
     bot.teleport(w[0], w[2])?;
     std::thread::sleep(Duration::from_millis(300));
@@ -91,7 +91,7 @@ fn board(bot: &Bot, v: u64, x: f32, z: f32) -> Check {
 }
 
 /// The bot's vehicle item `id`, once it's in the bag.
-fn bag_item(bot: &Bot, char_id: u64, id: &str) -> Result<u64, String> {
+pub(crate) fn bag_item(bot: &Bot, char_id: u64, id: &str) -> Result<u64, String> {
     let wire = sim::content::item_by_id(id).ok_or_else(|| format!("no item {id}"))?.wire;
     let find = || bot.conn.db.my_inventory().iter().find(|i| i.holder == char_id && i.def == wire).map(|i| i.id);
     wait_for(id, || find().is_some())?;
@@ -99,7 +99,7 @@ fn bag_item(bot: &Bot, char_id: u64, id: &str) -> Result<u64, String> {
 }
 
 /// Summon `id` from the bag at `spot`; returns the vehicle once we see it.
-fn summon(bot: &Bot, char_id: u64, id: &str, spot: Spot) -> Result<u64, String> {
+pub(crate) fn summon(bot: &Bot, char_id: u64, id: &str, spot: Spot) -> Result<u64, String> {
     grant(bot, id, 1)?;
     let item = bag_item(bot, char_id, id)?;
     bot.teleport(spot.x, spot.z)?;

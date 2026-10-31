@@ -5,6 +5,7 @@ use spacetimedb::{ReducerContext, Table, ViewContext};
 use sim::content::{BAG_SLOTS, item as def_of};
 
 use crate::session::{character_private__view, presence};
+use crate::vehicle::wreck;
 
 /// `Item::place` values: what kind of container holds a stack, and so what `holder` is.
 pub mod place {
@@ -134,6 +135,9 @@ pub fn split_item(ctx: &ReducerContext, item_id: u64, count: u32, to_slot: u16) 
         Some(_) => return Err(format!("slot {to_slot} is taken")),
     }
     let left = it.count - count;
+    if left == 0 {
+        ctx.db.wreck().item_id().delete(it.id);
+    }
     set_count(ctx, it, left);
     Ok(())
 }
@@ -146,6 +150,9 @@ pub fn destroy_item(ctx: &ReducerContext, item_id: u64, count: u32) -> Result<()
         return Err(format!("destroy 1 to {} of this stack", it.count));
     }
     let left = it.count - count;
+    if left == 0 {
+        ctx.db.wreck().item_id().delete(it.id);
+    }
     set_count(ctx, it, left);
     Ok(())
 }

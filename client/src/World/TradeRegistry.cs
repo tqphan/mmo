@@ -77,7 +77,9 @@ namespace Mmo.World
         {
             if (packs.ContainsKey(d.Id))
                 return;
-            var view = new Node3D { Name = $"Dropped{d.Id}", Position = new Vector3(d.X, d.Y, d.Z), Rotation = new Vector3(0, Sim.Yaw.FromU16(d.Yaw), 0) };
+            // A pack floating where a ship sank rides a little above the water, to show over the waves.
+            float lift = d.Y <= Sim.Movement.SeaLevelM ? 0.25f : 0;
+            var view = new Node3D { Name = $"Dropped{d.Id}", Position = new Vector3(d.X, d.Y + lift, d.Z), Rotation = new Vector3(0, Sim.Yaw.FromU16(d.Yaw), 0) };
             view.AddChild(Views.Pack(d.Def));
             view.AddChild(Label(GameContent.Item(d.Def)?.Name ?? "Pack", 1.2f, new Color(0.95f, 0.9f, 0.7f)));
             packs[d.Id] = (d, view);

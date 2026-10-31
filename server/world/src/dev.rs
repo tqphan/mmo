@@ -6,7 +6,7 @@ use sim::ship::{Hull, Motion};
 
 use crate::combat::{CombatEvent, combat_event, skill};
 use crate::session::{Account, account, presence, transform};
-use crate::ship::deck;
+use crate::ship::{deck, vehicle};
 use crate::terrain::Terrain;
 
 /// Make the caller a GM of any level, `gm::ADMIN` included. Bots use it to upload test terrain.
@@ -78,5 +78,13 @@ pub fn dev_spawn_ship(ctx: &ReducerContext, hull: u8, x: f32, z: f32, yaw: f32) 
 pub fn dev_remove_ship(ctx: &ReducerContext, ship: u64) -> Result<(), String> {
     let d = deck(ctx, ship).ok_or("no such ship")?;
     crate::ship::remove(ctx, &d);
+    Ok(())
+}
+
+/// Damage any vehicle as a cannon would, through `ship::damage`: 0 HP sinks it.
+#[spacetimedb::reducer]
+pub fn dev_damage_vehicle(ctx: &ReducerContext, vehicle: u64, amount: i32) -> Result<(), String> {
+    let v = ctx.db.vehicle().entity_id().find(vehicle).ok_or("no such vehicle")?;
+    crate::ship::damage(ctx, v, amount);
     Ok(())
 }

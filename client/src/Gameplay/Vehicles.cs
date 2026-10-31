@@ -46,6 +46,8 @@ namespace Mmo.Gameplay
             var r = session.Conn!.Reducers;
             r.OnSummonVehicle += (ctx, _) => Answer(ctx, "summoned");
             r.OnStowVehicle += (ctx, _) => Answer(ctx, "stowed");
+            r.OnRepairVehicle += (ctx, _) => Answer(ctx, "repaired");
+            r.OnMendVehicle += (ctx, _) => Answer(ctx, "mending it");
             r.OnLoadPack += (ctx, _, slot) =>
             {
                 if (ctx.Event.Status is SpacetimeDB.Status.Committed)
@@ -73,22 +75,45 @@ namespace Mmo.Gameplay
             ulong me = session.Me?.CharId ?? 0;
             foreach (var s in entities.Ships)
                 if (s.Vehicle is { } v)
-                    yield return new VehicleModel.Seen(s.Id, s.Hull, s.Pose, v.Cargo, me != 0 && v.Owner == me);
+                    yield return new VehicleModel.Seen(s.Id, s.Hull, s.Pose, v.Cargo, me != 0 && v.Owner == me, v.Hp, v.HitAt.MicrosecondsSinceUnixEpoch);
         }
 
         private System.Numerics.Vector3 At => PlayerController.ToNumerics(player.GlobalPosition);
 
         private bool Carrying => session.Conn is { } c && session.Me is { } me && c.Db.MyPack.Iter().Any(p => p.Carrier == me.CharId);
 
-        /// <summary>A vehicle item from the bag: summon it. False for anything else.</summary>
+        /// <summary>Our wreck of item <paramref name="item"/>, if it is one.</summary>
+        public Wreck? WreckOf(ulong item) => session.Conn?.Db.MyWrecks.Iter().FirstOrDefault(w => w.ItemId == item);
+
+        /// <summary>The bag's note for a stack: a wreck's state, or nothing.</summary>
+        public string Note(BagStack s) =>
+            WreckOf(s.Id) is { } w ? ShipyardModel.WreckLabel(w.Mending, w.ReadyAt.MicrosecondsSinceUnixEpoch, session.GameNowMicros) : "";
+
+        /// <summary>A vehicle item from the bag: summon it, or mend it if it's a wreck. False for anything else.</summary>
         public bool Begin(BagStack s)
         {
             if (GameContent.HullOfItem(s.Def) is not { } hull)
                 return false;
+            if (WreckOf(s.Id) is { Mending: false })
+            {
+                session.Conn?.Reducers.MendVehicle(s.Id);
+                session.Log($"mending the {hull.Name}");
+                return true;
+            }
             session.Conn?.Reducers.SummonVehicle(s.Id);
             session.Log($"summoning a {hull.Name}");
             return true;
         }
+
+        public void Repair(ulong vehicle)
+        {
+            session.Conn?.Reducers.RepairVehicle(vehicle);
+            session.Log($"repairing vehicle {vehicle}");
+        }
+
+        /// <summary>Our vehicles wherever they are (<c>my_vehicles</c>), for V out of sight.</summary>
+        private IEnumerable<ulong> Owned =>
+            session.Conn is { } c && session.Me is { } me ? c.Db.MyVehicles.Iter().Where(v => v.Owner == me.CharId).Select(v => v.EntityId).ToList() : Enumerable.Empty<ulong>();
 
         /// <summary>F was pressed: load or unload at a slot in reach. False if there's nothing to do.</summary>
         public bool Interact()
@@ -119,10 +144,17 @@ namespace Mmo.Gameplay
             var seen = Seen().ToList();
             if (Input.IsActionJustPressed("stow_vehicle"))
             {
-                if (VehicleModel.StowTarget(seen, player.Parent, At) is ulong v)
+                if (VehicleModel.StowTarget(seen, player.Parent, At, Owned) is ulong v)
                     Stow(v);
                 else
                     (lastResult, resultUntil) = ("no vehicle of yours in sight", System.DateTime.UtcNow.AddSeconds(4));
+            }
+            if (Input.IsActionJustPressed("repair_vehicle"))
+            {
+                if (VehicleModel.RepairTarget(seen, player.Parent, At) is ulong v)
+                    Repair(v);
+                else
+                    (lastResult, resultUntil) = ("nothing to repair in reach", System.DateTime.UtcNow.AddSeconds(4));
             }
             var lines = new List<string>();
             // At the helm or a cannon, F works that instead (PlayerController).
@@ -138,7 +170,10 @@ namespace Mmo.Gameplay
                 string cargo = VehicleModel.CargoLine(aboard.Cargo);
                 if (cargo.Length > 0)
                     lines.Add(cargo);
-                if (aboard.Ours)
+                string state = VehicleModel.StateLine(aboard, session.GameNowMicros);
+                if (state.Length > 0)
+                    lines.Add(state);
+                if (aboard.Ours && aboard.Hp > 0)
                     lines.Add($"V: stow your {aboard.Hull.Name}");
             }
             if (LastResult.Length > 0)

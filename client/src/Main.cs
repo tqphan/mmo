@@ -100,6 +100,11 @@ namespace Mmo
             var vehicles = new Vehicles(session, player, entities);
             AddChild(vehicles);
             player.Vehicles = vehicles;
+            var yardRegistry = new ShipyardRegistry(session);
+            AddChild(yardRegistry);
+            var shipyards = new Shipyards(session, player, yardRegistry);
+            AddChild(shipyards);
+            player.Shipyards = shipyards;
             var tradeRegistry = new TradeRegistry(session);
             AddChild(tradeRegistry);
             var trade = new Trade(session, player, tradeRegistry);
@@ -119,21 +124,23 @@ namespace Mmo
             var plotWindow = new PlotWindow(session, plots);
             AddChild(plotWindow);
             plots.Window = plotWindow;
-            var camera = new FollowCamera(player, options.CamYawDeg, map);
+            var camera = new FollowCamera(player, options.CamYawDeg, map, options.CamDistance);
             AddChild(camera);
             var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
             hud.Prompts.Add(() => looting.Prompt);
             hud.Prompts.Add(() => vehicles.Prompt);
+            hud.Prompts.Add(() => shipyards.Prompt);
             hud.Prompts.Add(() => trade.Status);
             hud.Prompts.Add(() => trade.Prompt);
             hud.Prompts.Add(() => placement.Active is null && farming.Active is null ? plots.Prompt : "");
             AddChild(hud);
-            // Right-clicking a stack uses it: deeds place plots, seeds plant, vehicles are summoned.
+            // Right-clicking a stack uses it: deeds place plots, seeds plant, vehicles are summoned
+            // (or mended, if wrecked), designs place shipyards.
             bool Use(BagStack s)
             {
-                if (vehicles.Begin(s))
+                if (vehicles.Begin(s) || shipyards.Begin(s))
                 {
                     placement.Cancel();
                     farming.Cancel();
@@ -146,7 +153,7 @@ namespace Mmo
                     return false;
                 return true;
             }
-            var bag = new BagWindow(session) { Use = Use };
+            var bag = new BagWindow(session) { Use = Use, Note = vehicles.Note };
             AddChild(bag);
             if (options.BagDemo)
                 AddChild(new BagDemo(session, bag));
@@ -162,6 +169,8 @@ namespace Mmo
                 AddChild(new TradeDemo(session, player, stations, crafting, craftWindow, tradeRegistry, trade));
             if (options.VehicleDemo)
                 AddChild(new VehicleDemo(session, player, entities, controls, vehicles, map));
+            if (options.ShipyardDemo)
+                AddChild(new ShipyardDemo(session, player, entities, vehicles, shipyards, yardRegistry, trade, tradeRegistry, map));
             if (options.CombatDemo)
                 AddChild(new CombatDemo(session, player, entities, combat));
             if (options.NpcDemo)
@@ -267,6 +276,7 @@ namespace Mmo
             Bind("respawn", Key.R);
             Bind("skillsets", Key.K);
             Bind("stow_vehicle", Key.V);
+            Bind("repair_vehicle", Key.H);
         }
     }
 }

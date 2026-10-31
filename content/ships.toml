@@ -4,7 +4,56 @@
 # at the deck's centre, -z the bow, +x starboard. A mount's `facing_deg` is a yaw on deck: 0 is the
 # bow, 90 port, -90 starboard. `[hull.cannon]` is needed only with mounts, and `[[hull.slot]]`s are
 # pack slots. For land hulls `draft_m` is the deepest water they ford and `max_gradient` the
-# steepest ground they drive on. Every number is a placeholder, confidence C, except where marked B.
+# steepest ground they drive on. `mend_kits` and `mend_s` are what a wreck takes to mend and the
+# wait after (docs/design/vehicles.md §2B). Every number is a placeholder, confidence C, except where marked B.
+
+# Wrecks, mending and repairs (docs/design/vehicles.md §2B), all ours.
+[vehicles]
+mend_item = "hullmenders_kit"
+# Each repair takes one kit and this much labor, and restores this share of the hull's HP.
+repair_labor = 10
+repair_pct = 10
+# A vehicle hit this recently is under fire: it can't be stowed or repaired.
+under_fire_s = 10
+# A vehicle at 0 HP sinks (or breaks down) for this long before it's wrecked.
+sink_s = 8
+
+# Shipyards: a design placed on the water and built stage by stage. Anyone may do a stage but the
+# last, which launches the hull's item into the owner's bag. Stages and labor are B.
+[[shipyard]]
+wire = 0
+id = "swiftgull_yard"
+name = "Swiftgull Shipyard"
+design = "swiftgull_design"
+hull = "clipper"
+place_labor = 25
+
+[[shipyard.stage]]
+name = "Keel and Frames"
+pack = "timber_bundle"
+labor = 25
+
+[[shipyard.stage]]
+name = "Ironwork"
+pack = "ironwork_crate"
+labor = 25
+
+[[shipyard.stage]]
+name = "Rigging"
+pack = "sailcloth_bale"
+labor = 25
+
+[[shipyard.stage]]
+name = "Fitting Out I"
+labor = 25
+
+[[shipyard.stage]]
+name = "Fitting Out II"
+labor = 25
+
+[[shipyard.stage]]
+name = "Fitting Out III"
+labor = 25
 
 [[hull]]
 id = "clipper"
@@ -23,6 +72,9 @@ deck_half_length_m = 9.0
 deck_height_m = 2.0
 draft_m = 1.2
 hp = 12000
+mend_kits = 5
+# B: the original's restore took 10-30 minutes.
+mend_s = 1800
 helm = [0.0, 7.5]
 
 [hull.cannon]
@@ -71,6 +123,8 @@ deck_half_length_m = 2.0
 deck_height_m = 0.5
 draft_m = 0.4
 hp = 2000
+mend_kits = 1
+mend_s = 600
 helm = [0.0, 1.5]
 
 [[hull]]
@@ -91,6 +145,8 @@ deck_height_m = 0.9
 draft_m = 0.4
 max_gradient = 0.6
 hp = 3000
+mend_kits = 2
+mend_s = 600
 # The driver's bench, at the front.
 helm = [0.0, -1.2]
 

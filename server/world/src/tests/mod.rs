@@ -19,6 +19,8 @@ mod npc;
 mod land;
 #[cfg(feature = "dev")]
 mod ships;
+#[cfg(feature = "dev")]
+mod shipyard;
 mod trade;
 #[cfg(feature = "dev")]
 mod vehicles;

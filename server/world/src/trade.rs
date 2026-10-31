@@ -202,31 +202,44 @@ pub fn drop_on_death(ctx: &ReducerContext, p: &Presence) {
 /// Take `pk` off `p`'s back and lay it on the ground where `p` stands. A spoiled pack falls apart.
 fn put_down(ctx: &ReducerContext, p: &Presence, pk: Pack) {
     take_off(ctx, p);
-    let t = now(ctx);
-    if fresh_permille(micros(pk.made_at), micros(t)).is_none() {
+    if !lay(ctx, pk.def, pk.owner, pk.origin_x, pk.origin_z, pk.made_at, [p.x, p.y, p.z], p.yaw) {
         log::info!("char {}'s spoiled pack fell apart", p.char_id);
-        return;
+    }
+}
+
+/// Lay a pack down at `at` (world) for anyone to take, unless it has spoiled. Returns whether it did.
+#[allow(clippy::too_many_arguments)] // the pack's fields, wherever it comes from
+pub(crate) fn lay(ctx: &ReducerContext, def: u16, owner: u64, origin_x: f32, origin_z: f32, made_at: Timestamp, at: [f32; 3], yaw: u16) -> bool {
+    let t = now(ctx);
+    if fresh_permille(micros(made_at), micros(t)).is_none() {
+        return false;
     }
     ctx.db.dropped_pack().insert(DroppedPack {
         id: 0,
-        cell: sim::cell::cell_of(sim::cell::OPEN_WORLD, p.x, p.z),
-        def: pk.def,
-        owner: pk.owner,
-        x: p.x,
-        y: p.y,
-        z: p.z,
-        yaw: p.yaw,
-        origin_x: pk.origin_x,
-        origin_z: pk.origin_z,
-        made_at: pk.made_at,
+        cell: sim::cell::cell_of(sim::cell::OPEN_WORLD, at[0], at[2]),
+        def,
+        owner,
+        x: at[0],
+        y: at[1],
+        z: at[2],
+        yaw,
+        origin_x,
+        origin_z,
+        made_at,
         dropped_at: t,
     });
+    true
 }
 
-/// Put a dropped pack on the caller's back. Taking one made by another account's character is theft.
+/// Put a dropped pack on the caller's back, from the ground or, for a pack floating where a ship
+/// sank, from the water. Taking one made by another account's character is theft.
 #[spacetimedb::reducer]
 pub fn pick_up_pack(ctx: &ReducerContext, id: u64) -> Result<(), String> {
-    let p = on_foot(ctx, "can't pick up a pack from a ship", "can't pick up a pack while swimming")?;
+    let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    crate::combat::require_alive(ctx, &p)?;
+    if p.parent != 0 {
+        return Err("can't pick up a pack from a ship".into());
+    }
     if carried(ctx, p.char_id).is_some() {
         return Err("already carrying a pack".into());
     }

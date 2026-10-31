@@ -14,8 +14,8 @@ namespace Mmo.Gameplay
     /// </summary>
     public static class VehicleModel
     {
-        /// <summary>A vehicle as these rules see it.</summary>
-        public readonly record struct Seen(ulong Id, HullData Hull, ShipPose Pose, IReadOnlyList<ushort> Cargo, bool Ours);
+        /// <summary>A vehicle as these rules see it; <paramref name="HitAt"/> is when it was last hit, in µs (0 never).</summary>
+        public readonly record struct Seen(ulong Id, HullData Hull, ShipPose Pose, IReadOnlyList<ushort> Cargo, bool Ours, int Hp = 0, long HitAt = 0);
 
         /// <summary>
         /// The nearest slot in reach of <paramref name="at"/> (world) where F does something: an empty
@@ -39,8 +39,11 @@ namespace Mmo.Gameplay
             return best;
         }
 
-        /// <summary>The vehicle V stows: ours that we're aboard, else our nearest in sight. Null if none.</summary>
-        public static ulong? StowTarget(IEnumerable<Seen> vehicles, ulong aboard, Vector3 at)
+        /// <summary>
+        /// The vehicle V stows: ours that we're aboard, else our nearest in sight, else any of
+        /// <paramref name="owned"/> (ours from <c>my_vehicles</c>, out of sight). Null if none.
+        /// </summary>
+        public static ulong? StowTarget(IEnumerable<Seen> vehicles, ulong aboard, Vector3 at, IEnumerable<ulong>? owned = null)
         {
             ulong? best = null;
             float bestD = float.PositiveInfinity;
@@ -54,7 +57,42 @@ namespace Mmo.Gameplay
                 if (d < bestD)
                     (best, bestD) = (v.Id, d);
             }
+            if (best is null && owned is not null)
+                foreach (var id in owned)
+                    return id;
             return best;
+        }
+
+        /// <summary>
+        /// The vehicle H repairs: the one we're aboard, else the nearest damaged one we can reach from
+        /// beside it. Null if none.
+        /// </summary>
+        public static ulong? RepairTarget(IEnumerable<Seen> vehicles, ulong aboard, Vector3 at)
+        {
+            ulong? best = null;
+            float bestD = float.PositiveInfinity;
+            foreach (var v in vehicles)
+            {
+                if (v.Id == aboard)
+                    return v.Id;
+                var m = new ShipMotion(v.Pose.X, v.Pose.Z, v.Pose.Yaw, 0);
+                float d = Vector2.DistanceSquared(new Vector2(v.Pose.X, v.Pose.Z), new Vector2(at.X, at.Z));
+                if (v.Hp > 0 && v.Hp < v.Hull.Hp && Ship.RepairReach(v.Hull, m, at) && d < bestD)
+                    (best, bestD) = (v.Id, d);
+            }
+            return best;
+        }
+
+        /// <summary>A vehicle's state line for the HUD: "sinking" (or "broken down"), "under fire", or what H would do.</summary>
+        public static string StateLine(Seen v, long now)
+        {
+            if (v.Hp <= 0)
+                return v.Hull.Land ? "it's broken down" : "it's sinking!";
+            if (Ship.UnderFire(v.HitAt, now))
+                return "under fire";
+            if (v.Hp < v.Hull.Hp)
+                return $"H: repair ({GameContent.Item(GameContent.Vehicles.MendItem)?.Name ?? "kit"}, {GameContent.Vehicles.RepairLabor} labor)";
+            return "";
         }
 
         /// <summary>The cargo line for the HUD: each slot's pack, or "empty".</summary>

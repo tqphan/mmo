@@ -35,10 +35,20 @@ namespace SpacetimeDB.Types
 
             public readonly EntityIdUniqueIndex EntityId;
 
+            public sealed class OwnerIndex : BTreeIndexBase<ulong>
+            {
+                protected override ulong GetKey(Vehicle row) => row.Owner;
+
+                public OwnerIndex(VehicleHandle table) : base(table) { }
+            }
+
+            public readonly OwnerIndex Owner;
+
             internal VehicleHandle(DbConnection conn) : base(conn)
             {
                 Cell = new(this);
                 EntityId = new(this);
+                Owner = new(this);
             }
 
             protected override object GetPrimaryKey(Vehicle row) => row.EntityId;
@@ -59,6 +69,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<SpacetimeDB.Timestamp>> CannonReadyAt { get; }
         public global::SpacetimeDB.Col<Vehicle, ulong> Owner { get; }
         public global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<ushort>> Cargo { get; }
+        public global::SpacetimeDB.Col<Vehicle, SpacetimeDB.Timestamp> HitAt { get; }
 
         public VehicleCols(string tableName)
         {
@@ -72,6 +83,7 @@ namespace SpacetimeDB.Types
             CannonReadyAt = new global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<SpacetimeDB.Timestamp>>(tableName, "cannon_ready_at");
             Owner = new global::SpacetimeDB.Col<Vehicle, ulong>(tableName, "owner");
             Cargo = new global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<ushort>>(tableName, "cargo");
+            HitAt = new global::SpacetimeDB.Col<Vehicle, SpacetimeDB.Timestamp>(tableName, "hit_at");
         }
     }
 
@@ -79,11 +91,13 @@ namespace SpacetimeDB.Types
     {
         public global::SpacetimeDB.IxCol<Vehicle, ulong> EntityId { get; }
         public global::SpacetimeDB.IxCol<Vehicle, ulong> Cell { get; }
+        public global::SpacetimeDB.IxCol<Vehicle, ulong> Owner { get; }
 
         public VehicleIxCols(string tableName)
         {
             EntityId = new global::SpacetimeDB.IxCol<Vehicle, ulong>(tableName, "entity_id");
             Cell = new global::SpacetimeDB.IxCol<Vehicle, ulong>(tableName, "cell");
+            Owner = new global::SpacetimeDB.IxCol<Vehicle, ulong>(tableName, "owner");
         }
     }
 }

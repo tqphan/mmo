@@ -28,6 +28,11 @@ pub const SUMMON_GAP_M: f32 = 1.5;
 /// How close to a pack slot's point a character must be to load or unload it, horizontally and
 /// vertically.
 pub const CARGO_REACH_M: f32 = 3.0;
+/// How close to a shipyard's footprint a character must be to work on it, horizontally
+/// (docs/design/vehicles.md §2B).
+pub const YARD_REACH_M: f32 = 4.0;
+/// How far beyond a vehicle's half-length from its centre a character may repair it from.
+pub const REPAIR_REACH_M: f32 = 3.0;
 
 /// Where a ship is: the centre of its deck in world coordinates, and its yaw.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -247,6 +252,31 @@ pub fn cannon_flight(from: [f32; 3], yaw: f32, pitch: f32, speed: f32) -> Option
 pub fn hits(hull: &HullData, pose: &Pose, landing: [f32; 3]) -> bool {
     let l = pose.to_local(landing);
     on_deck(hull, l[0], l[2], hull.cannon.splash_m)
+}
+
+/// Whether `at` (world) is within `YARD_REACH_M` of a shipyard's footprint, the deck of `hull`
+/// placed at `m`, horizontally.
+pub fn yard_reach(hull: &HullData, m: &Motion, at: [f32; 3]) -> bool {
+    let l = m.pose_at(0.0).to_local([at[0], 0.0, at[2]]);
+    let dx = (l[0].abs() - hull.deck_half_width_m).max(0.0);
+    let dz = (l[2].abs() - hull.deck_half_length_m).max(0.0);
+    dx * dx + dz * dz <= YARD_REACH_M * YARD_REACH_M
+}
+
+/// Whether `at` (world) is close enough to a vehicle at `m` to repair it from off its deck.
+pub fn repair_reach(hull: &HullData, m: &Motion, at: [f32; 3]) -> bool {
+    ((m.x - at[0]).powi(2) + (m.z - at[2]).powi(2)).sqrt() <= hull.deck_half_length_m + REPAIR_REACH_M
+}
+
+/// A vehicle's HP after one repair: `repair_pct` of its hull's HP more, up to full.
+pub fn repaired_hp(hull: &HullData, hp: i32) -> i32 {
+    let pct = crate::content::VEHICLES.repair_pct as i64;
+    (i64::from(hp) + i64::from(hull.hp) * pct / 100).min(i64::from(hull.hp)) as i32
+}
+
+/// Whether a vehicle last hit at `hit_at` (µs) is still under fire at `now` (µs). 0 is never hit.
+pub fn under_fire(hit_at: i64, now: i64) -> bool {
+    hit_at != 0 && now < hit_at + i64::from(crate::content::VEHICLES.under_fire_s) * 1_000_000
 }
 
 #[cfg(test)]
@@ -526,5 +556,31 @@ mod tests {
         assert!(cargo_reach(p, [102.5, 2.0, -6.0]));
         assert!(!cargo_reach(p, [104.5, 2.0, -4.5]), "too far across");
         assert!(!cargo_reach(p, [101.0, -1.5, -4.5]), "too far below, in the water");
+    }
+
+    #[test]
+    fn yards_are_reached_round_their_footprint() {
+        let h = clipper();
+        // Facing -x: the deck runs 9 m along x and 2.5 m along z.
+        let m = Motion { x: 50.0, z: 0.0, yaw: FRAC_PI_2, speed: 0.0 };
+        assert!(yard_reach(h, &m, [50.0, 1.0, 0.0]), "on it");
+        assert!(yard_reach(h, &m, [50.0 + 9.0 + 3.9, 0.0, 0.0]), "off the stern");
+        assert!(!yard_reach(h, &m, [50.0 + 9.0 + 4.1, 0.0, 0.0]));
+        assert!(yard_reach(h, &m, [50.0, 0.0, 2.5 + 3.9]), "off the side");
+        assert!(!yard_reach(h, &m, [50.0, 0.0, 2.5 + 4.1]));
+        assert!(!yard_reach(h, &m, [50.0 + 9.0 + 3.0, 0.0, 2.5 + 3.0]), "off a corner: 4.2 m");
+    }
+
+    #[test]
+    fn repairs_restore_a_share_up_to_full_and_wait_out_fire() {
+        let h = clipper();
+        assert_eq!(repaired_hp(h, 0), h.hp / 10);
+        assert_eq!(repaired_hp(h, h.hp - 1), h.hp);
+        assert_eq!(repaired_hp(h, 5000), 6200);
+        let m = Motion { x: 0.0, z: 0.0, yaw: 0.0, speed: 0.0 };
+        assert!(repair_reach(h, &m, [0.0, 0.0, 11.9]) && !repair_reach(h, &m, [0.0, 0.0, 12.1]));
+        let s = 1_000_000;
+        assert!(!under_fire(0, 5 * s), "never hit");
+        assert!(under_fire(5 * s, 14 * s) && !under_fire(5 * s, 15 * s));
     }
 }

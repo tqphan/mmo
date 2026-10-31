@@ -13,22 +13,22 @@ use sim::content::{BAG_SLOTS, item_by_id};
 use sim::ship::{Hull, HullData, Pose};
 use std::f32::consts::FRAC_PI_2;
 
-const ADMIN: u128 = 99;
-const RUN: u8 = 1;
-const SWIM: u8 = 2;
+pub(super) const ADMIN: u128 = 99;
+pub(super) const RUN: u8 = 1;
+pub(super) const SWIM: u8 = 2;
 
-fn cart() -> &'static HullData {
+pub(super) fn cart() -> &'static HullData {
     Hull::FurrowCart.data()
 }
 
-fn wire(id: &str) -> u16 {
+pub(super) fn wire(id: &str) -> u16 {
     item_by_id(id).unwrap().wire
 }
 
 /// Ground 3 m up for x < 40, falling at 0.4 into the sea from there to -5 m at x = 60; a hill
 /// rising at 0.2 from z = 10 to 7 m at z = 30; and a bank too steep to drive rising from 3 to 9 m
 /// between z = -30 and z = -34. Covers x and z from -64 to 128.
-fn height(x: f32, z: f32) -> f32 {
+pub(super) fn height(x: f32, z: f32) -> f32 {
     if x >= 40.0 {
         return (3.0 - 0.4 * (x - 40.0)).max(-5.0);
     }
@@ -41,7 +41,7 @@ fn height(x: f32, z: f32) -> f32 {
     }
 }
 
-fn shore() -> TestContext {
+pub(super) fn shore() -> TestContext {
     let t = world();
     call(&t, ADMIN, |ctx| {
         on_connect(ctx);
@@ -58,7 +58,7 @@ fn shore() -> TestContext {
 }
 
 /// `player` in the world at (x, z) on the ground facing `yaw`.
-fn stand_at(t: &TestContext, player: u128, x: f32, z: f32, yaw: f32) {
+pub(super) fn stand_at(t: &TestContext, player: u128, x: f32, z: f32, yaw: f32) {
     call(t, player, |ctx| dev_teleport(ctx, x, z)).unwrap();
     read(t, |ctx| {
         let p = ctx.db.presence().identity().find(identity(player)).unwrap();
@@ -67,57 +67,57 @@ fn stand_at(t: &TestContext, player: u128, x: f32, z: f32, yaw: f32) {
 }
 
 /// Give `player`'s character one of `id` and return the stack's id.
-fn give(t: &TestContext, player: u128, id: &str) -> u64 {
+pub(super) fn give(t: &TestContext, player: u128, id: &str) -> u64 {
     let c = presence_of(t, player).char_id;
     read(t, |ctx| grant(ctx, c, wire(id), 1)).unwrap();
     read(t, |ctx| ctx.db.item().by_slot().filter((c, place::BAG)).filter(|i| i.def == wire(id)).map(|i| i.id).max().unwrap())
 }
 
-fn item_row(t: &TestContext, id: u64) -> Item {
+pub(super) fn item_row(t: &TestContext, id: u64) -> Item {
     read(t, |ctx| ctx.db.item().id().find(id).unwrap())
 }
 
 /// Summon `id` as `player`; returns the vehicle's entity id.
-fn summon(t: &TestContext, player: u128, id: &str) -> u64 {
+pub(super) fn summon(t: &TestContext, player: u128, id: &str) -> u64 {
     let it = give(t, player, id);
     call(t, player, |ctx| summon_vehicle(ctx, it)).unwrap();
     read(t, |ctx| ctx.db.vehicle().iter().map(|v| v.entity_id).max().unwrap())
 }
 
-fn vehicle_of(t: &TestContext, v: u64) -> Vehicle {
+pub(super) fn vehicle_of(t: &TestContext, v: u64) -> Vehicle {
     read(t, |ctx| ctx.db.vehicle().entity_id().find(v).unwrap())
 }
 
-fn pose(t: &TestContext, v: u64) -> Pose {
+pub(super) fn pose(t: &TestContext, v: u64) -> Pose {
     read(t, |ctx| deck(ctx, v).unwrap().pose())
 }
 
-fn back(t: &TestContext, player: u128) -> Option<Pack> {
+pub(super) fn back(t: &TestContext, player: u128) -> Option<Pack> {
     let c = presence_of(t, player).char_id;
     read(t, |ctx| ctx.db.pack().carrier().find(c))
 }
 
-fn give_pack(t: &TestContext, player: u128) {
+pub(super) fn give_pack(t: &TestContext, player: u128) {
     read(t, |ctx| {
         let p = ctx.db.presence().identity().find(identity(player)).unwrap();
         crate::trade::made(ctx, &p, wire("grain_bale"), [p.x, p.y, p.z]);
     });
 }
 
-fn mv(t: &TestContext, player: u128, parent: u64, at: [f32; 3], mode: u8) {
+pub(super) fn mv(t: &TestContext, player: u128, parent: u64, at: [f32; 3], mode: u8) {
     let seq = presence_of(t, player).last_seq + 1;
     call(t, player, |ctx| move_event(ctx, seq, parent, at[0], at[1], at[2], 0, 540, mode)).unwrap();
 }
 
 /// Stand beside the deck point (x, z) of vehicle `v` and step up onto it.
-fn board(t: &TestContext, player: u128, v: u64, x: f32, z: f32) {
+pub(super) fn board(t: &TestContext, player: u128, v: u64, x: f32, z: f32) {
     let w = pose(t, v).to_world([x, 0.0, z]);
     call(t, player, |ctx| dev_teleport(ctx, w[0], w[2])).unwrap();
     advance_ms(t, 300);
     mv(t, player, v, [x, 0.0, z], RUN);
 }
 
-fn drive(t: &TestContext, ms: i64) {
+pub(super) fn drive(t: &TestContext, ms: i64) {
     for _ in 0..ms / 100 {
         advance_ms(t, 100);
         tick(t);

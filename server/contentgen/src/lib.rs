@@ -26,7 +26,7 @@ const MAX_STACK: u32 = 10_000;
 const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
-pub const ITEM_KINDS: [&str; 7] = ["material", "consumable", "gear", "deed", "seed", "pack", "vehicle"];
+pub const ITEM_KINDS: [&str; 8] = ["material", "consumable", "gear", "deed", "seed", "pack", "vehicle", "design"];
 /// Resource node kinds, in wire order, fixed here like the item kinds.
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
 /// Crop kinds, in wire order, fixed here like the item kinds (docs/design/farming.md).
@@ -112,7 +112,51 @@ pub struct MoveModeDef {
 #[serde(deny_unknown_fields)]
 struct ShipsFile {
     hull: Vec<HullDef>,
+    /// Checked to be there by `check_vehicles`.
+    vehicles: Option<VehicleRulesDef>,
+    #[serde(default)]
+    shipyard: Vec<ShipyardDef>,
 }
+
+/// Wrecks, mending and repairs (`[vehicles]` in ships.toml, docs/design/vehicles.md §2B).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct VehicleRulesDef {
+    /// The consumable item that mends wrecks and repairs hulls.
+    pub mend_item: String,
+    pub repair_labor: u32,
+    pub repair_pct: u32,
+    pub under_fire_s: u32,
+    pub sink_s: u32,
+}
+
+/// A shipyard kind: a design placed on the water and built in stages into a hull's item.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ShipyardDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    /// The design item (kind `design`) that places it.
+    pub design: String,
+    /// The sea hull it builds.
+    pub hull: String,
+    pub place_labor: u32,
+    #[serde(default)]
+    pub stage: Vec<StageDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StageDef {
+    pub name: String,
+    pub labor: u32,
+    /// A pack item the stage takes, if any.
+    pub pack: Option<String>,
+}
+
+/// More stages than this on one shipyard is a typo.
+pub const MAX_STAGES: usize = 12;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -137,6 +181,9 @@ pub struct HullDef {
     #[serde(default)]
     pub max_gradient: f32,
     pub hp: i32,
+    /// Hullmender's Kits to mend a wreck, and the wait after, s.
+    pub mend_kits: u32,
+    pub mend_s: u32,
     /// Ship-local `[x, z]`.
     pub helm: [f32; 2],
     /// Needed only with mounts.
@@ -666,6 +713,9 @@ pub struct Content {
     pub move_modes: Vec<MoveModeDef>,
     /// Sorted by `wire`, like the modes.
     pub hulls: Vec<HullDef>,
+    pub vehicles: VehicleRulesDef,
+    /// Sorted by `wire`, like the modes.
+    pub shipyards: Vec<ShipyardDef>,
     /// Sorted by `wire`, like the modes.
     pub land_uses: Vec<LandUseDef>,
     pub climates: Vec<ClimateDef>,
@@ -756,7 +806,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let npcs: Result<NpcsFile, _> = from_toml("npcs.toml", &src.npcs);
     let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs) =
         match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n)) => (m.mode, s.hull, l, b, i, g, c, f, t, k, n),
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n)) => (m.mode, s, l, b, i, g, c, f, t, k, n),
             (m, s, l, b, i, g, c, f, t, k, n) => {
                 let all = m
                     .err()
@@ -775,7 +825,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
             }
         };
     modes.sort_by_key(|m| m.wire);
-    hulls.sort_by_key(|h| h.wire);
+    hulls.hull.sort_by_key(|h| h.wire);
+    hulls.shipyard.sort_by_key(|y| y.wire);
     land.land_use.sort_by_key(|u| u.wire);
     land.climate.sort_by_key(|c| c.wire);
     land.plot.sort_by_key(|p| p.wire);
@@ -793,7 +844,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     combat.status.sort_by_key(|s| s.wire);
     npcs.kind.sort_by_key(|k| k.wire);
     check_move_modes(&modes, &mut errors);
-    check_hulls(&hulls, &items.item, &mut errors);
+    check_hulls(&hulls.hull, &items.item, &mut errors);
+    check_vehicles(&hulls, &items.item, &mut errors);
     check_land(&land, &items.item, &mut errors);
     check_labor(&labor, &mut errors);
     check_items(&items, &mut errors);
@@ -807,7 +859,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         return Err(errors);
     }
     let Some(property) = land.property else { unreachable!("check_land reports a missing [property]") };
-    let mut c = Content { move_modes: modes, hulls, land_uses: land.land_use, climates: land.climate, property, plots: land.plot, labor, bag: items.bag,
+    let Some(vehicles) = hulls.vehicles else { unreachable!("check_vehicles reports a missing [vehicles]") };
+    let mut c = Content { move_modes: modes, hulls: hulls.hull, vehicles, shipyards: hulls.shipyard, land_uses: land.land_use, climates: land.climate, property, plots: land.plot, labor, bag: items.bag,
         items: items.item,
         gathering: gathering.gathering,
         nodes: gathering.node,
@@ -960,6 +1013,83 @@ fn check_hulls(hulls: &[HullDef], items: &[ItemDef], errors: &mut Vec<String>) {
     }
 }
 
+fn check_vehicles(f: &ShipsFile, items: &[ItemDef], errors: &mut Vec<String>) {
+    let file = "ships.toml";
+    let kind_of = |id: &str| items.iter().find(|i| i.id == id).map(|i| i.kind.as_str());
+    let need = |at: &str, what: &str, id: &str, kind: &str, errors: &mut Vec<String>| match kind_of(id) {
+        None => errors.push(format!("{at}: {what} {id:?} isn't in items.toml")),
+        Some(k) if k != kind => errors.push(format!("{at}: {what} {id:?} isn't of kind {kind:?}")),
+        Some(_) => {}
+    };
+    match &f.vehicles {
+        None => errors.push(format!("{file}: missing [vehicles]")),
+        Some(v) => {
+            let at = format!("{file}: vehicles");
+            need(&at, "mend_item", &v.mend_item, "consumable", errors);
+            let mut range = |name: &str, v: u32, lo: u32, hi: u32| {
+                if !(lo..=hi).contains(&v) {
+                    errors.push(format!("{at}: {name} must be from {lo} to {hi}"));
+                }
+            };
+            range("repair_labor", v.repair_labor, 0, 1000);
+            range("repair_pct", v.repair_pct, 1, 100);
+            range("under_fire_s", v.under_fire_s, 0, 600);
+            range("sink_s", v.sink_s, 0, 600);
+        }
+    }
+    for h in &f.hull {
+        let at = format!("{file}: hull {:?}", h.id);
+        if h.mend_kits > 100 {
+            errors.push(format!("{at}: mend_kits must be from 0 to 100"));
+        }
+        if h.mend_s > 7 * 86_400 {
+            errors.push(format!("{at}: mend_s must be at most a week"));
+        }
+    }
+    for (i, y) in f.shipyard.iter().enumerate() {
+        let at = format!("{file}: shipyard {:?}", y.id);
+        if !is_id(&y.id) || f.shipyard[..i].iter().any(|o| o.id == y.id) {
+            errors.push(format!("{at}: ids are unique lower-case letters, digits and _, starting with a letter"));
+        }
+        if usize::from(y.wire) != i {
+            errors.push(format!("{at}: wire values must run 0, 1, 2, … with no gaps or repeats (found {})", y.wire));
+        }
+        if !is_item_name(&y.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        need(&at, "design", &y.design, "design", errors);
+        if f.shipyard[..i].iter().any(|o| o.design == y.design) {
+            errors.push(format!("{at}: {:?} already places another shipyard", y.design));
+        }
+        match f.hull.iter().find(|h| h.id == y.hull) {
+            None => errors.push(format!("{at}: unknown hull {:?}", y.hull)),
+            Some(h) if h.land() => errors.push(format!("{at}: shipyards build sea hulls; {:?} is a land hull", y.hull)),
+            Some(_) => {}
+        }
+        if y.place_labor > 1000 {
+            errors.push(format!("{at}: place_labor must be from 0 to 1000"));
+        }
+        if !(1..=MAX_STAGES).contains(&y.stage.len()) {
+            errors.push(format!("{at}: 1 to {MAX_STAGES} stages"));
+        }
+        for (k, st) in y.stage.iter().enumerate() {
+            let at = format!("{at}: stage {k}");
+            if !is_item_name(&st.name) {
+                errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+            }
+            if st.labor > 1000 {
+                errors.push(format!("{at}: labor must be from 0 to 1000"));
+            }
+            if let Some(pk) = &st.pack {
+                need(&at, "pack", pk, "pack", errors);
+                if k + 1 == y.stage.len() {
+                    errors.push(format!("{at}: the last stage launches, so it takes no pack"));
+                }
+            }
+        }
+    }
+}
+
 fn check_land(land: &LandFile, items: &[ItemDef], errors: &mut Vec<String>) {
     check_ids("land.toml", "land_use", land.land_use.iter().map(|u| (u.id.as_str(), usize::from(u.wire))), errors);
     check_ids("land.toml", "climate", land.climate.iter().map(|c| (c.id.as_str(), usize::from(c.wire))), errors);
@@ -1082,7 +1212,7 @@ fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
         }
         if !(1..=MAX_STACK).contains(&it.stack) {
             errors.push(format!("{at}: stack must be from 1 to {MAX_STACK}"));
-        } else if ["gear", "pack", "vehicle"].contains(&it.kind.as_str()) && it.stack != 1 {
+        } else if ["gear", "pack", "vehicle", "design"].contains(&it.kind.as_str()) && it.stack != 1 {
             errors.push(format!("{at}: {} items don't stack (stack = 1)", it.kind));
         }
     }
@@ -1609,6 +1739,17 @@ fn canonical(c: &Content) -> String {
             writeln!(s, "slot\t{:08x}\t{:08x}", sl.x.to_bits(), sl.z.to_bits()).unwrap();
         }
     }
+    write!(s, "vehicles\t{}", c.vehicles.mend_item).unwrap();
+    for f in vehicle_fields(&c.vehicles) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
+    for y in &c.shipyards {
+        writeln!(s, "shipyard\t{}\t{}\t{}\t{}\t{}\t{}", y.wire, y.id, y.name, y.design, y.hull, y.place_labor).unwrap();
+        for st in &y.stage {
+            writeln!(s, "stage\t{}\t{}\t{}", st.name, st.labor, st.pack.as_deref().unwrap_or("")).unwrap();
+        }
+    }
     for u in &c.land_uses {
         writeln!(s, "land_use\t{}\t{}\t{}\t{}", u.id, u.wire, u.buildable, u.plantable).unwrap();
     }
@@ -1856,6 +1997,8 @@ fn hull_fields(h: &HullDef) -> Vec<Field> {
         f("draft_m", "Depth below the water, m. Shallower water stops the ship. For land hulls, the deepest water they ford.", F32(h.draft_m)),
         f("max_gradient", "Land hulls: the steepest ground they drive on, rise over run. 0 for sea hulls.", F32(h.max_gradient)),
         f("hp", "Hit points when built.", I32(h.hp)),
+        f("mend_kits", "Hullmender's Kits to mend a wreck.", I32(h.mend_kits as i32)),
+        f("mend_s", "The wait after mending before a wreck can be summoned, s.", I32(h.mend_s as i32)),
         f("helm_x", "The helm's ship-local x, m.", F32(h.helm[0])),
         f("helm_z", "The helm's ship-local z, m.", F32(h.helm[1])),
     ]
@@ -1894,6 +2037,18 @@ fn labor_fields(l: &LaborDef) -> Vec<Field> {
         f("regen_points", "Points added at the end of each period.", I32(l.regen_points)),
         f("regen_period_s", "The regeneration period, s.", I32(l.regen_period_s)),
         f("start_points", "What a new account starts with.", I32(l.start_points)),
+    ]
+}
+
+fn vehicle_fields(v: &VehicleRulesDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("repair_labor", "Labor spent on each repair.", i(v.repair_labor)),
+        f("repair_pct", "The share of the hull's HP each repair restores, in percent.", i(v.repair_pct)),
+        f("under_fire_s", "How long after a hit a vehicle is under fire, s.", i(v.under_fire_s)),
+        f("sink_s", "How long a vehicle at 0 HP sinks before it's wrecked, s.", i(v.sink_s)),
     ]
 }
 
@@ -2094,6 +2249,39 @@ pub fn render_rust(c: &Content) -> String {
     s += "        &HULLS[self as usize]\n    }\n}\n\n";
     s += "/// The hull a vehicle item summons.\n";
     s += "pub fn hull_of_item(item: u16) -> Option<&'static HullData> {\n    HULLS.iter().find(|h| h.item == item)\n}\n\n";
+    let vehicles = vehicle_fields(&c.vehicles);
+    s += "/// Wrecks, mending and repairs (`[vehicles]` in `content/ships.toml`, docs/design/vehicles.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct VehicleRules {\n    /// The wire of the consumable that mends wrecks and repairs hulls.\n    pub mend_item: u16,\n";
+    rust_struct_fields(&mut s, &vehicles);
+    s += "}\n\n";
+    writeln!(s, "pub static VEHICLES: VehicleRules = VehicleRules {{ mend_item: {}, {} }};\n", c.item_wire(&c.vehicles.mend_item), rust_values(&vehicles)).unwrap();
+    s += "/// One stage of building at a shipyard.\n#[derive(Debug, PartialEq)]\npub struct StageData {\n    pub name: &'static str,\n    pub labor: i32,\n    /// The wire of the pack it takes, or 0 for none.\n    pub pack: u16,\n}\n\n";
+    s += "/// Shipyard kinds (`content/ships.toml`, docs/design/vehicles.md).\n#[derive(Debug, PartialEq)]\npub struct ShipyardData {\n";
+    s += "    /// Stored in shipyard rows.\n    pub wire: u8,\n    pub id: &'static str,\n    pub name: &'static str,\n";
+    s += "    /// The wire of the design item that places it.\n    pub design: u16,\n    /// The hull it builds.\n    pub hull: Hull,\n";
+    s += "    pub place_labor: i32,\n    /// In order; the last launches.\n    pub stages: &'static [StageData],\n}\n\n";
+    writeln!(s, "pub static SHIPYARDS: [ShipyardData; {}] = [", c.shipyards.len()).unwrap();
+    for y in &c.shipyards {
+        writeln!(
+            s,
+            "    ShipyardData {{\n        wire: {},\n        id: {:?},\n        name: {:?},\n        design: {},\n        hull: Hull::{},\n        place_labor: {},\n        stages: &[",
+            y.wire,
+            y.id,
+            y.name,
+            c.item_wire(&y.design),
+            pascal(&y.hull),
+            y.place_labor
+        )
+        .unwrap();
+        for st in &y.stage {
+            writeln!(s, "            StageData {{ name: {:?}, labor: {}, pack: {} }},", st.name, st.labor, st.pack.as_deref().map_or(0, |p| c.item_wire(p))).unwrap();
+        }
+        s += "        ],\n    },\n";
+    }
+    s += "];\n\n";
+    s += "pub fn shipyard(wire: u8) -> Option<&'static ShipyardData> {\n    SHIPYARDS.get(usize::from(wire))\n}\n\n";
+    s += "/// The shipyard a design item places.\n";
+    s += "pub fn shipyard_by_design(item: u16) -> Option<&'static ShipyardData> {\n    SHIPYARDS.iter().find(|y| y.design == item)\n}\n\n";
 
     s += "/// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant\n";
     s += "/// is the wire value.\n";
@@ -2794,6 +2982,18 @@ pub fn render_csharp(c: &Content) -> String {
         csharp_params(&hull)
     )
     .unwrap();
+    let vehicles = vehicle_fields(&c.vehicles);
+    s += "    /// <summary>Wrecks, mending and repairs ([vehicles] in content/ships.toml, docs/design/vehicles.md).</summary>\n";
+    s += "    /// <param name=\"MendItem\">The wire of the consumable that mends wrecks and repairs hulls.</param>\n";
+    csharp_param_docs(&mut s, &vehicles);
+    writeln!(s, "    public sealed record VehicleRules(ushort MendItem, {});\n", csharp_params(&vehicles)).unwrap();
+    s += "    /// <summary>One stage of building at a shipyard.</summary>\n";
+    s += "    /// <param name=\"Pack\">The wire of the pack it takes, or 0 for none.</param>\n";
+    s += "    public sealed record StageData(string Name, int Labor, ushort Pack);\n\n";
+    s += "    /// <summary>Shipyard kinds (content/ships.toml, docs/design/vehicles.md).</summary>\n";
+    s += "    /// <param name=\"Design\">The wire of the design item that places it.</param>\n";
+    s += "    /// <param name=\"Stages\">In order; the last launches.</param>\n";
+    s += "    public sealed record ShipyardData(byte Wire, string Id, string Name, ushort Design, Hull Hull, int PlaceLabor, IReadOnlyList<StageData> Stages);\n\n";
     s += "    public static class GameContent\n    {\n";
     s += "        /// <summary>Must match the server's, or entering the world is refused.</summary>\n";
     writeln!(s, "        public const ulong Hash = 0x{:016x}UL;\n", c.hash).unwrap();
@@ -2829,6 +3029,17 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        /// <summary>The hull a vehicle item summons, if it is a vehicle item.</summary>\n";
     s += "        public static HullData? HullOfItem(ushort item)\n        {\n";
     s += "            foreach (var h in Hulls)\n                if (h.Item == item)\n                    return h;\n            return null;\n        }\n\n";
+    writeln!(s, "        public static readonly VehicleRules Vehicles = new({}, {});\n", c.item_wire(&c.vehicles.mend_item), csharp_values(&vehicles)).unwrap();
+    s += "        public static readonly IReadOnlyList<ShipyardData> Shipyards = new ShipyardData[]\n        {\n";
+    for y in &c.shipyards {
+        let stages: Vec<String> = y.stage.iter().map(|st| format!("new({:?}, {}, {})", st.name, st.labor, st.pack.as_deref().map_or(0, |p| c.item_wire(p)))).collect();
+        writeln!(s, "            new({}, {:?}, {:?}, {}, Hull.{}, {}, new StageData[] {{ {} }}),", y.wire, y.id, y.name, c.item_wire(&y.design), pascal(&y.hull), y.place_labor, stages.join(", ")).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        public static ShipyardData? Shipyard(byte wire) => wire < Shipyards.Count ? Shipyards[wire] : null;\n\n";
+    s += "        /// <summary>The shipyard a design item places, if it is a design.</summary>\n";
+    s += "        public static ShipyardData? ShipyardOfDesign(ushort item)\n        {\n";
+    s += "            foreach (var y in Shipyards)\n                if (y.Design == item)\n                    return y;\n            return null;\n        }\n\n";
     s += "        public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]\n        {\n";
     for u in &c.land_uses {
         writeln!(s, "            new(LandUse.{}, {:?}, {}, {}),", pascal(&u.id), u.id, u.buildable, u.plantable).unwrap();
@@ -3138,6 +3349,13 @@ mod tests {
     "#;
 
     const SHIPS: &str = r#"
+        [vehicles]
+        mend_item = "kit"
+        repair_labor = 10
+        repair_pct = 10
+        under_fire_s = 10
+        sink_s = 8
+
         [[hull]]
         id = "clipper"
         wire = 0
@@ -3154,6 +3372,8 @@ mod tests {
         deck_height_m = 2.0
         draft_m = 1.2
         hp = 12000
+        mend_kits = 5
+        mend_s = 1800
         helm = [0.0, 7.5]
 
         [hull.cannon]
@@ -3236,6 +3456,20 @@ mod tests {
     const ITEMS: &str = r#"
         [bag]
         slots = 50
+
+        [[item]]
+        wire = 104
+        id = "kit"
+        name = "Kit"
+        kind = "consumable"
+        stack = 100
+
+        [[item]]
+        wire = 710
+        id = "plans"
+        name = "Plans"
+        kind = "design"
+        stack = 1
 
         [[item]]
         wire = 702
@@ -3826,6 +4060,7 @@ mod tests {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
         assert!(ship_errors("hull = []").contains("no hulls"));
+        assert!(ship_errors(&format!("[[hull]]{}", SHIPS.split_once("[[hull]]").unwrap().1)).contains("missing [vehicles]"));
         assert!(ship_errors(&SHIPS.replace("draft_m = 1.2", "draft_m = 1.2\nkeel = 1")).contains("unknown field `keel`"));
     }
 
@@ -3862,6 +4097,77 @@ mod tests {
         assert!(cs.contains("new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }, new PackSlot[] {  }"), "{cs}");
     }
 
+    /// A shipyard for the clipper in `SHIPS`.
+    const YARD: &str = r#"
+        [[shipyard]]
+        wire = 0
+        id = "yard"
+        name = "Yard"
+        design = "plans"
+        hull = "clipper"
+        place_labor = 25
+
+        [[shipyard.stage]]
+        name = "Keel"
+        pack = "bale"
+        labor = 25
+
+        [[shipyard.stage]]
+        name = "Launch"
+        labor = 30
+    "#;
+
+    #[test]
+    fn vehicle_rules_and_shipyards_reach_both_outputs_and_the_hash() {
+        let ships = format!("{SHIPS}\n{YARD}");
+        let c = parse_ships(&ships).unwrap();
+        assert_eq!((c.shipyards.len(), c.shipyards[0].stage.len(), c.vehicles.sink_s, c.hulls[0].mend_kits), (1, 2, 8, 5));
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("pub static VEHICLES: VehicleRules = VehicleRules { mend_item: 104, repair_labor: 10, repair_pct: 10, under_fire_s: 10, sink_s: 8 };"), "{rs}");
+        assert!(rs.contains("design: 710,\n        hull: Hull::Clipper,\n        place_labor: 25,"), "{rs}");
+        assert!(rs.contains(r#"StageData { name: "Keel", labor: 25, pack: 500 },"#) && rs.contains(r#"StageData { name: "Launch", labor: 30, pack: 0 },"#), "{rs}");
+        assert!(rs.contains("mend_kits: 5,\n        mend_s: 1800,"), "{rs}");
+        assert!(cs.contains("public static readonly VehicleRules Vehicles = new(104, 10, 10, 10, 8);"), "{cs}");
+        assert!(cs.contains(r#"new(0, "yard", "Yard", 710, Hull.Clipper, 25, new StageData[] { new("Keel", 25, 500), new("Launch", 30, 0) }),"#), "{cs}");
+        let a = c.hash;
+        for changed in [
+            ships.replace("labor = 30", "labor = 31"),
+            ships.replace("pack = \"bale\"", "pack = \"crate\""),
+            ships.replace("sink_s = 8", "sink_s = 9"),
+            ships.replace("mend_s = 1800", "mend_s = 1801"),
+            ships.replace("place_labor = 25", "place_labor = 20"),
+        ] {
+            assert_ne!(parse_ships(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_vehicle_rules_and_shipyards_are_reported() {
+        let ships = format!("{SHIPS}\n{CART}\n{YARD}");
+        let bad = ships
+            .replace("mend_item = \"kit\"", "mend_item = \"bale\"")
+            .replace("repair_pct = 10", "repair_pct = 0")
+            .replace("design = \"plans\"", "design = \"kit\"")
+            .replace("hull = \"clipper\"", "hull = \"furrow_cart\"")
+            .replace("name = \"Launch\"\n        labor = 30", "name = \"Launch\"\n        labor = 30\n        pack = \"swiftgull\"");
+        let e = ship_errors(&bad);
+        for want in [
+            "mend_item \"bale\" isn't of kind \"consumable\"",
+            "repair_pct must be from 1",
+            "design \"kit\" isn't of kind \"design\"",
+            "is a land hull",
+            "pack \"swiftgull\" isn't of kind \"pack\"",
+            "the last stage launches",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = ship_errors(&format!("{SHIPS}\n{YARD}").replace("hull = \"clipper\"", "hull = \"galleon\"").replace("wire = 0\n        id = \"yard\"", "wire = 1\n        id = \"yard\""));
+        assert!(e.contains("unknown hull \"galleon\"") && e.contains("no gaps"), "{e}");
+        let no_stages = format!("{SHIPS}\n{YARD}");
+        let no_stages = no_stages.split_once("[[shipyard.stage]]").unwrap().0;
+        assert!(ship_errors(no_stages).contains("1 to 12 stages"));
+    }
+
     /// A land hull, after the clipper in `SHIPS`.
     const CART: &str = r#"
         [[hull]]
@@ -3881,6 +4187,8 @@ mod tests {
         draft_m = 0.4
         max_gradient = 0.6
         hp = 3000
+        mend_kits = 2
+        mend_s = 600
         helm = [0.0, -1.2]
 
         [[hull.slot]]
@@ -4075,12 +4383,12 @@ mod tests {
     #[test]
     fn items_parse_in_wire_order_and_reach_both_outputs() {
         let c = parse_items(ITEMS).unwrap();
-        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401, 500, 501, 700, 702]);
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 104, 300, 301, 400, 401, 500, 501, 700, 702, 710]);
         assert_eq!(c.bag.slots, 50);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
-        assert!(rs.contains("pub static ITEMS: [ItemData; 10] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
-        assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
+        assert!(rs.contains("pub static ITEMS: [ItemData; 12] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,") && rs.contains("Design = 7,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
     }

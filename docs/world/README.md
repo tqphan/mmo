@@ -97,6 +97,11 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Vehicle | Furrow Cart | A farm cart with room for two packs in its bed (`furrow_cart`, item and hull) |
 | Vehicle | Driftpine Skiff | A small rowing boat for two (`driftpine_skiff`; hull `skiff`) |
 | Vehicle | Swiftgull | The fast, light sailing ship with a cannon on each side (`swiftgull`; hull `clipper`) |
+| Item: design | Swiftgull Design | A shipwright's plans, placed on the water as a shipyard (`swiftgull_design`) |
+| Shipyard | Swiftgull Shipyard | A slipway and scaffold where a Swiftgull is built (`swiftgull_yard`, `content/ships.toml`) |
+| Item: pack | Timber Bundle, Ironwork Crate, Sailcloth Bale | Shipbuilding materials carried to a shipyard (`timber_bundle`, `ironwork_crate`, `sailcloth_bale`) |
+| Item: consumable | Hullmender's Kit | Planks, nails and rope for mending wrecks and patching hulls (`hullmenders_kit`) |
+| Shipyard stage | Keel and Frames, Ironwork, Rigging, Fitting Out I–III | The Swiftgull Shipyard's stages |
 | Dev target | Straw Dummy | A practice target on a post, dev builds only |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

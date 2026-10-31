@@ -83,14 +83,17 @@ namespace Mmo.Gameplay
             session.Log($"trade: {lastResult}");
         }
 
-        /// <summary>F was pressed on land: sell at a post, or pick up a pack. False if neither is in reach.</summary>
+        /// <summary>
+        /// F was pressed off a deck: sell at a post on land, or pick up a pack, from the water too
+        /// for one floating where a ship sank. False if neither is in reach.
+        /// </summary>
         public bool Interact()
         {
-            if (session.Conn is not { } c || player.Parent != 0 || player.Mode == MoveMode.Swim)
+            if (session.Conn is not { } c || player.Parent != 0)
                 return false;
             if (Carried is not null)
             {
-                if (NearestPost() is not { } post)
+                if (player.Mode == MoveMode.Swim || NearestPost() is not { } post)
                     return false;
                 Sell(post);
                 return true;
@@ -138,7 +141,7 @@ namespace Mmo.Gameplay
                 return "";
             if (carried is { } pack)
             {
-                if (NearestPost() is not { } post || GameContent.Post(post.Kind) is not { } kind)
+                if (player.Mode == MoveMode.Swim || NearestPost() is not { } post || GameContent.Post(post.Kind) is not { } kind)
                     return "";
                 return TradeModel.SellPrompt(pack, kind, new System.Numerics.Vector2(post.X, post.Z), Demand(post.Kind, pack.Def, now), now);
             }

@@ -146,6 +146,30 @@ namespace Mmo.Sim
         public static bool CargoReach(Vector3 point, Vector3 at) =>
             MathF.Sqrt(MathF.Pow(point.X - at.X, 2) + MathF.Pow(point.Z - at.Z, 2)) <= CargoReachM && MathF.Abs(point.Y - at.Y) <= CargoReachM;
 
+        /// <summary>How close to a shipyard's footprint a character must be to work on it, horizontally (docs/design/vehicles.md §2B).</summary>
+        public const float YardReachM = 4.0f;
+        /// <summary>How far beyond a vehicle's half-length from its centre it may be repaired from.</summary>
+        public const float RepairReachM = 3.0f;
+
+        /// <summary>Whether <paramref name="at"/> (world) is within reach of a shipyard's footprint: the deck of <paramref name="hull"/> placed at <paramref name="m"/>.</summary>
+        public static bool YardReach(HullData hull, ShipMotion m, Vector3 at)
+        {
+            var l = m.PoseAt(0).ToLocal(new Vector3(at.X, 0, at.Z));
+            float dx = MathF.Max(MathF.Abs(l.X) - hull.DeckHalfWidthM, 0), dz = MathF.Max(MathF.Abs(l.Z) - hull.DeckHalfLengthM, 0);
+            return dx * dx + dz * dz <= YardReachM * YardReachM;
+        }
+
+        /// <summary>Whether <paramref name="at"/> (world) is close enough to a vehicle at <paramref name="m"/> to repair it from off its deck.</summary>
+        public static bool RepairReach(HullData hull, ShipMotion m, Vector3 at) =>
+            MathF.Sqrt(MathF.Pow(m.X - at.X, 2) + MathF.Pow(m.Z - at.Z, 2)) <= hull.DeckHalfLengthM + RepairReachM;
+
+        /// <summary>A vehicle's HP after one repair: a share of its hull's HP more, up to full.</summary>
+        public static int RepairedHp(HullData hull, int hp) =>
+            (int)Math.Min((long)hp + (long)hull.Hp * GameContent.Vehicles.RepairPct / 100, hull.Hp);
+
+        /// <summary>Whether a vehicle last hit at <paramref name="hitAt"/> (µs; 0 is never) is still under fire at <paramref name="now"/>.</summary>
+        public static bool UnderFire(long hitAt, long now) => hitAt != 0 && now < hitAt + (long)GameContent.Vehicles.UnderFireS * 1_000_000;
+
         /// <summary>The radius of the circle a ship sails at full speed and full rudder.</summary>
         public static float TurningRadius(HullData hull) => hull.MaxSpeedMps / (hull.TurnRateDps * RadsPerDeg);
 

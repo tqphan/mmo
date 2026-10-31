@@ -2,11 +2,11 @@
 //! (docs/design/ships.md, docs/design/vehicles.md). The rules themselves live in `sim::ship`;
 //! moving decks are handled by `movement`, and owning, summoning and cargo by `vehicle`.
 
-use spacetimedb::{ReducerContext, ScheduleAt, Table, TimeDuration, Timestamp};
+use spacetimedb::{ReducerContext, ScheduleAt, Table, TimeDuration, Timestamp, ViewContext};
 use sim::ship::{Hull, HullData, Input, Motion, Pose};
 
 use crate::combat::{CombatEvent, combat_event, flags, skill};
-use crate::session::{Entity, Presence, Transform, entity, entity_kind, presence, transform};
+use crate::session::{Entity, Presence, Transform, character_private__view, entity, entity_kind, presence, transform};
 use sim::movement::MoveMode;
 use crate::terrain::Terrain;
 use crate::time::now;
@@ -29,10 +29,34 @@ pub struct Vehicle {
     /// When each mount may fire again, in the hull's mount order.
     pub cannon_ready_at: Vec<Timestamp>,
     /// The character that summoned it, or 0 for a dev ship anyone may use.
+    #[index(btree)]
     pub owner: u64,
     /// The pack item in each slot, in the hull's slot order; 0 is empty. The rest of each pack is
     /// in the private `cargo` table.
     pub cargo: Vec<u16>,
+    /// When it was last hit; the Unix epoch if never. It's under fire for a while after.
+    pub hit_at: Timestamp,
+}
+
+/// The `vehicle` rows of the caller's characters, wherever they are (docs/design/vehicles.md §2B).
+#[spacetimedb::view(accessor = my_vehicles, public)]
+pub(crate) fn my_vehicles(ctx: &ViewContext) -> Vec<Vehicle> {
+    ctx.db
+        .character_private()
+        .owner()
+        .filter(ctx.sender())
+        .flat_map(|c| ctx.db.vehicle().owner().filter(c.char_id).collect::<Vec<_>>())
+        .collect()
+}
+
+/// Private: a vehicle at 0 HP, wrecked when this fires.
+#[spacetimedb::table(accessor = vehicle_wreck, scheduled(wreck_vehicle))]
+pub struct VehicleWreck {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub vehicle: u64,
 }
 
 /// Private: the exact state the tick steps. `transform` carries a rounded copy at 5 Hz.
@@ -126,6 +150,9 @@ pub fn take_helm(ctx: &ReducerContext) -> Result<(), String> {
     if v.owner != 0 && !crate::vehicle::same_account(ctx, v.owner) {
         return Err("only the owner can drive this".into());
     }
+    if v.hp <= 0 {
+        return Err(sinking(d.hull).into());
+    }
     ctx.db.vehicle().entity_id().update(Vehicle { helm: p.entity_id, ..v });
     Ok(())
 }
@@ -198,7 +225,7 @@ pub fn cannon_impact(ctx: &ReducerContext, shot: CannonShot) -> Result<(), Strin
     let target = sim::cell::window_cells(cell, 1)
         .into_iter()
         .flat_map(|c| ctx.db.vehicle().cell().filter(c))
-        .filter(|v| v.entity_id != shot.ship)
+        .filter(|v| v.entity_id != shot.ship && v.hp > 0)
         .filter_map(|v| deck(ctx, v.entity_id))
         .filter(|d| sim::ship::hits(d.hull, &d.pose(), landing))
         .min_by(|a, b| distance2(a, landing).total_cmp(&distance2(b, landing)));
@@ -208,12 +235,50 @@ pub fn cannon_impact(ctx: &ReducerContext, shot: CannonShot) -> Result<(), Strin
     match target.and_then(|d| ctx.db.vehicle().entity_id().find(d.ship)) {
         Some(v) => {
             ctx.db.combat_event().insert(event(v.entity_id, damage, flags::HIT));
-            ctx.db.vehicle().entity_id().update(Vehicle { hp: (v.hp - damage).max(0), ..v });
+            self::damage(ctx, v, damage);
         }
         None => {
             ctx.db.combat_event().insert(event(0, 0, 0));
         }
     }
+    Ok(())
+}
+
+/// "it's sinking", or for a cart "it's broken down".
+pub fn sinking(hull: &HullData) -> &'static str {
+    if hull.land { "it's broken down" } else { "it's sinking" }
+}
+
+/// Whether `v` was hit too recently to be stowed or repaired.
+pub fn under_fire(ctx: &ReducerContext, v: &Vehicle) -> bool {
+    sim::ship::under_fire(v.hit_at.to_micros_since_unix_epoch(), now(ctx).to_micros_since_unix_epoch())
+}
+
+/// Every hit on a vehicle goes through here: it loses `amount` HP and is under fire. At 0 HP it
+/// lets go of the helm, takes no more damage, and is wrecked `sink_s` later. A vehicle already at
+/// 0 is left alone.
+pub fn damage(ctx: &ReducerContext, v: Vehicle, amount: i32) {
+    if v.hp <= 0 {
+        return;
+    }
+    let hp = (v.hp - amount.max(0)).max(0);
+    let mut v = Vehicle { hp, hit_at: now(ctx), ..v };
+    if hp == 0 {
+        v = Vehicle { helm: 0, throttle: 0, rudder: 0, ..v };
+        let sink = TimeDuration::from_micros(i64::from(sim::content::VEHICLES.sink_s) * 1_000_000);
+        ctx.db.vehicle_wreck().insert(VehicleWreck { scheduled_id: 0, scheduled_at: (ctx.timestamp + sink).into(), vehicle: v.entity_id });
+        log::info!("vehicle {} of char {} is going down", v.entity_id, v.owner);
+    }
+    ctx.db.vehicle().entity_id().update(v);
+}
+
+/// A vehicle that went to 0 HP is wrecked (`vehicle::wreck`).
+#[spacetimedb::reducer]
+pub fn wreck_vehicle(ctx: &ReducerContext, row: VehicleWreck) -> Result<(), String> {
+    if ctx.sender() != ctx.database_identity() {
+        return Err("wreck_vehicle runs on the server's schedule only".into());
+    }
+    crate::vehicle::wreck(ctx, row.vehicle);
     Ok(())
 }
 
@@ -300,6 +365,7 @@ pub fn launch(ctx: &ReducerContext, hull: Hull, m: Motion, y: f32, owner: u64) -
         cannon_ready_at: vec![now(ctx); data.mounts.len()],
         owner,
         cargo: vec![0; data.slots.len()],
+        hit_at: Timestamp::UNIX_EPOCH,
     });
     ctx.db.ship_motion().insert(ShipMotion { entity_id: e.id, x: m.x, z: m.z, yaw: m.yaw, speed: m.speed, y });
     log::info!("vehicle {} ({}) of char {owner} out at ({:.1}, {:.1})", e.id, data.id, m.x, m.z);

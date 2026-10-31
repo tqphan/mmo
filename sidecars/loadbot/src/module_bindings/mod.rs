@@ -7,6 +7,7 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod abandon_plot_reducer;
+pub mod abandon_shipyard_reducer;
 pub mod account_type;
 pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
@@ -51,6 +52,7 @@ pub mod crop_table;
 pub mod crop_type;
 pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
+pub mod dev_damage_vehicle_reducer;
 pub mod dev_discard_pack_reducer;
 pub mod dev_give_pack_reducer;
 pub mod dev_grant_item_reducer;
@@ -91,6 +93,7 @@ pub mod load_pack_reducer;
 pub mod loot_corpse_reducer;
 pub mod loot_table;
 pub mod loot_type;
+pub mod mend_vehicle_reducer;
 pub mod move_event_reducer;
 pub mod move_item_reducer;
 pub mod moved_type;
@@ -102,6 +105,8 @@ pub mod my_labor_table;
 pub mod my_pack_table;
 pub mod my_presence_table;
 pub mod my_purse_table;
+pub mod my_vehicles_table;
+pub mod my_wrecks_table;
 pub mod node_placement_type;
 pub mod npc_type;
 pub mod owner_type;
@@ -111,6 +116,7 @@ pub mod periodic_type;
 pub mod pick_skillset_reducer;
 pub mod pick_up_pack_reducer;
 pub mod place_plot_reducer;
+pub mod place_shipyard_reducer;
 pub mod plant_reducer;
 pub mod plot_demolition_type;
 pub mod plot_table;
@@ -118,6 +124,7 @@ pub mod plot_type;
 pub mod post_placement_type;
 pub mod presence_type;
 pub mod purse_type;
+pub mod repair_vehicle_reducer;
 pub mod resist_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
@@ -126,6 +133,8 @@ pub mod sell_pack_reducer;
 pub mod set_plot_access_reducer;
 pub mod set_target_reducer;
 pub mod ship_motion_type;
+pub mod shipyard_table;
+pub mod shipyard_type;
 pub mod shrine_placement_type;
 pub mod shrine_table;
 pub mod shrine_type;
@@ -157,11 +166,15 @@ pub mod uproot_reducer;
 pub mod use_skill_reducer;
 pub mod vehicle_table;
 pub mod vehicle_type;
+pub mod vehicle_wreck_type;
 pub mod vitals_table;
 pub mod vitals_type;
+pub mod work_shipyard_reducer;
 pub mod world_tick_timer_type;
+pub mod wreck_type;
 
 pub use abandon_plot_reducer::abandon_plot;
+pub use abandon_shipyard_reducer::abandon_shipyard;
 pub use account_type::Account;
 pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
@@ -206,6 +219,7 @@ pub use crop_table::*;
 pub use crop_type::Crop;
 pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
+pub use dev_damage_vehicle_reducer::dev_damage_vehicle;
 pub use dev_discard_pack_reducer::dev_discard_pack;
 pub use dev_give_pack_reducer::dev_give_pack;
 pub use dev_grant_item_reducer::dev_grant_item;
@@ -246,6 +260,7 @@ pub use load_pack_reducer::load_pack;
 pub use loot_corpse_reducer::loot_corpse;
 pub use loot_table::*;
 pub use loot_type::Loot;
+pub use mend_vehicle_reducer::mend_vehicle;
 pub use move_event_reducer::move_event;
 pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
@@ -257,6 +272,8 @@ pub use my_labor_table::*;
 pub use my_pack_table::*;
 pub use my_presence_table::*;
 pub use my_purse_table::*;
+pub use my_vehicles_table::*;
+pub use my_wrecks_table::*;
 pub use node_placement_type::NodePlacement;
 pub use npc_type::Npc;
 pub use owner_type::Owner;
@@ -266,6 +283,7 @@ pub use periodic_type::Periodic;
 pub use pick_skillset_reducer::pick_skillset;
 pub use pick_up_pack_reducer::pick_up_pack;
 pub use place_plot_reducer::place_plot;
+pub use place_shipyard_reducer::place_shipyard;
 pub use plant_reducer::plant;
 pub use plot_demolition_type::PlotDemolition;
 pub use plot_table::*;
@@ -273,6 +291,7 @@ pub use plot_type::Plot;
 pub use post_placement_type::PostPlacement;
 pub use presence_type::Presence;
 pub use purse_type::Purse;
+pub use repair_vehicle_reducer::repair_vehicle;
 pub use resist_type::Resist;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
@@ -281,6 +300,8 @@ pub use sell_pack_reducer::sell_pack;
 pub use set_plot_access_reducer::set_plot_access;
 pub use set_target_reducer::set_target;
 pub use ship_motion_type::ShipMotion;
+pub use shipyard_table::*;
+pub use shipyard_type::Shipyard;
 pub use shrine_placement_type::ShrinePlacement;
 pub use shrine_table::*;
 pub use shrine_type::Shrine;
@@ -312,9 +333,12 @@ pub use uproot_reducer::uproot;
 pub use use_skill_reducer::use_skill;
 pub use vehicle_table::*;
 pub use vehicle_type::Vehicle;
+pub use vehicle_wreck_type::VehicleWreck;
 pub use vitals_table::*;
 pub use vitals_type::Vitals;
+pub use work_shipyard_reducer::work_shipyard;
 pub use world_tick_timer_type::WorldTickTimer;
+pub use wreck_type::Wreck;
 
 #[derive(Clone, PartialEq, Debug)]
 
@@ -326,6 +350,9 @@ pub use world_tick_timer_type::WorldTickTimer;
 pub enum Reducer {
     AbandonPlot {
         plot_id: u64,
+    },
+    AbandonShipyard {
+        yard_id: u64,
     },
     AdminClearLand,
     AdminClearNodes,
@@ -402,6 +429,10 @@ pub enum Reducer {
     },
     DevAdvanceClock {
         micros: i64,
+    },
+    DevDamageVehicle {
+        vehicle: u64,
+        amount: i32,
     },
     DevDiscardPack,
     DevGivePack {
@@ -488,6 +519,9 @@ pub enum Reducer {
     LootCorpse {
         corpse: u64,
     },
+    MendVehicle {
+        item_id: u64,
+    },
     MoveEvent {
         seq: u32,
         parent: u64,
@@ -517,10 +551,16 @@ pub enum Reducer {
         z: f32,
         yaw: u8,
     },
+    PlaceShipyard {
+        item_id: u64,
+    },
     Plant {
         item_id: u64,
         x: f32,
         z: f32,
+    },
+    RepairVehicle {
+        vehicle_id: u64,
     },
     Respawn,
     SellPack {
@@ -556,6 +596,9 @@ pub enum Reducer {
         skill: u16,
         target: u64,
     },
+    WorkShipyard {
+        yard_id: u64,
+    },
 }
 
 impl __sdk::InModule for Reducer {
@@ -566,6 +609,7 @@ impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
             Reducer::AbandonPlot { .. } => "abandon_plot",
+            Reducer::AbandonShipyard { .. } => "abandon_shipyard",
             Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearPosts => "admin_clear_posts",
@@ -597,6 +641,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateCharacter { .. } => "create_character",
             Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
+            Reducer::DevDamageVehicle { .. } => "dev_damage_vehicle",
             Reducer::DevDiscardPack => "dev_discard_pack",
             Reducer::DevGivePack { .. } => "dev_give_pack",
             Reducer::DevGrantItem { .. } => "dev_grant_item",
@@ -623,13 +668,16 @@ impl __sdk::Reducer for Reducer {
             Reducer::LeaveWorld => "leave_world",
             Reducer::LoadPack { .. } => "load_pack",
             Reducer::LootCorpse { .. } => "loot_corpse",
+            Reducer::MendVehicle { .. } => "mend_vehicle",
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
             Reducer::PayTax { .. } => "pay_tax",
             Reducer::PickSkillset { .. } => "pick_skillset",
             Reducer::PickUpPack { .. } => "pick_up_pack",
             Reducer::PlacePlot { .. } => "place_plot",
+            Reducer::PlaceShipyard { .. } => "place_shipyard",
             Reducer::Plant { .. } => "plant",
+            Reducer::RepairVehicle { .. } => "repair_vehicle",
             Reducer::Respawn => "respawn",
             Reducer::SellPack { .. } => "sell_pack",
             Reducer::SetPlotAccess { .. } => "set_plot_access",
@@ -641,6 +689,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UnloadPack { .. } => "unload_pack",
             Reducer::Uproot { .. } => "uproot",
             Reducer::UseSkill { .. } => "use_skill",
+            Reducer::WorkShipyard { .. } => "work_shipyard",
             _ => unreachable!(),
         }
     }
@@ -650,6 +699,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AbandonPlot { plot_id } => {
                 __sats::bsatn::to_vec(&abandon_plot_reducer::AbandonPlotArgs {
                     plot_id: plot_id.clone(),
+                })
+            }
+            Reducer::AbandonShipyard { yard_id } => {
+                __sats::bsatn::to_vec(&abandon_shipyard_reducer::AbandonShipyardArgs {
+                    yard_id: yard_id.clone(),
                 })
             }
             Reducer::AdminClearLand => {
@@ -790,6 +844,12 @@ impl __sdk::Reducer for Reducer {
                     micros: micros.clone(),
                 })
             }
+            Reducer::DevDamageVehicle { vehicle, amount } => {
+                __sats::bsatn::to_vec(&dev_damage_vehicle_reducer::DevDamageVehicleArgs {
+                    vehicle: vehicle.clone(),
+                    amount: amount.clone(),
+                })
+            }
             Reducer::DevDiscardPack => {
                 __sats::bsatn::to_vec(&dev_discard_pack_reducer::DevDiscardPackArgs {})
             }
@@ -915,6 +975,11 @@ impl __sdk::Reducer for Reducer {
                     corpse: corpse.clone(),
                 })
             }
+            Reducer::MendVehicle { item_id } => {
+                __sats::bsatn::to_vec(&mend_vehicle_reducer::MendVehicleArgs {
+                    item_id: item_id.clone(),
+                })
+            }
             Reducer::MoveEvent {
                 seq,
                 parent,
@@ -959,11 +1024,21 @@ impl __sdk::Reducer for Reducer {
                     yaw: yaw.clone(),
                 })
             }
+            Reducer::PlaceShipyard { item_id } => {
+                __sats::bsatn::to_vec(&place_shipyard_reducer::PlaceShipyardArgs {
+                    item_id: item_id.clone(),
+                })
+            }
             Reducer::Plant { item_id, x, z } => __sats::bsatn::to_vec(&plant_reducer::PlantArgs {
                 item_id: item_id.clone(),
                 x: x.clone(),
                 z: z.clone(),
             }),
+            Reducer::RepairVehicle { vehicle_id } => {
+                __sats::bsatn::to_vec(&repair_vehicle_reducer::RepairVehicleArgs {
+                    vehicle_id: vehicle_id.clone(),
+                })
+            }
             Reducer::Respawn => __sats::bsatn::to_vec(&respawn_reducer::RespawnArgs {}),
             Reducer::SellPack { post_id } => {
                 __sats::bsatn::to_vec(&sell_pack_reducer::SellPackArgs {
@@ -1016,6 +1091,11 @@ impl __sdk::Reducer for Reducer {
                     target: target.clone(),
                 })
             }
+            Reducer::WorkShipyard { yard_id } => {
+                __sats::bsatn::to_vec(&work_shipyard_reducer::WorkShipyardArgs {
+                    yard_id: yard_id.clone(),
+                })
+            }
             _ => unreachable!(),
         }
     }
@@ -1041,8 +1121,11 @@ pub struct DbUpdate {
     my_pack: __sdk::TableUpdate<Pack>,
     my_presence: __sdk::TableUpdate<Presence>,
     my_purse: __sdk::TableUpdate<Purse>,
+    my_vehicles: __sdk::TableUpdate<Vehicle>,
+    my_wrecks: __sdk::TableUpdate<Wreck>,
     plot: __sdk::TableUpdate<Plot>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
+    shipyard: __sdk::TableUpdate<Shipyard>,
     shrine: __sdk::TableUpdate<Shrine>,
     station: __sdk::TableUpdate<Station>,
     terrain_info: __sdk::TableUpdate<TerrainInfo>,
@@ -1107,12 +1190,21 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(my_purse_table::parse_table_update(table_update)?),
+                "my_vehicles" => db_update
+                    .my_vehicles
+                    .append(my_vehicles_table::parse_table_update(table_update)?),
+                "my_wrecks" => db_update
+                    .my_wrecks
+                    .append(my_wrecks_table::parse_table_update(table_update)?),
                 "plot" => db_update
                     .plot
                     .append(plot_table::parse_table_update(table_update)?),
                 "resource_node" => db_update
                     .resource_node
                     .append(resource_node_table::parse_table_update(table_update)?),
+                "shipyard" => db_update
+                    .shipyard
+                    .append(shipyard_table::parse_table_update(table_update)?),
                 "shrine" => db_update
                     .shrine
                     .append(shrine_table::parse_table_update(table_update)?),
@@ -1188,6 +1280,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.resource_node = cache
             .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
             .with_updates_by_pk(|row| &row.id);
+        diff.shipyard = cache
+            .apply_diff_to_table::<Shipyard>("shipyard", &self.shipyard)
+            .with_updates_by_pk(|row| &row.id);
         diff.shrine = cache
             .apply_diff_to_table::<Shrine>("shrine", &self.shrine)
             .with_updates_by_pk(|row| &row.id);
@@ -1222,6 +1317,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.my_pack = cache.apply_diff_to_table::<Pack>("my_pack", &self.my_pack);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
         diff.my_purse = cache.apply_diff_to_table::<Purse>("my_purse", &self.my_purse);
+        diff.my_vehicles = cache.apply_diff_to_table::<Vehicle>("my_vehicles", &self.my_vehicles);
+        diff.my_wrecks = cache.apply_diff_to_table::<Wreck>("my_wrecks", &self.my_wrecks);
 
         diff
     }
@@ -1277,11 +1374,20 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_vehicles" => db_update
+                    .my_vehicles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_wrecks" => db_update
+                    .my_wrecks
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "plot" => db_update
                     .plot
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "shipyard" => db_update
+                    .shipyard
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "shrine" => db_update
                     .shrine
@@ -1368,11 +1474,20 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_vehicles" => db_update
+                    .my_vehicles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_wrecks" => db_update
+                    .my_wrecks
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "plot" => db_update
                     .plot
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "shipyard" => db_update
+                    .shipyard
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "shrine" => db_update
                     .shrine
@@ -1429,8 +1544,11 @@ pub struct AppliedDiff<'r> {
     my_pack: __sdk::TableAppliedDiff<'r, Pack>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     my_purse: __sdk::TableAppliedDiff<'r, Purse>,
+    my_vehicles: __sdk::TableAppliedDiff<'r, Vehicle>,
+    my_wrecks: __sdk::TableAppliedDiff<'r, Wreck>,
     plot: __sdk::TableAppliedDiff<'r, Plot>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
+    shipyard: __sdk::TableAppliedDiff<'r, Shipyard>,
     shrine: __sdk::TableAppliedDiff<'r, Shrine>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     terrain_info: __sdk::TableAppliedDiff<'r, TerrainInfo>,
@@ -1484,12 +1602,15 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Pack>("my_pack", &self.my_pack, event);
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<Purse>("my_purse", &self.my_purse, event);
+        callbacks.invoke_table_row_callbacks::<Vehicle>("my_vehicles", &self.my_vehicles, event);
+        callbacks.invoke_table_row_callbacks::<Wreck>("my_wrecks", &self.my_wrecks, event);
         callbacks.invoke_table_row_callbacks::<Plot>("plot", &self.plot, event);
         callbacks.invoke_table_row_callbacks::<ResourceNode>(
             "resource_node",
             &self.resource_node,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Shipyard>("shipyard", &self.shipyard, event);
         callbacks.invoke_table_row_callbacks::<Shrine>("shrine", &self.shrine, event);
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
         callbacks.invoke_table_row_callbacks::<TerrainInfo>(
@@ -2182,8 +2303,11 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_pack_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         my_purse_table::register_table(client_cache);
+        my_vehicles_table::register_table(client_cache);
+        my_wrecks_table::register_table(client_cache);
         plot_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
+        shipyard_table::register_table(client_cache);
         shrine_table::register_table(client_cache);
         station_table::register_table(client_cache);
         terrain_info_table::register_table(client_cache);
@@ -2210,8 +2334,11 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_pack",
         "my_presence",
         "my_purse",
+        "my_vehicles",
+        "my_wrecks",
         "plot",
         "resource_node",
+        "shipyard",
         "shrine",
         "station",
         "terrain_info",

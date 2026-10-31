@@ -22,6 +22,8 @@ namespace Mmo.World
         private readonly ushort[] shownCargo;
         private ShipInput? ownInput;
         private double ownInputAt;
+        /// <summary>When we first saw it at 0 HP, sinking (docs/design/vehicles.md §2B).</summary>
+        private double? sinkingSince;
 
         /// <param name="ground">The ground, so the predictor stands the vehicle where the server would (docs/design/vehicles.md).</param>
         public ShipView(ulong id, HullData hull, System.Func<float, float, Ground?>? ground = null)
@@ -85,7 +87,9 @@ namespace Mmo.World
                 ownInput = null;
             if (ownInput is null)
                 Predictor.SetInput(now, input);
-            label.Text = $"{Hull.Name} #{Id}  {v.Hp:N0}/{Hull.Hp:N0}";
+            label.Text = v.Hp > 0 ? $"{Hull.Name} #{Id}  {v.Hp:N0}/{Hull.Hp:N0}" : $"{Hull.Name} #{Id}  {(Hull.Land ? "broken down" : "sinking")}";
+            if (v.Hp <= 0)
+                sinkingSince ??= now;
             for (int i = 0; i < slots.Length; i++)
             {
                 ushort def = i < v.Cargo.Count ? v.Cargo[i] : (ushort)0;
@@ -121,6 +125,14 @@ namespace Mmo.World
                 return;
             Pose = Predictor.Pose(now);
             Speed = Predictor.Speed(now);
+            // A sinking ship settles until its deck is awash; a broken cart slumps a little. Anyone
+            // aboard rides down with it, in its frame.
+            if (sinkingSince is double since)
+            {
+                float k = Mathf.Clamp((float)(now - since) / Mathf.Max(1, GameContent.Vehicles.SinkS), 0, 1);
+                float depth = Hull.Land ? 0.3f : Hull.DeckHeightM + 0.4f;
+                Pose = Pose with { Y = Pose.Y - k * depth };
+            }
             GlobalTransform = new Transform3D(new Basis(Vector3.Up, Pose.Yaw), new Vector3(Pose.X, Pose.Y, Pose.Z));
         }
     }

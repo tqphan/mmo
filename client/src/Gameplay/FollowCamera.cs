@@ -26,9 +26,10 @@ namespace Mmo.Gameplay
         private ulong lastFrame;
         private float lastFrameYaw;
 
-        public FollowCamera(PlayerController player, float yawDeg, HeightMap map)
+        public FollowCamera(PlayerController player, float yawDeg, HeightMap map, float distance = 8.0f)
         {
             this.player = player;
+            this.distance = distance;
             this.map = map;
             yaw = Mathf.DegToRad(yawDeg);
             Name = "Camera";

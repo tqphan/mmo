@@ -77,6 +77,9 @@ namespace Mmo.Gameplay
         public ShipControls? Controls { get; set; }
         public Vehicles? Vehicles { get; set; }
 
+        /// <summary>Shipyards; set by <see cref="Main"/>. F by a yard does its next stage.</summary>
+        public Shipyards? Shipyards { get; set; }
+
         /// <summary>Gathering from resource nodes; set by <see cref="Main"/>. F on land gathers before it climbs.</summary>
         public Gathering? Gathering { get; set; }
 
@@ -188,7 +191,7 @@ namespace Mmo.Gameplay
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
             if (interact && Parent == 0
                 && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Vehicles?.Interact() == true
-                    || Trade?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
+                    || Shipyards?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // Aboard, a pack slot takes F unless we stand at the helm or a cannon, or are working one.
             if (interact && Parent != 0 && Controls?.Manning is null && Controls?.AtStation != true && Vehicles?.Interact() == true)

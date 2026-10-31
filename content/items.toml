@@ -1,6 +1,6 @@
 # Items (docs/design/items.md). `wire` is the number stored in item rows: it never changes and is
 # never reused, even after an item is removed, so gaps are fine. 0 is reserved. Kinds are
-# `material`, `consumable`, `gear`, `deed`, `seed`, `pack` and `vehicle`; gear, packs and vehicles don't stack. Names come from docs/world/.
+# `material`, `consumable`, `gear`, `deed`, `seed`, `pack`, `vehicle` and `design`; gear, packs, vehicles and designs don't stack. Names come from docs/world/.
 
 [bag]
 # Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
@@ -173,6 +173,13 @@ stack = 100
 wire = 102
 id = "emberleaf_salve"
 name = "Emberleaf Salve"
+kind = "consumable"
+stack = 100
+
+[[item]]
+wire = 104
+id = "hullmenders_kit"
+name = "Hullmender's Kit"
 kind = "consumable"
 stack = 100
 
@@ -363,6 +370,28 @@ name = "Preserves Crate"
 kind = "pack"
 stack = 1
 
+# Material packs for shipyards (docs/design/vehicles.md §2B); they sell too, for little.
+[[item]]
+wire = 502
+id = "timber_bundle"
+name = "Timber Bundle"
+kind = "pack"
+stack = 1
+
+[[item]]
+wire = 503
+id = "ironwork_crate"
+name = "Ironwork Crate"
+kind = "pack"
+stack = 1
+
+[[item]]
+wire = 504
+id = "sailcloth_bale"
+name = "Sailcloth Bale"
+kind = "pack"
+stack = 1
+
 # Trophies from NPCs (docs/design/npcs.md): materials with no recipes yet.
 
 [[item]]
@@ -463,4 +492,12 @@ wire = 702
 id = "swiftgull"
 name = "Swiftgull"
 kind = "vehicle"
+stack = 1
+
+# Ship designs (docs/design/vehicles.md §2B): placed on the water as a shipyard.
+[[item]]
+wire = 710
+id = "swiftgull_design"
+name = "Swiftgull Design"
+kind = "design"
 stack = 1

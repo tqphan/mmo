@@ -68,6 +68,9 @@ pub fn generate() -> String {
          # farm_stage <crop wire> <grown from> <ripe at> <now> <stage: 0 growing, 1 ripe, 2 withered> <progress>\n\
          # ground <x> <z> <lo> <hi> <gradient>, or none, on the land_ vectors' ground\n\
          # vehicle_stand <hull> <x> <z> <yaw> <deck height, or none>, on the land_ vectors' ground\n\
+         # yard_reach <hull> <x> <z> <yaw> <at x> <at z> <yard 1 or 0> <repair 1 or 0>\n\
+         # vehicle_repair <hull> <hp> <after one repair>\n\
+         # vehicle_fire <hit at> <now> <under fire 1 or 0>\n\
          # farm_spot <crop wire> <x> <z> <plots as x0:z0:x1:z1:tend, comma-separated, or -> <plantings as x:z:space, or -> <ok:y:plot index or -:ideal, or the error code>, on the land_ vectors' ground\n\
          # trade_reach <thing x y z> <at x y z> <1 or 0>\n\
          # trade_demand <permille> <at> <now> <demand now> <after a sale>\n\
@@ -508,6 +511,24 @@ fn vehicles(out: &mut String, rng: &mut Lcg, heights: &mut terrain::FileChunks) 
         out.push_str(&format!("vehicle_stand {} {} {} {} {text}\n", hull as u8, f(m.x), f(m.z), f(m.yaw)));
     }
     assert!(seen.iter().all(|&n| n > 10), "both outcomes are covered: {seen:?}");
+    let mut reached = [0usize; 2];
+    for k in 0..120 {
+        let hull = [Hull::Clipper, Hull::Skiff, Hull::FurrowCart][k % 3];
+        let m = Motion { x: rng.range(-50.0, 50.0), z: rng.range(-50.0, 50.0), yaw: rng.range(0.0, std::f32::consts::TAU), speed: 0.0 };
+        let at = [m.x + rng.range(-16.0, 16.0), 0.0, m.z + rng.range(-16.0, 16.0)];
+        let (yard, repair) = (ship::yard_reach(hull.data(), &m, at), ship::repair_reach(hull.data(), &m, at));
+        reached[usize::from(yard)] += 1;
+        out.push_str(&format!("yard_reach {} {} {} {} {} {} {} {}\n", hull as u8, f(m.x), f(m.z), f(m.yaw), f(at[0]), f(at[2]), u8::from(yard), u8::from(repair)));
+    }
+    assert!(reached.iter().all(|&n| n > 10), "both outcomes are covered: {reached:?}");
+    for hull in [Hull::Clipper, Hull::Skiff, Hull::FurrowCart] {
+        for hp in [0, 1, hull.data().hp / 2, hull.data().hp - 1] {
+            out.push_str(&format!("vehicle_repair {} {hp} {}\n", hull as u8, ship::repaired_hp(hull.data(), hp)));
+        }
+    }
+    for (hit, now) in [(0, 5_000_000), (5_000_000, 5_000_000), (5_000_000, 14_999_999), (5_000_000, 15_000_000)] {
+        out.push_str(&format!("vehicle_fire {hit} {now} {}\n", u8::from(ship::under_fire(hit, now))));
+    }
 }
 
 /// `sim::farm`'s growth, stages and spot checks, for the client's port, on the land vectors' ground.

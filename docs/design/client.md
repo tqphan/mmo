@@ -75,6 +75,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--world DIR` | The world's files (default `world`), or a bare `.mmoh` height file |
 | `--secs S` | Quit after S seconds |
 | `--cam-yaw DEG` | Starting camera yaw, 0 looking north (-z) |
+| `--cam-distance M` | Starting camera distance behind the player, 3 to 30 m (8); the mouse wheel changes it |
 | `--trace` | Log where each other entity is drawn every frame, to measure smoothness |
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
 | `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |

@@ -20,6 +20,7 @@ mod land;
 mod npc;
 mod metrics;
 mod ship;
+mod shipyard;
 mod swarm;
 mod terrain;
 mod trade;
@@ -118,6 +119,7 @@ fn main() {
         "combat" => combat::scenario(&args),
         "npc" => npc::scenario(&args),
         "vehicle" => vehicle::scenario(&args),
+        "shipyard" => shipyard::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -141,7 +143,8 @@ fn main() {
                  trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock\n  \
                  combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn\n  \
                  npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death\n  \
-                 vehicle          a bot summons a cart, loads packs, drives a rider and stows it; then rows a skiff and stows it"
+                 vehicle          a bot summons a cart, loads packs, drives a rider and stows it; then rows a skiff and stows it\n  \
+                 shipyard         two bots build a Swiftgull through every stage; it's hit, repaired, sunk, its pack taken from the water, and mended"
             );
             std::process::exit(2);
         }

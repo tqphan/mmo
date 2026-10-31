@@ -106,6 +106,7 @@ namespace Mmo.Content
         Seed = 4,
         Pack = 5,
         Vehicle = 6,
+        Design = 7,
     }
 
     /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
@@ -315,15 +316,34 @@ namespace Mmo.Content
     /// <param name="DraftM">Depth below the water, m. Shallower water stops the ship. For land hulls, the deepest water they ford.</param>
     /// <param name="MaxGradient">Land hulls: the steepest ground they drive on, rise over run. 0 for sea hulls.</param>
     /// <param name="Hp">Hit points when built.</param>
+    /// <param name="MendKits">Hullmender's Kits to mend a wreck.</param>
+    /// <param name="MendS">The wait after mending before a wreck can be summoned, s.</param>
     /// <param name="HelmX">The helm's ship-local x, m.</param>
     /// <param name="HelmZ">The helm's ship-local z, m.</param>
     /// <param name="Cannon">Inert (all zero) for a hull without mounts.</param>
-    public sealed record HullData(Hull Hull, string Id, string Name, bool Land, ushort Item, float MaxSpeedMps, float AsternSpeedMps, float AccelMps2, float DriftDecelMps2, float TurnRateDps, float DeckHalfWidthM, float DeckHalfLengthM, float DeckHeightM, float DraftM, float MaxGradient, int Hp, float HelmX, float HelmZ, CannonData Cannon, IReadOnlyList<Mount> Mounts, IReadOnlyList<PackSlot> Slots);
+    public sealed record HullData(Hull Hull, string Id, string Name, bool Land, ushort Item, float MaxSpeedMps, float AsternSpeedMps, float AccelMps2, float DriftDecelMps2, float TurnRateDps, float DeckHalfWidthM, float DeckHalfLengthM, float DeckHeightM, float DraftM, float MaxGradient, int Hp, int MendKits, int MendS, float HelmX, float HelmZ, CannonData Cannon, IReadOnlyList<Mount> Mounts, IReadOnlyList<PackSlot> Slots);
+
+    /// <summary>Wrecks, mending and repairs ([vehicles] in content/ships.toml, docs/design/vehicles.md).</summary>
+    /// <param name="MendItem">The wire of the consumable that mends wrecks and repairs hulls.</param>
+    /// <param name="RepairLabor">Labor spent on each repair.</param>
+    /// <param name="RepairPct">The share of the hull's HP each repair restores, in percent.</param>
+    /// <param name="UnderFireS">How long after a hit a vehicle is under fire, s.</param>
+    /// <param name="SinkS">How long a vehicle at 0 HP sinks before it's wrecked, s.</param>
+    public sealed record VehicleRules(ushort MendItem, int RepairLabor, int RepairPct, int UnderFireS, int SinkS);
+
+    /// <summary>One stage of building at a shipyard.</summary>
+    /// <param name="Pack">The wire of the pack it takes, or 0 for none.</param>
+    public sealed record StageData(string Name, int Labor, ushort Pack);
+
+    /// <summary>Shipyard kinds (content/ships.toml, docs/design/vehicles.md).</summary>
+    /// <param name="Design">The wire of the design item that places it.</param>
+    /// <param name="Stages">In order; the last launches.</param>
+    public sealed record ShipyardData(byte Wire, string Id, string Name, ushort Design, Hull Hull, int PlaceLabor, IReadOnlyList<StageData> Stages);
 
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xfc62fe23648321d6UL;
+        public const ulong Hash = 0xc6a01c5e8a92ba74UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -336,9 +356,9 @@ namespace Mmo.Content
 
         public static readonly IReadOnlyList<HullData> Hulls = new HullData[]
         {
-            new(Hull.Clipper, "clipper", "Swiftgull", false, 702, 11.0f, 3.0f, 1.5f, 0.8f, 12.0f, 2.5f, 9.0f, 2.0f, 1.2f, 0.0f, 12000, 0.0f, 7.5f, new CannonData(40.0f, 1.0f, 30.0f, -5.0f, 15.0f, 5.0f, 1500, 2.0f), new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }, new PackSlot[] { new(-1.0f, 4.5f), new(1.0f, 4.5f) }),
-            new(Hull.Skiff, "skiff", "Driftpine Skiff", false, 701, 4.0f, 1.5f, 1.0f, 0.8f, 30.0f, 0.8f, 2.0f, 0.5f, 0.4f, 0.0f, 2000, 0.0f, 1.5f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] {  }),
-            new(Hull.FurrowCart, "furrow_cart", "Furrow Cart", true, 700, 4.0f, 1.5f, 2.0f, 4.0f, 22.9f, 0.9f, 1.6f, 0.9f, 0.4f, 0.6f, 3000, 0.0f, -1.2f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] { new(-0.45f, 0.6f), new(0.45f, 0.6f) }),
+            new(Hull.Clipper, "clipper", "Swiftgull", false, 702, 11.0f, 3.0f, 1.5f, 0.8f, 12.0f, 2.5f, 9.0f, 2.0f, 1.2f, 0.0f, 12000, 5, 1800, 0.0f, 7.5f, new CannonData(40.0f, 1.0f, 30.0f, -5.0f, 15.0f, 5.0f, 1500, 2.0f), new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }, new PackSlot[] { new(-1.0f, 4.5f), new(1.0f, 4.5f) }),
+            new(Hull.Skiff, "skiff", "Driftpine Skiff", false, 701, 4.0f, 1.5f, 1.0f, 0.8f, 30.0f, 0.8f, 2.0f, 0.5f, 0.4f, 0.0f, 2000, 1, 600, 0.0f, 1.5f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] {  }),
+            new(Hull.FurrowCart, "furrow_cart", "Furrow Cart", true, 700, 4.0f, 1.5f, 2.0f, 4.0f, 22.9f, 0.9f, 1.6f, 0.9f, 0.4f, 0.6f, 3000, 2, 600, 0.0f, -1.2f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] { new(-0.45f, 0.6f), new(0.45f, 0.6f) }),
         };
 
         public static HullData Data(this Hull hull) => Hulls[(int)hull];
@@ -349,6 +369,24 @@ namespace Mmo.Content
             foreach (var h in Hulls)
                 if (h.Item == item)
                     return h;
+            return null;
+        }
+
+        public static readonly VehicleRules Vehicles = new(104, 10, 10, 10, 8);
+
+        public static readonly IReadOnlyList<ShipyardData> Shipyards = new ShipyardData[]
+        {
+            new(0, "swiftgull_yard", "Swiftgull Shipyard", 710, Hull.Clipper, 25, new StageData[] { new("Keel and Frames", 25, 502), new("Ironwork", 25, 503), new("Rigging", 25, 504), new("Fitting Out I", 25, 0), new("Fitting Out II", 25, 0), new("Fitting Out III", 25, 0) }),
+        };
+
+        public static ShipyardData? Shipyard(byte wire) => wire < Shipyards.Count ? Shipyards[wire] : null;
+
+        /// <summary>The shipyard a design item places, if it is a design.</summary>
+        public static ShipyardData? ShipyardOfDesign(ushort item)
+        {
+            foreach (var y in Shipyards)
+                if (y.Design == item)
+                    return y;
             return null;
         }
 
@@ -421,6 +459,7 @@ namespace Mmo.Content
             new(101, "duskberry_preserve", "Duskberry Preserve", ItemKind.Consumable, 100),
             new(102, "emberleaf_salve", "Emberleaf Salve", ItemKind.Consumable, 100),
             new(103, "emberleaf_tea", "Emberleaf Tea", ItemKind.Consumable, 100),
+            new(104, "hullmenders_kit", "Hullmender's Kit", ItemKind.Consumable, 100),
             new(200, "reedcutter_knife", "Reedcutter's Knife", ItemKind.Gear, 1),
             new(201, "felling_axe", "Felling Axe", ItemKind.Gear, 1),
             new(202, "prospector_pick", "Prospector's Pick", ItemKind.Gear, 1),
@@ -438,6 +477,9 @@ namespace Mmo.Content
             new(408, "woolback_lamb", "Woolback Lamb", ItemKind.Seed, 10),
             new(500, "grain_bale", "Grain Bale", ItemKind.Pack, 1),
             new(501, "preserves_crate", "Preserves Crate", ItemKind.Pack, 1),
+            new(502, "timber_bundle", "Timber Bundle", ItemKind.Pack, 1),
+            new(503, "ironwork_crate", "Ironwork Crate", ItemKind.Pack, 1),
+            new(504, "sailcloth_bale", "Sailcloth Bale", ItemKind.Pack, 1),
             new(600, "skitter_shell", "Skitter Shell", ItemKind.Material, 1000),
             new(601, "coarse_hide", "Coarse Hide", ItemKind.Material, 1000),
             new(602, "boar_tusk", "Boar Tusk", ItemKind.Material, 1000),
@@ -452,6 +494,7 @@ namespace Mmo.Content
             new(700, "furrow_cart", "Furrow Cart", ItemKind.Vehicle, 1),
             new(701, "driftpine_skiff", "Driftpine Skiff", ItemKind.Vehicle, 1),
             new(702, "swiftgull", "Swiftgull", ItemKind.Vehicle, 1),
+            new(710, "swiftgull_design", "Swiftgull Design", ItemKind.Design, 1),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -533,6 +576,11 @@ namespace Mmo.Content
             new(32, "preserves_crate", 3, new Ingredient[] { new(101, 6), new(40, 4), new(52, 10) }, 501, 1, 40, 6.0f),
             new(33, "furrow_cart", 0, new Ingredient[] { new(41, 10), new(42, 2), new(53, 4) }, 700, 1, 50, 15.0f),
             new(34, "driftpine_skiff", 0, new Ingredient[] { new(40, 12), new(32, 2), new(52, 6) }, 701, 1, 30, 10.0f),
+            new(35, "timber_bundle", 3, new Ingredient[] { new(42, 4), new(40, 20) }, 502, 1, 25, 10.0f),
+            new(36, "ironwork_crate", 3, new Ingredient[] { new(51, 20), new(53, 4) }, 503, 1, 25, 10.0f),
+            new(37, "sailcloth_bale", 3, new Ingredient[] { new(33, 6), new(32, 6) }, 504, 1, 25, 10.0f),
+            new(38, "swiftgull_design", 0, new Ingredient[] { new(40, 10), new(33, 2), new(32, 4) }, 710, 1, 50, 10.0f),
+            new(39, "hullmenders_kit", 0, new Ingredient[] { new(40, 4), new(52, 4), new(32, 1) }, 104, 1, 10, 4.0f),
         };
 
         /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>
@@ -571,6 +619,9 @@ namespace Mmo.Content
         {
             new(500, 15000),
             new(501, 18000),
+            new(502, 6000),
+            new(503, 6000),
+            new(504, 6000),
         };
 
         /// <summary>The value of the pack item <paramref name="item"/>, if it is a pack.</summary>

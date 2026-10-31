@@ -17,6 +17,7 @@ pub struct Vehicle {
     pub cannon_ready_at: Vec<__sdk::Timestamp>,
     pub owner: u64,
     pub cargo: Vec<u16>,
+    pub hit_at: __sdk::Timestamp,
 }
 
 impl __sdk::InModule for Vehicle {
@@ -37,6 +38,7 @@ pub struct VehicleCols {
     pub cannon_ready_at: __sdk::__query_builder::Col<Vehicle, Vec<__sdk::Timestamp>>,
     pub owner: __sdk::__query_builder::Col<Vehicle, u64>,
     pub cargo: __sdk::__query_builder::Col<Vehicle, Vec<u16>>,
+    pub hit_at: __sdk::__query_builder::Col<Vehicle, __sdk::Timestamp>,
 }
 
 impl __sdk::__query_builder::HasCols for Vehicle {
@@ -53,6 +55,7 @@ impl __sdk::__query_builder::HasCols for Vehicle {
             cannon_ready_at: __sdk::__query_builder::Col::new(table_name, "cannon_ready_at"),
             owner: __sdk::__query_builder::Col::new(table_name, "owner"),
             cargo: __sdk::__query_builder::Col::new(table_name, "cargo"),
+            hit_at: __sdk::__query_builder::Col::new(table_name, "hit_at"),
         }
     }
 }
@@ -63,6 +66,7 @@ impl __sdk::__query_builder::HasCols for Vehicle {
 pub struct VehicleIxCols {
     pub cell: __sdk::__query_builder::IxCol<Vehicle, u64>,
     pub entity_id: __sdk::__query_builder::IxCol<Vehicle, u64>,
+    pub owner: __sdk::__query_builder::IxCol<Vehicle, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Vehicle {
@@ -71,6 +75,7 @@ impl __sdk::__query_builder::HasIxCols for Vehicle {
         VehicleIxCols {
             cell: __sdk::__query_builder::IxCol::new(table_name, "cell"),
             entity_id: __sdk::__query_builder::IxCol::new(table_name, "entity_id"),
+            owner: __sdk::__query_builder::IxCol::new(table_name, "owner"),
         }
     }
 }

@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xfc62fe23648321d6;
+pub const CONTENT_HASH: u64 = 0xc6a01c5e8a92ba74;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,6 +117,10 @@ pub struct HullData {
     pub max_gradient: f32,
     /// Hit points when built.
     pub hp: i32,
+    /// Hullmender's Kits to mend a wreck.
+    pub mend_kits: i32,
+    /// The wait after mending before a wreck can be summoned, s.
+    pub mend_s: i32,
     /// The helm's ship-local x, m.
     pub helm_x: f32,
     /// The helm's ship-local z, m.
@@ -146,6 +150,8 @@ pub static HULLS: [HullData; 3] = [
         draft_m: 1.2,
         max_gradient: 0.0,
         hp: 12000,
+        mend_kits: 5,
+        mend_s: 1800,
         helm_x: 0.0,
         helm_z: 7.5,
         cannon: CannonData { muzzle_speed_mps: 40.0, muzzle_height_m: 1.0, arc_deg: 30.0, min_pitch_deg: -5.0, max_pitch_deg: 15.0, reload_s: 5.0, damage: 1500, splash_m: 2.0 },
@@ -175,6 +181,8 @@ pub static HULLS: [HullData; 3] = [
         draft_m: 0.4,
         max_gradient: 0.0,
         hp: 2000,
+        mend_kits: 1,
+        mend_s: 600,
         helm_x: 0.0,
         helm_z: 1.5,
         cannon: CannonData { muzzle_speed_mps: 0.0, muzzle_height_m: 0.0, arc_deg: 0.0, min_pitch_deg: 0.0, max_pitch_deg: 0.0, reload_s: 0.0, damage: 0, splash_m: 0.0 },
@@ -200,6 +208,8 @@ pub static HULLS: [HullData; 3] = [
         draft_m: 0.4,
         max_gradient: 0.6,
         hp: 3000,
+        mend_kits: 2,
+        mend_s: 600,
         helm_x: 0.0,
         helm_z: -1.2,
         cannon: CannonData { muzzle_speed_mps: 0.0, muzzle_height_m: 0.0, arc_deg: 0.0, min_pitch_deg: 0.0, max_pitch_deg: 0.0, reload_s: 0.0, damage: 0, splash_m: 0.0 },
@@ -225,6 +235,76 @@ impl Hull {
 /// The hull a vehicle item summons.
 pub fn hull_of_item(item: u16) -> Option<&'static HullData> {
     HULLS.iter().find(|h| h.item == item)
+}
+
+/// Wrecks, mending and repairs (`[vehicles]` in `content/ships.toml`, docs/design/vehicles.md).
+#[derive(Debug, PartialEq)]
+pub struct VehicleRules {
+    /// The wire of the consumable that mends wrecks and repairs hulls.
+    pub mend_item: u16,
+    /// Labor spent on each repair.
+    pub repair_labor: i32,
+    /// The share of the hull's HP each repair restores, in percent.
+    pub repair_pct: i32,
+    /// How long after a hit a vehicle is under fire, s.
+    pub under_fire_s: i32,
+    /// How long a vehicle at 0 HP sinks before it's wrecked, s.
+    pub sink_s: i32,
+}
+
+pub static VEHICLES: VehicleRules = VehicleRules { mend_item: 104, repair_labor: 10, repair_pct: 10, under_fire_s: 10, sink_s: 8 };
+
+/// One stage of building at a shipyard.
+#[derive(Debug, PartialEq)]
+pub struct StageData {
+    pub name: &'static str,
+    pub labor: i32,
+    /// The wire of the pack it takes, or 0 for none.
+    pub pack: u16,
+}
+
+/// Shipyard kinds (`content/ships.toml`, docs/design/vehicles.md).
+#[derive(Debug, PartialEq)]
+pub struct ShipyardData {
+    /// Stored in shipyard rows.
+    pub wire: u8,
+    pub id: &'static str,
+    pub name: &'static str,
+    /// The wire of the design item that places it.
+    pub design: u16,
+    /// The hull it builds.
+    pub hull: Hull,
+    pub place_labor: i32,
+    /// In order; the last launches.
+    pub stages: &'static [StageData],
+}
+
+pub static SHIPYARDS: [ShipyardData; 1] = [
+    ShipyardData {
+        wire: 0,
+        id: "swiftgull_yard",
+        name: "Swiftgull Shipyard",
+        design: 710,
+        hull: Hull::Clipper,
+        place_labor: 25,
+        stages: &[
+            StageData { name: "Keel and Frames", labor: 25, pack: 502 },
+            StageData { name: "Ironwork", labor: 25, pack: 503 },
+            StageData { name: "Rigging", labor: 25, pack: 504 },
+            StageData { name: "Fitting Out I", labor: 25, pack: 0 },
+            StageData { name: "Fitting Out II", labor: 25, pack: 0 },
+            StageData { name: "Fitting Out III", labor: 25, pack: 0 },
+        ],
+    },
+];
+
+pub fn shipyard(wire: u8) -> Option<&'static ShipyardData> {
+    SHIPYARDS.get(usize::from(wire))
+}
+
+/// The shipyard a design item places.
+pub fn shipyard_by_design(item: u16) -> Option<&'static ShipyardData> {
+    SHIPYARDS.iter().find(|y| y.design == item)
 }
 
 /// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant
@@ -375,6 +455,7 @@ pub enum ItemKind {
     Seed = 4,
     Pack = 5,
     Vehicle = 6,
+    Design = 7,
 }
 
 #[derive(Debug, PartialEq)]
@@ -390,7 +471,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 63] = [
+pub static ITEMS: [ItemData; 68] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -423,6 +504,7 @@ pub static ITEMS: [ItemData; 63] = [
     ItemData { wire: 101, id: "duskberry_preserve", name: "Duskberry Preserve", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 102, id: "emberleaf_salve", name: "Emberleaf Salve", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 103, id: "emberleaf_tea", name: "Emberleaf Tea", kind: ItemKind::Consumable, stack: 100 },
+    ItemData { wire: 104, id: "hullmenders_kit", name: "Hullmender's Kit", kind: ItemKind::Consumable, stack: 100 },
     ItemData { wire: 200, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },
     ItemData { wire: 201, id: "felling_axe", name: "Felling Axe", kind: ItemKind::Gear, stack: 1 },
     ItemData { wire: 202, id: "prospector_pick", name: "Prospector's Pick", kind: ItemKind::Gear, stack: 1 },
@@ -440,6 +522,9 @@ pub static ITEMS: [ItemData; 63] = [
     ItemData { wire: 408, id: "woolback_lamb", name: "Woolback Lamb", kind: ItemKind::Seed, stack: 10 },
     ItemData { wire: 500, id: "grain_bale", name: "Grain Bale", kind: ItemKind::Pack, stack: 1 },
     ItemData { wire: 501, id: "preserves_crate", name: "Preserves Crate", kind: ItemKind::Pack, stack: 1 },
+    ItemData { wire: 502, id: "timber_bundle", name: "Timber Bundle", kind: ItemKind::Pack, stack: 1 },
+    ItemData { wire: 503, id: "ironwork_crate", name: "Ironwork Crate", kind: ItemKind::Pack, stack: 1 },
+    ItemData { wire: 504, id: "sailcloth_bale", name: "Sailcloth Bale", kind: ItemKind::Pack, stack: 1 },
     ItemData { wire: 600, id: "skitter_shell", name: "Skitter Shell", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 601, id: "coarse_hide", name: "Coarse Hide", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 602, id: "boar_tusk", name: "Boar Tusk", kind: ItemKind::Material, stack: 1000 },
@@ -454,6 +539,7 @@ pub static ITEMS: [ItemData; 63] = [
     ItemData { wire: 700, id: "furrow_cart", name: "Furrow Cart", kind: ItemKind::Vehicle, stack: 1 },
     ItemData { wire: 701, id: "driftpine_skiff", name: "Driftpine Skiff", kind: ItemKind::Vehicle, stack: 1 },
     ItemData { wire: 702, id: "swiftgull", name: "Swiftgull", kind: ItemKind::Vehicle, stack: 1 },
+    ItemData { wire: 710, id: "swiftgull_design", name: "Swiftgull Design", kind: ItemKind::Design, stack: 1 },
 ];
 
 /// Slots in every character's bag.
@@ -569,7 +655,7 @@ pub struct RecipeData {
 }
 
 /// Every recipe, sorted by wire, which is the index.
-pub static RECIPES: [RecipeData; 35] = [
+pub static RECIPES: [RecipeData; 40] = [
     RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
     RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
@@ -605,6 +691,11 @@ pub static RECIPES: [RecipeData; 35] = [
     RecipeData { wire: 32, id: "preserves_crate", station: 3, inputs: &[Ingredient { item: 101, count: 6 }, Ingredient { item: 40, count: 4 }, Ingredient { item: 52, count: 10 }], output: 501, output_count: 1, labor: 40, craft_s: 6.0 },
     RecipeData { wire: 33, id: "furrow_cart", station: 0, inputs: &[Ingredient { item: 41, count: 10 }, Ingredient { item: 42, count: 2 }, Ingredient { item: 53, count: 4 }], output: 700, output_count: 1, labor: 50, craft_s: 15.0 },
     RecipeData { wire: 34, id: "driftpine_skiff", station: 0, inputs: &[Ingredient { item: 40, count: 12 }, Ingredient { item: 32, count: 2 }, Ingredient { item: 52, count: 6 }], output: 701, output_count: 1, labor: 30, craft_s: 10.0 },
+    RecipeData { wire: 35, id: "timber_bundle", station: 3, inputs: &[Ingredient { item: 42, count: 4 }, Ingredient { item: 40, count: 20 }], output: 502, output_count: 1, labor: 25, craft_s: 10.0 },
+    RecipeData { wire: 36, id: "ironwork_crate", station: 3, inputs: &[Ingredient { item: 51, count: 20 }, Ingredient { item: 53, count: 4 }], output: 503, output_count: 1, labor: 25, craft_s: 10.0 },
+    RecipeData { wire: 37, id: "sailcloth_bale", station: 3, inputs: &[Ingredient { item: 33, count: 6 }, Ingredient { item: 32, count: 6 }], output: 504, output_count: 1, labor: 25, craft_s: 10.0 },
+    RecipeData { wire: 38, id: "swiftgull_design", station: 0, inputs: &[Ingredient { item: 40, count: 10 }, Ingredient { item: 33, count: 2 }, Ingredient { item: 32, count: 4 }], output: 710, output_count: 1, labor: 50, craft_s: 10.0 },
+    RecipeData { wire: 39, id: "hullmenders_kit", station: 0, inputs: &[Ingredient { item: 40, count: 4 }, Ingredient { item: 52, count: 4 }, Ingredient { item: 32, count: 1 }], output: 104, output_count: 1, labor: 10, craft_s: 4.0 },
 ];
 
 /// How close a character must stand to a station, horizontally and vertically, in metres.
@@ -748,9 +839,12 @@ pub struct PackData {
 }
 
 /// Every pack, sorted by item wire.
-pub static PACKS: [PackData; 2] = [
+pub static PACKS: [PackData; 5] = [
     PackData { item: 500, value: 15000 },
     PackData { item: 501, value: 18000 },
+    PackData { item: 502, value: 6000 },
+    PackData { item: 503, value: 6000 },
+    PackData { item: 504, value: 6000 },
 ];
 
 /// Trade post kinds (`content/trade.toml`, docs/design/trade.md).
