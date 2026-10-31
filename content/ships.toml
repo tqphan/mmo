@@ -1,11 +1,18 @@
-# Ship hulls (docs/design/ships.md). `wire` is the hull's id on the wire and in `entity.ref_id`;
-# the values must run 0, 1, 2, … with no gaps. Positions are ship-local metres: origin at the deck's
-# centre, -z the bow, +x starboard. A mount's `facing_deg` is a yaw on deck: 0 is the bow, 90 port,
-# -90 starboard. Every number is a placeholder, confidence C, except the clipper's top speed (B).
+# Vehicle hulls (docs/design/ships.md, docs/design/vehicles.md). `wire` is the hull's id on the wire
+# and in `entity.ref_id`; the values must run 0, 1, 2, … with no gaps. `medium` is `sea` or `land`,
+# and `item` the vehicle item (`items.toml`) that summons it. Positions are ship-local metres: origin
+# at the deck's centre, -z the bow, +x starboard. A mount's `facing_deg` is a yaw on deck: 0 is the
+# bow, 90 port, -90 starboard. `[hull.cannon]` is needed only with mounts, and `[[hull.slot]]`s are
+# pack slots. For land hulls `draft_m` is the deepest water they ford and `max_gradient` the
+# steepest ground they drive on. Every number is a placeholder, confidence C, except where marked B.
 
 [[hull]]
 id = "clipper"
 wire = 0
+name = "Swiftgull"
+medium = "sea"
+item = "swiftgull"
+# B
 max_speed_mps = 11.0
 astern_speed_mps = 3.0
 accel_mps2 = 1.5
@@ -37,3 +44,61 @@ facing_deg = 90.0
 x = 2.0
 z = 0.0
 facing_deg = -90.0
+
+# Two slots by the stern (the original's smallest clipper had none; docs/design/vehicles.md §3).
+[[hull.slot]]
+x = -1.0
+z = 4.5
+
+[[hull.slot]]
+x = 1.0
+z = 4.5
+
+[[hull]]
+id = "skiff"
+wire = 1
+name = "Driftpine Skiff"
+medium = "sea"
+item = "driftpine_skiff"
+# B
+max_speed_mps = 4.0
+astern_speed_mps = 1.5
+accel_mps2 = 1.0
+drift_decel_mps2 = 0.8
+turn_rate_dps = 30.0
+deck_half_width_m = 0.8
+deck_half_length_m = 2.0
+deck_height_m = 0.5
+draft_m = 0.4
+hp = 2000
+helm = [0.0, 1.5]
+
+[[hull]]
+id = "furrow_cart"
+wire = 2
+name = "Furrow Cart"
+medium = "land"
+item = "furrow_cart"
+# B, and the turn rate
+max_speed_mps = 4.0
+astern_speed_mps = 1.5
+accel_mps2 = 2.0
+drift_decel_mps2 = 4.0
+turn_rate_dps = 22.9
+deck_half_width_m = 0.9
+deck_half_length_m = 1.6
+deck_height_m = 0.9
+draft_m = 0.4
+max_gradient = 0.6
+hp = 3000
+# The driver's bench, at the front.
+helm = [0.0, -1.2]
+
+# Two packs in the bed (B).
+[[hull.slot]]
+x = -0.45
+z = 0.6
+
+[[hull.slot]]
+x = 0.45
+z = 0.6

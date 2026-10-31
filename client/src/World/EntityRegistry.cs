@@ -18,16 +18,20 @@ namespace Mmo.World
     {
         private readonly Session session;
         private readonly bool trace;
+        private readonly Func<float, float, Sim.Ground?>? ground;
         private readonly Dictionary<ulong, RemoteView> views = new();
         private readonly Dictionary<ulong, ShipView> ships = new();
         private readonly List<Gameplay.Deck> decks = new();
         /// <summary>Rows deleted this frame. A row that moves between two subscribed cells can arrive as a delete and an insert.</summary>
         private readonly HashSet<ulong> gone = new();
 
-        public EntityRegistry(Session session, bool trace)
+        /// <param name="map">The world's heights, so vehicles are predicted on the server's ground.</param>
+        public EntityRegistry(Session session, bool trace, HeightMap? map = null)
         {
             this.session = session;
             this.trace = trace;
+            if (map is not null)
+                ground = (x, z) => Sim.Terrain.Ground(map.QuadCorner, x, z);
             Name = "Entities";
             // Before the player, which runs at the default priority.
             ProcessPhysicsPriority = -1;
@@ -36,6 +40,9 @@ namespace Mmo.World
         public int Count => views.Count + ships.Count;
 
         public ShipView? Ship(ulong id) => ships.GetValueOrDefault(id);
+
+        /// <summary>Every ship and other vehicle in view.</summary>
+        public IEnumerable<ShipView> Ships => ships.Values;
 
         /// <summary>Another character or a dummy, as drawn.</summary>
         public RemoteView? View(ulong id) => views.GetValueOrDefault(id);
@@ -80,14 +87,14 @@ namespace Mmo.World
                 var e = session.Conn!.Db.Entity.Id.Find(t.EntityId);
                 if (e?.Kind == EntityKind.Ship && e.RefId < (ulong)GameContent.Hulls.Count)
                 {
-                    ship = new ShipView(t.EntityId, GameContent.Hulls[(int)e.RefId]);
+                    ship = new ShipView(t.EntityId, GameContent.Hulls[(int)e.RefId], ground);
                     ships[t.EntityId] = ship;
                     AddChild(ship);
                     ship.Push(t, Clock.Now);
                     if (session.Conn.Db.Vehicle.EntityId.Find(t.EntityId) is Vehicle v)
                         ship.SetVehicle(v, Clock.Now);
                     ship.Place(Clock.Now);
-                    session.Log($"sees ship {t.EntityId} ({ship.Hull.Id}) at ({t.X:F1}, {t.Z:F1})");
+                    session.Log($"sees ship {t.EntityId} ({ship.Hull.Name}) at ({t.X:F1}, {t.Z:F1})");
                     return;
                 }
                 view = new RemoteView(t.EntityId, e?.Kind ?? EntityKind.Character, e?.RefId ?? 0);

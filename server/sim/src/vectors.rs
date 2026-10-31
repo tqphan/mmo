@@ -66,6 +66,8 @@ pub fn generate() -> String {
          # land_tax <plot wire> <plots owned> <seals a week, or none>\n\
          # farm_growth <crop wire> <ideal: 1 or 0> <from> <ripe at> <regrown at, or none> <withers at, or none>\n\
          # farm_stage <crop wire> <grown from> <ripe at> <now> <stage: 0 growing, 1 ripe, 2 withered> <progress>\n\
+         # ground <x> <z> <lo> <hi> <gradient>, or none, on the land_ vectors' ground\n\
+         # vehicle_stand <hull> <x> <z> <yaw> <deck height, or none>, on the land_ vectors' ground\n\
          # farm_spot <crop wire> <x> <z> <plots as x0:z0:x1:z1:tend, comma-separated, or -> <plantings as x:z:space, or -> <ok:y:plot index or -:ideal, or the error code>, on the land_ vectors' ground\n\
          # trade_reach <thing x y z> <at x y z> <1 or 0>\n\
          # trade_demand <permille> <at> <now> <demand now> <after a sale>\n\
@@ -481,6 +483,31 @@ fn land(out: &mut String, rng: &mut Lcg) {
         }
     }
     farm(out, rng, &mut land, &mut heights);
+    vehicles(out, rng, &mut heights);
+}
+
+/// `sim::terrain::ground` and `sim::ship::stand` for land hulls, for the client's port, on the land
+/// vectors' ground.
+fn vehicles(out: &mut String, rng: &mut Lcg, heights: &mut terrain::FileChunks) {
+    use ship::{Hull, Motion};
+    for _ in 0..60 {
+        let (x, z) = (rng.range(-4.0, 132.0), rng.range(-4.0, 132.0));
+        let text = match terrain::ground(heights, x, z) {
+            Some(g) => format!("{} {} {}", f(g.lo), f(g.hi), f(g.gradient)),
+            None => "none".to_string(),
+        };
+        out.push_str(&format!("ground {} {} {text}\n", f(x), f(z)));
+    }
+    let mut seen = [0usize; 2];
+    for k in 0..200 {
+        let hull = if k % 4 == 3 { Hull::Skiff } else { Hull::FurrowCart };
+        let m = Motion { x: rng.range(-2.0, 130.0), z: rng.range(-2.0, 130.0), yaw: rng.range(0.0, std::f32::consts::TAU), speed: 0.0 };
+        let got = ship::stand(hull.data(), &m, |x, z| terrain::ground(heights, x, z));
+        seen[usize::from(got.is_some())] += 1;
+        let text = got.map_or("none".to_string(), f);
+        out.push_str(&format!("vehicle_stand {} {} {} {} {text}\n", hull as u8, f(m.x), f(m.z), f(m.yaw)));
+    }
+    assert!(seen.iter().all(|&n| n > 10), "both outcomes are covered: {seen:?}");
 }
 
 /// `sim::farm`'s growth, stages and spot checks, for the client's port, on the land vectors' ground.

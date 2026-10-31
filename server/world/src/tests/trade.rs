@@ -237,7 +237,7 @@ fn dropping_is_refused_aboard_and_swimming() {
         let p = ctx.db.presence().identity().find(identity(1)).unwrap();
         ctx.db.presence().identity().update(Presence { mode: 1, parent: 7, ..p });
     });
-    assert_eq!(call(&t, 1, drop_pack), Err("can't drop a pack on a ship yet".into()));
+    assert_eq!(call(&t, 1, drop_pack), Err("load it into a pack slot instead".into()));
 }
 
 #[test]

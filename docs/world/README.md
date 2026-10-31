@@ -94,6 +94,9 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | NPC: beast | Ashwing Drone | A fist-sized ember-winged wasp with a burning sting (`ashwing_drone`) |
 | NPC: people | Wreck Captain | The brigands' leader, with a grapeshot pistol and a heavy cleaver (`wreck_captain`) |
 | Item: trophy | Skitter Shell, Coarse Hide, Boar Tusk, Fen Gland, Wolf Fang, Brigand's Token, Brine Pearl, Stalker Claw, Mossback Scute, Ashwing Venom, Captain's Compass | Dropped by NPCs; no recipes yet (`skitter_shell`, `coarse_hide`, `boar_tusk`, `fen_gland`, `wolf_fang`, `brigands_token`, `brine_pearl`, `stalker_claw`, `mossback_scute`, `ashwing_venom`, `captains_compass`) |
+| Vehicle | Furrow Cart | A farm cart with room for two packs in its bed (`furrow_cart`, item and hull) |
+| Vehicle | Driftpine Skiff | A small rowing boat for two (`driftpine_skiff`; hull `skiff`) |
+| Vehicle | Swiftgull | The fast, light sailing ship with a cannon on each side (`swiftgull`; hull `clipper`) |
 | Dev target | Straw Dummy | A practice target on a post, dev builds only |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

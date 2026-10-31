@@ -23,6 +23,11 @@ pub const RAIL_M: f32 = 1.5;
 pub const REACH_M: f32 = 2.5;
 /// How far a client's view of a ship may lag the server's, allowed for when changing frame.
 pub const POSE_LAG_S: f32 = 0.5;
+/// A summoned vehicle's stern lands this far ahead of its owner (docs/design/vehicles.md).
+pub const SUMMON_GAP_M: f32 = 1.5;
+/// How close to a pack slot's point a character must be to load or unload it, horizontally and
+/// vertically.
+pub const CARGO_REACH_M: f32 = 3.0;
 
 /// Where a ship is: the centre of its deck in world coordinates, and its yaw.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -72,8 +77,15 @@ pub struct Motion {
 }
 
 impl Motion {
+    /// The pose of a ship afloat: its deck at sea level plus the deck's height. A land hull's deck
+    /// height comes from `stand` instead (`pose_at`).
     pub fn pose(&self, hull: &HullData) -> Pose {
-        Pose { x: self.x, y: SEA_LEVEL_M + hull.deck_height_m, z: self.z, yaw: self.yaw }
+        self.pose_at(SEA_LEVEL_M + hull.deck_height_m)
+    }
+
+    /// The pose with the deck at height `y`.
+    pub fn pose_at(&self, y: f32) -> Pose {
+        Pose { x: self.x, y, z: self.z, yaw: self.yaw }
     }
 }
 
@@ -137,6 +149,48 @@ pub fn afloat(hull: &HullData, m: &Motion, mut ground: impl FnMut(f32, f32) -> O
         let [x, _, z] = pose.to_world([0.0, 0.0, lz]);
         ground(x, z).is_none_or(|g| g.hi <= floor)
     })
+}
+
+/// Where a hull can be with motion `m`, as its deck's height, or `None` where it can't
+/// (docs/design/vehicles.md). A sea hull must be `afloat`, and its deck is at sea level plus its
+/// height. A land hull must stand on known ground at its bow, centre and stern: no deeper than its
+/// ford (`draft_m`) under the sea, no steeper than `max_gradient`, and rising no more than that
+/// from stern to bow; its deck is the centre's higher triangulation plus its height.
+pub fn stand(hull: &HullData, m: &Motion, mut ground: impl FnMut(f32, f32) -> Option<Ground>) -> Option<f32> {
+    if !hull.land {
+        return afloat(hull, m, ground).then_some(SEA_LEVEL_M + hull.deck_height_m);
+    }
+    let pose = m.pose_at(0.0);
+    let l = hull.deck_half_length_m;
+    let mut his = [0.0f32; 3];
+    for (k, lz) in [-l, 0.0, l].into_iter().enumerate() {
+        let [x, _, z] = pose.to_world([0.0, 0.0, lz]);
+        let g = ground(x, z)?;
+        if g.hi < SEA_LEVEL_M - hull.draft_m || g.gradient > hull.max_gradient {
+            return None;
+        }
+        his[k] = g.hi;
+    }
+    ((his[0] - his[2]).abs() <= hull.max_gradient * 2.0 * l).then_some(his[1] + hull.deck_height_m)
+}
+
+/// Where a vehicle summoned by a character standing at `at` (world) and facing `yaw` is put: facing
+/// the same way, its stern `SUMMON_GAP_M` ahead. At rest.
+pub fn summon_motion(hull: &HullData, at: [f32; 3], yaw: f32) -> Motion {
+    let [fx, fz] = facing(yaw);
+    let ahead = hull.deck_half_length_m + SUMMON_GAP_M;
+    Motion { x: at[0] + fx * ahead, z: at[2] + fz * ahead, yaw: yaw.rem_euclid(TAU), speed: 0.0 }
+}
+
+/// A pack slot's point in world coordinates: on the deck at the slot.
+pub fn slot_point(hull: &HullData, pose: &Pose, slot: usize) -> Option<[f32; 3]> {
+    hull.slots.get(slot).map(|s| pose.to_world([s.x, 0.0, s.z]))
+}
+
+/// Whether a character at `at` (world) can reach a slot at `point` (world).
+pub fn cargo_reach(point: [f32; 3], at: [f32; 3]) -> bool {
+    let h = ((point[0] - at[0]).powi(2) + (point[2] - at[2]).powi(2)).sqrt();
+    h <= CARGO_REACH_M && (point[1] - at[1]).abs() <= CARGO_REACH_M
 }
 
 /// Whether a ship-local point is on the deck rectangle grown by `margin`.
@@ -407,5 +461,70 @@ mod tests {
         assert!(hits(h, &pose, [0.0, 0.0, 4.4]));
         assert!(!hits(h, &pose, [0.0, 0.0, 4.6]));
         assert!(!hits(h, &pose, [11.5, 0.0, 0.0]));
+    }
+
+    fn cart() -> &'static HullData {
+        Hull::FurrowCart.data()
+    }
+
+    /// Ground of the plane `height(x, z)`, its gradient `slope`, known within 100 m of the origin.
+    fn plane(height: impl Fn(f32, f32) -> f32, slope: f32) -> impl FnMut(f32, f32) -> Option<Ground> {
+        move |x, z| (x.abs() < 100.0 && z.abs() < 100.0).then(|| Ground { lo: height(x, z), hi: height(x, z), gradient: slope })
+    }
+
+    #[test]
+    fn a_cart_stands_on_gentle_known_ground_with_its_deck_on_the_centre() {
+        let at = Motion { x: 10.0, z: 5.0, yaw: 0.3, speed: 0.0 };
+        let y = stand(cart(), &at, plane(|x, _| 2.0 + x * 0.1, 0.1)).unwrap();
+        assert!(close(y, 2.0 + 1.0 + cart().deck_height_m, 1e-5), "{y}");
+    }
+
+    #[test]
+    fn unknown_ground_deep_water_and_steep_ground_stop_a_cart() {
+        let h = cart();
+        let edge = Motion { x: 99.0, z: 0.0, yaw: FRAC_PI_2, speed: 0.0 };
+        assert_eq!(stand(h, &edge, plane(|_, _| 2.0, 0.0)), None, "its bow is past the known ground");
+        let at = Motion { x: 0.0, z: 0.0, yaw: 0.0, speed: 0.0 };
+        assert!(stand(h, &at, plane(|_, _| -0.39, 0.0)).is_some(), "fords shallow water");
+        assert_eq!(stand(h, &at, plane(|_, _| -0.41, 0.0)), None, "too deep to ford");
+        assert_eq!(stand(h, &at, plane(|_, _| 2.0, 0.61)), None, "too steep under a wheel");
+        // A step between bow and stern that each wheel stands level on.
+        let step = |_: f32, z: f32| if z < 0.0 { 4.0 } else { 2.0 };
+        assert_eq!(stand(h, &at, plane(step, 0.0)), None, "too steep a rise from stern to bow");
+        assert!(stand(h, &at, plane(|_, z| 2.0 - z * 0.5, 0.0)).is_some(), "a rise within the limit");
+    }
+
+    #[test]
+    fn sea_hulls_stand_where_afloat() {
+        let at = Motion { x: 0.0, z: 0.0, yaw: 0.0, speed: 0.0 };
+        assert_eq!(stand(clipper(), &at, plane(|_, _| -5.0, 0.0)), Some(SEA_LEVEL_M + clipper().deck_height_m));
+        assert_eq!(stand(clipper(), &at, plane(|_, _| -1.0, 0.0)), None);
+        assert!(stand(Hull::Skiff.data(), &at, plane(|_, _| -1.0, 0.0)).is_some(), "the skiff draws less");
+        assert!(stand(clipper(), &at, |_, _| None).is_some(), "unknown terrain is deep water");
+    }
+
+    #[test]
+    fn summoned_vehicles_face_ahead_of_their_owner() {
+        let h = cart();
+        let m = summon_motion(h, [10.0, 3.0, 10.0], FRAC_PI_2);
+        // Facing -x: the centre is half a length plus the gap toward -x, and the stern toward us.
+        assert!(close(m.x, 10.0 - h.deck_half_length_m - SUMMON_GAP_M, 1e-5) && close(m.z, 10.0, 1e-5), "{m:?}");
+        let stern = m.pose_at(0.0).to_world([0.0, 0.0, h.deck_half_length_m]);
+        assert!(close(stern[0], 10.0 - SUMMON_GAP_M, 1e-4), "{stern:?}");
+        assert_eq!(m.speed, 0.0);
+        assert!(close(summon_motion(h, [0.0; 3], -FRAC_PI_2).yaw, 3.0 * FRAC_PI_2, 1e-5));
+    }
+
+    #[test]
+    fn slots_have_world_points_in_reach() {
+        let h = clipper();
+        let pose = Pose { x: 100.0, y: 2.0, z: 0.0, yaw: PI };
+        let p = slot_point(h, &pose, 0).unwrap();
+        assert!(close(p[0], 101.0, 1e-4) && close(p[1], 2.0, 1e-6) && close(p[2], -4.5, 1e-4), "{p:?}");
+        assert_eq!(slot_point(h, &pose, 2), None);
+        assert_eq!(slot_point(Hull::Skiff.data(), &pose, 0), None, "the skiff has no slots");
+        assert!(cargo_reach(p, [102.5, 2.0, -6.0]));
+        assert!(!cargo_reach(p, [104.5, 2.0, -4.5]), "too far across");
+        assert!(!cargo_reach(p, [101.0, -1.5, -4.5]), "too far below, in the water");
     }
 }

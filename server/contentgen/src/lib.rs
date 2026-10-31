@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 12";
+const FORMAT: &str = "contentgen 13";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -26,7 +26,7 @@ const MAX_STACK: u32 = 10_000;
 const MAX_BAG_SLOTS: u16 = 150;
 const MAX_ITEM_NAME: usize = 40;
 /// Item kinds, in wire order. Code depends on them, so they're fixed here rather than in content.
-pub const ITEM_KINDS: [&str; 6] = ["material", "consumable", "gear", "deed", "seed", "pack"];
+pub const ITEM_KINDS: [&str; 7] = ["material", "consumable", "gear", "deed", "seed", "pack", "vehicle"];
 /// Resource node kinds, in wire order, fixed here like the item kinds.
 pub const NODE_KINDS: [&str; 3] = ["plant", "ore", "tree"];
 /// Crop kinds, in wire order, fixed here like the item kinds (docs/design/farming.md).
@@ -119,6 +119,11 @@ struct ShipsFile {
 pub struct HullDef {
     pub id: String,
     pub wire: u8,
+    pub name: String,
+    /// `sea` or `land` (`HULL_MEDIA`).
+    pub medium: String,
+    /// The vehicle item that summons it, an id from `items.toml`.
+    pub item: String,
     pub max_speed_mps: f32,
     pub astern_speed_mps: f32,
     pub accel_mps2: f32,
@@ -128,13 +133,52 @@ pub struct HullDef {
     pub deck_half_length_m: f32,
     pub deck_height_m: f32,
     pub draft_m: f32,
+    /// Land hulls only: the steepest ground they drive on, rise over run.
+    #[serde(default)]
+    pub max_gradient: f32,
     pub hp: i32,
     /// Ship-local `[x, z]`.
     pub helm: [f32; 2],
-    pub cannon: CannonDef,
+    /// Needed only with mounts.
+    pub cannon: Option<CannonDef>,
     #[serde(default)]
     pub mount: Vec<MountDef>,
+    #[serde(default)]
+    pub slot: Vec<SlotDef>,
 }
+
+impl HullDef {
+    /// The hull's cannon, or an inert one for a hull without mounts.
+    fn cannon(&self) -> CannonDef {
+        self.cannon.clone().unwrap_or(CannonDef {
+            muzzle_speed_mps: 0.0,
+            muzzle_height_m: 0.0,
+            arc_deg: 0.0,
+            min_pitch_deg: 0.0,
+            max_pitch_deg: 0.0,
+            reload_s: 0.0,
+            damage: 0,
+            splash_m: 0.0,
+        })
+    }
+
+    fn land(&self) -> bool {
+        self.medium == "land"
+    }
+}
+
+/// A pack slot on deck (docs/design/vehicles.md).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SlotDef {
+    pub x: f32,
+    pub z: f32,
+}
+
+/// What a hull's `medium` may be.
+pub const HULL_MEDIA: [&str; 2] = ["sea", "land"];
+/// More pack slots than this on one hull is a typo.
+pub const MAX_SLOTS: usize = 8;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -749,7 +793,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     combat.status.sort_by_key(|s| s.wire);
     npcs.kind.sort_by_key(|k| k.wire);
     check_move_modes(&modes, &mut errors);
-    check_hulls(&hulls, &mut errors);
+    check_hulls(&hulls, &items.item, &mut errors);
     check_land(&land, &items.item, &mut errors);
     check_labor(&labor, &mut errors);
     check_items(&items, &mut errors);
@@ -835,11 +879,33 @@ fn check_move_modes(modes: &[MoveModeDef], errors: &mut Vec<String>) {
     }
 }
 
-fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
+fn check_hulls(hulls: &[HullDef], items: &[ItemDef], errors: &mut Vec<String>) {
     check_ids("ships.toml", "hull", hulls.iter().map(|h| (h.id.as_str(), usize::from(h.wire))), errors);
+    let mut summons = std::collections::HashSet::new();
     for h in hulls {
         let at = format!("ships.toml: hull {:?}", h.id);
         let e = &mut *errors;
+        if !is_item_name(&h.name) {
+            e.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        let land = h.medium == "land";
+        if !HULL_MEDIA.contains(&h.medium.as_str()) {
+            e.push(format!("{at}: medium must be one of {}", HULL_MEDIA.join(", ")));
+        }
+        match items.iter().find(|i| i.id == h.item) {
+            None => e.push(format!("{at}: unknown item {:?}", h.item)),
+            Some(i) if i.kind != "vehicle" => e.push(format!("{at}: {:?} isn't of kind \"vehicle\"", h.item)),
+            Some(_) if !summons.insert(h.item.as_str()) => e.push(format!("{at}: {:?} already summons another hull", h.item)),
+            Some(_) => {}
+        }
+        if land {
+            check_range(&at, "max_gradient", h.max_gradient, f32::MIN_POSITIVE, 2.0, e);
+            if !h.mount.is_empty() {
+                e.push(format!("{at}: land hulls have no mounts"));
+            }
+        } else if h.max_gradient != 0.0 {
+            e.push(format!("{at}: max_gradient is for land hulls only"));
+        }
         // Every positive quantity starts just above 0.
         let tiny = f32::MIN_POSITIVE;
         check_range(&at, "max_speed_mps", h.max_speed_mps, tiny, MAX_SPEED_LIMIT_MPS, e);
@@ -858,7 +924,20 @@ fn check_hulls(hulls: &[HullDef], errors: &mut Vec<String>) {
         if !on_deck(h.helm[0], h.helm[1]) {
             e.push(format!("{at}: the helm must be on the deck"));
         }
-        let c = &h.cannon;
+        if h.slot.len() > MAX_SLOTS {
+            e.push(format!("{at}: at most {MAX_SLOTS} slots"));
+        }
+        for (i, sl) in h.slot.iter().enumerate() {
+            if !on_deck(sl.x, sl.z) {
+                e.push(format!("{at}: slot {i} must be on the deck"));
+            }
+        }
+        let Some(c) = &h.cannon else {
+            if !h.mount.is_empty() {
+                e.push(format!("{at}: mounts need a [hull.cannon]"));
+            }
+            continue;
+        };
         check_range(&at, "cannon.muzzle_speed_mps", c.muzzle_speed_mps, tiny, 200.0, e);
         check_range(&at, "cannon.muzzle_height_m", c.muzzle_height_m, 0.0, 10.0, e);
         check_range(&at, "cannon.arc_deg", c.arc_deg, 0.0, 180.0, e);
@@ -1003,8 +1082,8 @@ fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
         }
         if !(1..=MAX_STACK).contains(&it.stack) {
             errors.push(format!("{at}: stack must be from 1 to {MAX_STACK}"));
-        } else if it.kind == "gear" && it.stack != 1 {
-            errors.push(format!("{at}: gear doesn't stack (stack = 1)"));
+        } else if ["gear", "pack", "vehicle"].contains(&it.kind.as_str()) && it.stack != 1 {
+            errors.push(format!("{at}: {} items don't stack (stack = 1)", it.kind));
         }
     }
 }
@@ -1514,8 +1593,8 @@ fn canonical(c: &Content) -> String {
         writeln!(s, "move_mode\t{}\t{}\t{:08x}", m.id, m.wire, m.max_speed_mps.to_bits()).unwrap();
     }
     for h in &c.hulls {
-        write!(s, "hull\t{}\t{}", h.id, h.wire).unwrap();
-        for f in hull_fields(h).iter().chain(&cannon_fields(&h.cannon)) {
+        write!(s, "hull\t{}\t{}\t{}\t{}\t{}", h.id, h.wire, h.name, h.medium, h.item).unwrap();
+        for f in hull_fields(h).iter().chain(&cannon_fields(&h.cannon())) {
             write!(s, "\t{}", f.value.bits()).unwrap();
         }
         s += "\n";
@@ -1525,6 +1604,9 @@ fn canonical(c: &Content) -> String {
                 write!(s, "\t{}", f.value.bits()).unwrap();
             }
             s += "\n";
+        }
+        for sl in &h.slot {
+            writeln!(s, "slot\t{:08x}\t{:08x}", sl.x.to_bits(), sl.z.to_bits()).unwrap();
         }
     }
     for u in &c.land_uses {
@@ -1771,7 +1853,8 @@ fn hull_fields(h: &HullDef) -> Vec<Field> {
         f("deck_half_width_m", "Half the deck's width (ship-local x), m.", F32(h.deck_half_width_m)),
         f("deck_half_length_m", "Half the deck's length (ship-local z), m.", F32(h.deck_half_length_m)),
         f("deck_height_m", "The deck's height above the water, m.", F32(h.deck_height_m)),
-        f("draft_m", "Depth below the water, m. Shallower water stops the ship.", F32(h.draft_m)),
+        f("draft_m", "Depth below the water, m. Shallower water stops the ship. For land hulls, the deepest water they ford.", F32(h.draft_m)),
+        f("max_gradient", "Land hulls: the steepest ground they drive on, rise over run. 0 for sea hulls.", F32(h.max_gradient)),
         f("hp", "Hit points when built.", I32(h.hp)),
         f("helm_x", "The helm's ship-local x, m.", F32(h.helm[0])),
         f("helm_z", "The helm's ship-local z, m.", F32(h.helm[1])),
@@ -1963,25 +2046,43 @@ pub fn render_rust(c: &Content) -> String {
     }
     s += "}\n\n";
     s += "#[derive(Debug, PartialEq)]\npub struct CannonData {\n";
-    rust_struct_fields(&mut s, &cannon_fields(&first.cannon));
+    rust_struct_fields(&mut s, &cannon_fields(&first.cannon()));
     s += "}\n\n";
     s += "/// A cannon's place on deck.\n#[derive(Debug, PartialEq)]\npub struct Mount {\n";
     rust_struct_fields(&mut s, &mount_fields(&MountDef { x: 0.0, z: 0.0, facing_deg: 0.0 }));
     s += "}\n\n";
+    s += "/// A pack slot's place on deck.\n#[derive(Debug, PartialEq)]\npub struct PackSlot {\n";
+    s += "    /// Ship-local x, m.\n    pub x: f32,\n    /// Ship-local z, m.\n    pub z: f32,\n}\n\n";
     s += "#[derive(Debug, PartialEq)]\npub struct HullData {\n";
-    s += "    pub hull: Hull,\n    pub id: &'static str,\n";
+    s += "    pub hull: Hull,\n    pub id: &'static str,\n    pub name: &'static str,\n";
+    s += "    /// Drives on land (`medium = \"land\"`) rather than sailing.\n    pub land: bool,\n";
+    s += "    /// The wire of the vehicle item that summons it.\n    pub item: u16,\n";
     rust_struct_fields(&mut s, &hull_fields(first));
-    s += "    pub cannon: CannonData,\n    pub mounts: &'static [Mount],\n}\n\n";
+    s += "    /// Inert (all zero) for a hull without mounts.\n    pub cannon: CannonData,\n    pub mounts: &'static [Mount],\n";
+    s += "    /// Pack slots, in order (docs/design/vehicles.md).\n    pub slots: &'static [PackSlot],\n}\n\n";
     writeln!(s, "pub static HULLS: [HullData; {}] = [", c.hulls.len()).unwrap();
     for h in &c.hulls {
-        writeln!(s, "    HullData {{\n        hull: Hull::{},\n        id: {:?},", pascal(&h.id), h.id).unwrap();
+        writeln!(
+            s,
+            "    HullData {{\n        hull: Hull::{},\n        id: {:?},\n        name: {:?},\n        land: {},\n        item: {},",
+            pascal(&h.id),
+            h.id,
+            h.name,
+            h.land(),
+            c.item_wire(&h.item)
+        )
+        .unwrap();
         for f in hull_fields(h) {
             writeln!(s, "        {}: {},", f.name, f.value.rust()).unwrap();
         }
-        writeln!(s, "        cannon: CannonData {{ {} }},", rust_values(&cannon_fields(&h.cannon))).unwrap();
+        writeln!(s, "        cannon: CannonData {{ {} }},", rust_values(&cannon_fields(&h.cannon()))).unwrap();
         s += "        mounts: &[\n";
         for m in &h.mount {
             writeln!(s, "            Mount {{ {} }},", rust_values(&mount_fields(m))).unwrap();
+        }
+        s += "        ],\n        slots: &[\n";
+        for sl in &h.slot {
+            writeln!(s, "            PackSlot {{ x: {:?}, z: {:?} }},", sl.x, sl.z).unwrap();
         }
         s += "        ],\n    },\n";
     }
@@ -1991,6 +2092,8 @@ pub fn render_rust(c: &Content) -> String {
     s += "        HULLS.get(usize::from(v)).map(|d| d.hull)\n    }\n\n";
     s += "    pub fn data(self) -> &'static HullData {\n";
     s += "        &HULLS[self as usize]\n    }\n}\n\n";
+    s += "/// The hull a vehicle item summons.\n";
+    s += "pub fn hull_of_item(item: u16) -> Option<&'static HullData> {\n    HULLS.iter().find(|h| h.item == item)\n}\n\n";
 
     s += "/// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant\n";
     s += "/// is the wire value.\n";
@@ -2503,13 +2606,16 @@ pub fn render_csharp(c: &Content) -> String {
         writeln!(s, "        {} = {},", pascal(&h.id), h.wire).unwrap();
     }
     s += "    }\n\n";
-    let cannon = cannon_fields(&first.cannon);
+    let cannon = cannon_fields(&first.cannon());
     csharp_param_docs(&mut s, &cannon);
     writeln!(s, "    public sealed record CannonData({});\n", csharp_params(&cannon)).unwrap();
     let mount = mount_fields(&MountDef { x: 0.0, z: 0.0, facing_deg: 0.0 });
     s += "    /// <summary>A cannon's place on deck.</summary>\n";
     csharp_param_docs(&mut s, &mount);
     writeln!(s, "    public sealed record Mount({});\n", csharp_params(&mount)).unwrap();
+    s += "    /// <summary>A pack slot's place on deck (docs/design/vehicles.md).</summary>\n";
+    s += "    /// <param name=\"X\">Ship-local x, m.</param>\n    /// <param name=\"Z\">Ship-local z, m.</param>\n";
+    s += "    public sealed record PackSlot(float X, float Z);\n\n";
     s += "    /// <summary>Land-use classes (content/land.toml): the low 4 bits of a land-use texel. The value is the wire value.</summary>\n";
     s += "    public enum LandUse : byte\n    {\n";
     for u in &c.land_uses {
@@ -2678,10 +2784,13 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"Wire\">Stored in shrine rows.</param>\n";
     s += "    public sealed record ShrineData(byte Wire, string Id, string Name);\n\n";
     let hull = hull_fields(first);
+    s += "    /// <param name=\"Land\">Drives on land rather than sailing.</param>\n";
+    s += "    /// <param name=\"Item\">The wire of the vehicle item that summons it.</param>\n";
     csharp_param_docs(&mut s, &hull);
+    s += "    /// <param name=\"Cannon\">Inert (all zero) for a hull without mounts.</param>\n";
     writeln!(
         s,
-        "    public sealed record HullData(Hull Hull, string Id, {}, CannonData Cannon, IReadOnlyList<Mount> Mounts);\n",
+        "    public sealed record HullData(Hull Hull, string Id, string Name, bool Land, ushort Item, {}, CannonData Cannon, IReadOnlyList<Mount> Mounts, IReadOnlyList<PackSlot> Slots);\n",
         csharp_params(&hull)
     )
     .unwrap();
@@ -2699,19 +2808,27 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        public static readonly IReadOnlyList<HullData> Hulls = new HullData[]\n        {\n";
     for h in &c.hulls {
         let mounts: Vec<String> = h.mount.iter().map(|m| format!("new({})", csharp_values(&mount_fields(m)))).collect();
+        let slots: Vec<String> = h.slot.iter().map(|sl| format!("new({:?}f, {:?}f)", sl.x, sl.z)).collect();
         writeln!(
             s,
-            "            new(Hull.{}, {:?}, {}, new CannonData({}), new Mount[] {{ {} }}),",
+            "            new(Hull.{}, {:?}, {:?}, {}, {}, {}, new CannonData({}), new Mount[] {{ {} }}, new PackSlot[] {{ {} }}),",
             pascal(&h.id),
             h.id,
+            h.name,
+            if h.land() { "true" } else { "false" },
+            c.item_wire(&h.item),
             csharp_values(&hull_fields(h)),
-            csharp_values(&cannon_fields(&h.cannon)),
-            mounts.join(", ")
+            csharp_values(&cannon_fields(&h.cannon())),
+            mounts.join(", "),
+            slots.join(", ")
         )
         .unwrap();
     }
     s += "        };\n\n";
     s += "        public static HullData Data(this Hull hull) => Hulls[(int)hull];\n\n";
+    s += "        /// <summary>The hull a vehicle item summons, if it is a vehicle item.</summary>\n";
+    s += "        public static HullData? HullOfItem(ushort item)\n        {\n";
+    s += "            foreach (var h in Hulls)\n                if (h.Item == item)\n                    return h;\n            return null;\n        }\n\n";
     s += "        public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]\n        {\n";
     for u in &c.land_uses {
         writeln!(s, "            new(LandUse.{}, {:?}, {}, {}),", pascal(&u.id), u.id, u.buildable, u.plantable).unwrap();
@@ -3024,6 +3141,9 @@ mod tests {
         [[hull]]
         id = "clipper"
         wire = 0
+        name = "Swiftgull"
+        medium = "sea"
+        item = "swiftgull"
         max_speed_mps = 11.0
         astern_speed_mps = 3.0
         accel_mps2 = 1.5
@@ -3116,6 +3236,20 @@ mod tests {
     const ITEMS: &str = r#"
         [bag]
         slots = 50
+
+        [[item]]
+        wire = 702
+        id = "swiftgull"
+        name = "Swiftgull"
+        kind = "vehicle"
+        stack = 1
+
+        [[item]]
+        wire = 700
+        id = "furrow_cart"
+        name = "Furrow Cart"
+        kind = "vehicle"
+        stack = 1
 
         [[item]]
         wire = 20
@@ -3658,7 +3792,7 @@ mod tests {
         let c = parse_ships(SHIPS).unwrap();
         let h = &c.hulls[0];
         assert_eq!((h.id.as_str(), h.max_speed_mps, h.hp, h.helm), ("clipper", 11.0, 12000, [0.0, 7.5]));
-        assert_eq!(h.cannon.damage, 1500);
+        assert_eq!(h.cannon().damage, 1500);
         assert_eq!(h.mount, [MountDef { x: -2.0, z: 0.0, facing_deg: 90.0 }, MountDef { x: 2.0, z: 0.0, facing_deg: -90.0 }]);
     }
 
@@ -3723,8 +3857,71 @@ mod tests {
         assert!(rs.contains("Clipper = 0,") && cs.contains("Clipper = 0,"));
         assert!(rs.contains("max_speed_mps: 11.0,"));
         assert!(rs.contains("Mount { x: 2.0, z: 0.0, facing_deg: -90.0 },"));
-        assert!(cs.contains(r#"new(Hull.Clipper, "clipper", 11.0f,"#));
-        assert!(cs.contains("new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }"));
+        assert!(rs.contains("name: \"Swiftgull\",\n        land: false,\n        item: 702,"), "{rs}");
+        assert!(cs.contains(r#"new(Hull.Clipper, "clipper", "Swiftgull", false, 702, 11.0f,"#), "{cs}");
+        assert!(cs.contains("new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }, new PackSlot[] {  }"), "{cs}");
+    }
+
+    /// A land hull, after the clipper in `SHIPS`.
+    const CART: &str = r#"
+        [[hull]]
+        id = "furrow_cart"
+        wire = 1
+        name = "Furrow Cart"
+        medium = "land"
+        item = "furrow_cart"
+        max_speed_mps = 4.0
+        astern_speed_mps = 1.5
+        accel_mps2 = 2.0
+        drift_decel_mps2 = 4.0
+        turn_rate_dps = 22.9
+        deck_half_width_m = 0.9
+        deck_half_length_m = 1.6
+        deck_height_m = 0.9
+        draft_m = 0.4
+        max_gradient = 0.6
+        hp = 3000
+        helm = [0.0, -1.2]
+
+        [[hull.slot]]
+        x = -0.45
+        z = 0.6
+    "#;
+
+    #[test]
+    fn land_hulls_and_slots_parse_and_reach_both_outputs() {
+        let ships = format!("{SHIPS}\n{CART}");
+        let c = parse_ships(&ships).unwrap();
+        let h = &c.hulls[1];
+        assert!(h.land() && h.cannon.is_none() && h.slot == [SlotDef { x: -0.45, z: 0.6 }]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("land: true,\n        item: 700,") && rs.contains("max_gradient: 0.6,"), "{rs}");
+        assert!(rs.contains("slots: &[\n            PackSlot { x: -0.45, z: 0.6 },"), "{rs}");
+        assert!(rs.contains("cannon: CannonData { muzzle_speed_mps: 0.0,"), "{rs}");
+        assert!(cs.contains(r#"new(Hull.FurrowCart, "furrow_cart", "Furrow Cart", true, 700, 4.0f,"#), "{cs}");
+        assert!(cs.contains("new PackSlot[] { new(-0.45f, 0.6f) }"), "{cs}");
+        let a = c.hash;
+        for changed in [ships.replace("z = 0.6", "z = 0.7"), ships.replace("max_gradient = 0.6", "max_gradient = 0.5"), ships.replace("\"Furrow Cart\"", "\"Furrow Wain\"")] {
+            assert_ne!(parse_ships(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_vehicle_hulls_are_reported() {
+        let ships = format!("{SHIPS}\n{CART}");
+        let bad = ships
+            .replace("medium = \"land\"", "medium = \"air\"")
+            .replace("item = \"furrow_cart\"", "item = \"swiftgull\"")
+            .replace("x = -0.45", "x = -3.0");
+        let e = ship_errors(&bad);
+        for want in ["medium must be one of sea, land", "already summons another hull", "slot 0 must be on the deck", "max_gradient is for land hulls only"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = ship_errors(&ships.replace("item = \"furrow_cart\"", "item = \"driftpine_log\"").replace("max_gradient = 0.6", "max_gradient = 0.0"));
+        assert!(e.contains("isn't of kind \"vehicle\"") && e.contains("max_gradient must be"), "{e}");
+        let e = ship_errors(&format!("{ships}\n[[hull.mount]]\nx = 0.0\nz = 0.0\nfacing_deg = 90.0\n"));
+        assert!(e.contains("land hulls have no mounts") && e.contains("mounts need a [hull.cannon]"), "{e}");
+        assert!(ship_errors(&SHIPS.replace("item = \"swiftgull\"", "item = \"nothing\"")).contains("unknown item"));
     }
 
     #[test]
@@ -3878,11 +4075,11 @@ mod tests {
     #[test]
     fn items_parse_in_wire_order_and_reach_both_outputs() {
         let c = parse_items(ITEMS).unwrap();
-        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401, 500, 501]);
+        assert_eq!(c.items.iter().map(|i| i.wire).collect::<Vec<_>>(), [3, 20, 300, 301, 400, 401, 500, 501, 700, 702]);
         assert_eq!(c.bag.slots, 50);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
-        assert!(rs.contains("pub static ITEMS: [ItemData; 8] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("pub static ITEMS: [ItemData; 10] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
         assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
@@ -3922,7 +4119,7 @@ mod tests {
             .replace("stack = 1\n", "stack = 5\n")
             .replace("slots = 50", "slots = 151");
         let e = item_errors(&bad);
-        for want in ["wire 0 is reserved", "kind must be one of material, consumable, gear, deed", "gear doesn't stack", "bag.slots must be"] {
+        for want in ["wire 0 is reserved", "kind must be one of material, consumable, gear, deed", "gear items don't stack", "bag.slots must be"] {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
         let twin = format!("{ITEMS}\n[[item]]\nwire = 20\nid = \"driftpine_log\"\nname = \"Driftpine Log\"\nkind = \"material\"\nstack = 1000\n");

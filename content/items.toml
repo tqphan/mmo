@@ -1,6 +1,6 @@
 # Items (docs/design/items.md). `wire` is the number stored in item rows: it never changes and is
 # never reused, even after an item is removed, so gaps are fine. 0 is reserved. Kinds are
-# `material`, `consumable`, `gear`, `deed`, `seed` and `pack`; gear and packs don't stack. Names come from docs/world/.
+# `material`, `consumable`, `gear`, `deed`, `seed`, `pack` and `vehicle`; gear, packs and vehicles don't stack. Names come from docs/world/.
 
 [bag]
 # Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
@@ -440,4 +440,27 @@ wire = 610
 id = "captains_compass"
 name = "Captain's Compass"
 kind = "material"
+stack = 1
+
+# Vehicles (docs/design/vehicles.md): each summons the hull in `ships.toml` that names it, and is
+# out of the bag while the vehicle is summoned.
+[[item]]
+wire = 700
+id = "furrow_cart"
+name = "Furrow Cart"
+kind = "vehicle"
+stack = 1
+
+[[item]]
+wire = 701
+id = "driftpine_skiff"
+name = "Driftpine Skiff"
+kind = "vehicle"
+stack = 1
+
+[[item]]
+wire = 702
+id = "swiftgull"
+name = "Swiftgull"
+kind = "vehicle"
 stack = 1

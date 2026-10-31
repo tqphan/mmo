@@ -133,13 +133,13 @@ pub fn carried(ctx: &ReducerContext, char_id: u64) -> Option<Pack> {
 
 /// Put a pack on `p`'s back and show it on the entity. The caller checked the back was free.
 #[allow(clippy::too_many_arguments)] // the pack's fields, wherever it comes from
-fn put_on(ctx: &ReducerContext, p: &Presence, def: u16, owner: u64, origin_x: f32, origin_z: f32, made_at: Timestamp) {
+pub(crate) fn put_on(ctx: &ReducerContext, p: &Presence, def: u16, owner: u64, origin_x: f32, origin_z: f32, made_at: Timestamp) {
     ctx.db.pack().insert(Pack { carrier: p.char_id, def, owner, origin_x, origin_z, made_at, on_at: now(ctx) });
     show(ctx, p.entity_id, def);
 }
 
 /// Take `p`'s pack off its back.
-fn take_off(ctx: &ReducerContext, p: &Presence) {
+pub(crate) fn take_off(ctx: &ReducerContext, p: &Presence) {
     ctx.db.pack().carrier().delete(p.char_id);
     show(ctx, p.entity_id, 0);
 }
@@ -181,19 +181,20 @@ fn theft(thief: u64, d: &DroppedPack) {
 /// Put the carried pack on the ground at the carrier's feet. A spoiled pack falls apart instead.
 #[spacetimedb::reducer]
 pub fn drop_pack(ctx: &ReducerContext) -> Result<(), String> {
-    let p = on_foot(ctx, "can't drop a pack on a ship yet", "can't drop a pack in the water")?;
+    let p = on_foot(ctx, "load it into a pack slot instead", "can't drop a pack in the water")?;
     let pk = carried(ctx, p.char_id).ok_or("not carrying a pack")?;
     put_down(ctx, &p, pk);
     Ok(())
 }
 
-/// Called when `p`'s character dies: on land, its pack falls at its feet for anyone to take. On a
-/// ship or in the water it stays on the back until vehicles give it somewhere to fall.
+/// Called when `p`'s character dies: on land, its pack falls at its feet for anyone to take; aboard
+/// a vehicle, into its first free slot (docs/design/vehicles.md). With no free slot, or in the
+/// water, it stays on the back.
 pub fn drop_on_death(ctx: &ReducerContext, p: &Presence) {
-    if p.parent != 0 || p.mode == MoveMode::Swim as u8 {
-        return;
-    }
-    if let Some(pk) = carried(ctx, p.char_id) {
+    let Some(pk) = carried(ctx, p.char_id) else { return };
+    if p.parent != 0 {
+        crate::vehicle::stow_on_death(ctx, p, &pk);
+    } else if p.mode != MoveMode::Swim as u8 {
         put_down(ctx, p, pk);
     }
 }

@@ -15,6 +15,7 @@ namespace Mmo
     /// <item><c>--bag-demo</c>: dev builds; on entering, empty the bag, grant some items and work through a move, a merge, a split, a swap and a destroy with the bag window open (docs/design/items.md).</item>
     /// <item><c>--gather-demo</c>: dev builds; on entering, teleport beside the nearest ready plant and gather it, then the nearest tree (docs/design/gathering.md).</item>
     /// <item><c>--farm-demo</c>: dev builds; on entering, place a farm on the nearest housing site, plant a row of Hearthgrain, a Woolback and an Amberpear Tree on it and Hearthgrain beside it, ripen them with the dev clock, harvest, then let the crop beside it wither (docs/design/farming.md).</item>
+    /// <item><c>--vehicle-demo</c>: dev builds; summon a Furrow Cart near spawn, load a pack, climb aboard and drive it, unload and stow it, then summon a Driftpine Skiff off the west beach, row it and stow it (docs/design/vehicles.md).</item>
     /// <item><c>--trade-demo</c>: dev builds; on entering, teleport to the Packwright's Bench, craft a Grain Bale, walk a few steps with it, drop it and pick it up, then teleport to Gullhaven Post and sell it (docs/design/trade.md).</item>
     /// <item><c>--combat-demo</c>: dev builds; on entering, put a Straw Dummy ahead and fight it through the hotbar, have a cast interrupted, turn to face it, heal, then die and respawn at a Wayshrine (docs/design/combat.md).</item>
     /// <item><c>--npc-demo</c>: dev builds; on entering, go to level 5, put a Greymane Wolf ahead, let it come and bite, fight it down through the hotbar and loot the corpse (docs/design/npcs.md).</item>
@@ -48,6 +49,7 @@ namespace Mmo
         public bool LandDemo;
         public bool FarmDemo;
         public bool TradeDemo;
+        public bool VehicleDemo;
         public bool CombatDemo;
         public bool NpcDemo;
         public bool Walk;
@@ -95,6 +97,7 @@ namespace Mmo
                     case "--land-demo": o.LandDemo = true; break;
                     case "--farm-demo": o.FarmDemo = true; break;
                     case "--trade-demo": o.TradeDemo = true; break;
+                    case "--vehicle-demo": o.VehicleDemo = true; break;
                     case "--combat-demo": o.CombatDemo = true; break;
                     case "--npc-demo": o.NpcDemo = true; break;
                     case "--labor": o.Labor = int.Parse(Next(), CultureInfo.InvariantCulture); break;

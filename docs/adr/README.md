@@ -34,3 +34,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0028](0028-vitals-from-timestamps-casts-as-scheduled-rows.md) | Vitals are a public row settled from timestamps; casts and projectiles are scheduled rows; the client turns to face before a skill | Accepted |
 | [0029](0029-statuses-in-vitals-ticks-by-due-index.md) | Statuses live in `vitals`; damage over time ticks from a due-time index; controls diminish per group; levels and skillsets live in `fighter` | Accepted |
 | [0030](0030-npcs-wake-near-players-move-by-segments.md) | NPCs exist only near players, move by timed segments published as moves, and think every 200 ms in the tick | Accepted |
+| [0031](0031-owned-vehicles-are-bag-items-carts-share-the-ship-step.md) | Owned vehicles are bag items that leave the bag while out; carts share the ships' step with a stored deck height; cargo is public by item and private in detail | Accepted |

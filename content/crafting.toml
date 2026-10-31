@@ -364,3 +364,24 @@ output = "preserves_crate"
 output_count = 1
 labor = 40
 craft_s = 6.0
+
+# Vehicles (docs/design/vehicles.md), at the Joiner's Bench. The Swiftgull comes from the shipyard.
+[[recipe]]
+wire = 33
+id = "furrow_cart"
+station = "joiners_bench"
+inputs = [{ item = "hollowoak_plank", count = 10 }, { item = "hollowoak_beam", count = 2 }, { item = "rustiron_fittings", count = 4 }]
+output = "furrow_cart"
+output_count = 1
+labor = 50
+craft_s = 15.0
+
+[[recipe]]
+wire = 34
+id = "driftpine_skiff"
+station = "joiners_bench"
+inputs = [{ item = "driftpine_plank", count = 12 }, { item = "saltrope", count = 2 }, { item = "rustiron_nails", count = 6 }]
+output = "driftpine_skiff"
+output_count = 1
+labor = 30
+craft_s = 10.0

@@ -157,6 +157,56 @@ namespace Mmo.Tests
             Assert.True(n >= 30 && none >= 1, $"{n} flights, {none} from the water");
         }
 
+        [Fact]
+        public void TerrainGround()
+        {
+            var map = Mmo.World.HeightMap.Parse(Hex(Lines("land_mmoh").Single()[1]));
+            int n = 0, none = 0;
+            foreach (var v in Lines("ground"))
+            {
+                var got = Terrain.Ground(map.QuadCorner, F(v[1]), F(v[2]));
+                string what = $"ground {v[1]} {v[2]}";
+                if (v[3] == "none")
+                {
+                    Assert.True(got is null, what);
+                    none++;
+                    continue;
+                }
+                Assert.True(got is not null, what);
+                Near(F(v[3]), got!.Value.Lo, 1e-4f, what + " lo");
+                Near(F(v[4]), got.Value.Hi, 1e-4f, what + " hi");
+                Near(F(v[5]), got.Value.Gradient, 1e-4f, what + " gradient");
+                n++;
+            }
+            Assert.True(n >= 40 && none >= 1, $"{n} vectors, {none} off the ground");
+        }
+
+        [Fact]
+        public void VehicleStand()
+        {
+            var map = Mmo.World.HeightMap.Parse(Hex(Lines("land_mmoh").Single()[1]));
+            int n = 0, none = 0;
+            foreach (var v in Lines("vehicle_stand"))
+            {
+                var hull = GameContent.Hulls[int.Parse(v[1])];
+                var m = new ShipMotion(F(v[2]), F(v[3]), F(v[4]), 0);
+                var got = Ship.Stand(hull, m, (x, z) => Terrain.Ground(map.QuadCorner, x, z));
+                string what = $"stand {string.Join(' ', v[1..5])}";
+                if (v[5] == "none")
+                {
+                    Assert.True(got is null, what);
+                    none++;
+                }
+                else
+                {
+                    Assert.True(got is not null, what);
+                    Near(F(v[5]), got!.Value, 1e-4f, what);
+                }
+                n++;
+            }
+            Assert.True(n >= 200 && none >= 10, $"{n} vectors, {none} that can't stand");
+        }
+
         // Labor is integer arithmetic, so it must match exactly.
 
         [Fact]

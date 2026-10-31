@@ -94,7 +94,7 @@ fn the_tick_sails_the_ship_and_publishes_it_at_5hz() {
     sail(&t, 100);
     let m = read(&t, |ctx| ctx.db.ship_motion().entity_id().find(ship).unwrap());
     let cell = transform_of(&t, ship).cell;
-    let expected = crate::ship::ship_transform(ship, cell, clipper(), &Motion { x: m.x, z: m.z, yaw: m.yaw, speed: m.speed });
+    let expected = crate::ship::ship_transform(ship, cell, &Motion { x: m.x, z: m.z, yaw: m.yaw, speed: m.speed }, m.y);
     assert_eq!(transform_of(&t, ship), expected);
     // A ship at rest isn't rewritten.
     let (t, ship) = crewed(0.0, 0.0, 0.0);

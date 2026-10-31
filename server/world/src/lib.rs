@@ -17,6 +17,7 @@ mod terrain;
 mod tick;
 mod time;
 mod trade;
+mod vehicle;
 
 #[cfg(test)]
 mod tests;

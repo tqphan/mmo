@@ -32,7 +32,10 @@ namespace Mmo.Sim
     /// <summary>What the server's tick steps for each ship. Yaw stays within 0 to 2π; speed is negative astern.</summary>
     public readonly record struct ShipMotion(float X, float Z, float Yaw, float Speed)
     {
-        public ShipPose Pose(HullData hull) => new(X, Movement.SeaLevelM + hull.DeckHeightM, Z, Yaw);
+        /// <summary>The pose of a ship afloat. A land hull's deck height comes from <see cref="Ship.Stand"/> (<see cref="PoseAt"/>).</summary>
+        public ShipPose Pose(HullData hull) => PoseAt(Movement.SeaLevelM + hull.DeckHeightM);
+
+        public ShipPose PoseAt(float y) => new(X, y, Z, Yaw);
     }
 
     /// <summary>The helmsman's settings, each -100 to 100 percent. Positive rudder turns to starboard.</summary>
@@ -58,6 +61,8 @@ namespace Mmo.Sim
         public const float ReachM = 2.5f;
         /// <summary>How far a client's view of a ship may lag the server's, allowed for when changing frame.</summary>
         public const float PoseLagS = 0.5f;
+        /// <summary>How close to a pack slot's point a character must be to load or unload it, horizontally and vertically.</summary>
+        public const float CargoReachM = 3.0f;
 
         private const float Tau = MathF.PI * 2.0f;
         private const float RadsPerDeg = MathF.PI / 180.0f;
@@ -94,6 +99,52 @@ namespace Mmo.Sim
             var (fx, fz) = Yaw.Facing(yaw);
             return new ShipMotion(m.X + fx * speed * dt, m.Z + fz * speed * dt, yaw, speed);
         }
+
+        /// <summary>Whether the water is deep enough for the hull at its bow, centre and stern; unknown terrain is deep water.</summary>
+        public static bool Afloat(HullData hull, ShipMotion m, Func<float, float, Ground?> ground)
+        {
+            var pose = m.Pose(hull);
+            float floor = Movement.SeaLevelM - hull.DraftM;
+            foreach (float lz in new[] { -hull.DeckHalfLengthM, 0.0f, hull.DeckHalfLengthM })
+            {
+                var w = pose.ToWorld(new Vector3(0, 0, lz));
+                if (ground(w.X, w.Z) is Ground g && g.Hi > floor)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Where a hull can be with motion <paramref name="m"/>, as its deck's height, or null where it
+        /// can't (docs/design/vehicles.md): afloat for a sea hull; for a land hull, known ground at bow,
+        /// centre and stern no deeper than its ford, no steeper than its gradient, and rising no more
+        /// than that from stern to bow. A port of <c>sim::ship::stand</c>.
+        /// </summary>
+        public static float? Stand(HullData hull, ShipMotion m, Func<float, float, Ground?> ground)
+        {
+            if (!hull.Land)
+                return Afloat(hull, m, ground) ? Movement.SeaLevelM + hull.DeckHeightM : null;
+            var pose = m.PoseAt(0.0f);
+            float l = hull.DeckHalfLengthM;
+            Span<float> his = stackalloc float[3];
+            int k = 0;
+            foreach (float lz in new[] { -l, 0.0f, l })
+            {
+                var w = pose.ToWorld(new Vector3(0, 0, lz));
+                if (ground(w.X, w.Z) is not Ground g || g.Hi < Movement.SeaLevelM - hull.DraftM || g.Gradient > hull.MaxGradient)
+                    return null;
+                his[k++] = g.Hi;
+            }
+            return MathF.Abs(his[0] - his[2]) <= hull.MaxGradient * 2.0f * l ? his[1] + hull.DeckHeightM : null;
+        }
+
+        /// <summary>A pack slot's point in world coordinates, on the deck; null for no such slot.</summary>
+        public static Vector3? SlotPoint(HullData hull, ShipPose pose, int slot) =>
+            slot >= 0 && slot < hull.Slots.Count ? pose.ToWorld(new Vector3(hull.Slots[slot].X, 0, hull.Slots[slot].Z)) : null;
+
+        /// <summary>Whether a character at <paramref name="at"/> (world) can reach a slot at <paramref name="point"/> (world).</summary>
+        public static bool CargoReach(Vector3 point, Vector3 at) =>
+            MathF.Sqrt(MathF.Pow(point.X - at.X, 2) + MathF.Pow(point.Z - at.Z, 2)) <= CargoReachM && MathF.Abs(point.Y - at.Y) <= CargoReachM;
 
         /// <summary>The radius of the circle a ship sails at full speed and full rudder.</summary>
         public static float TurningRadius(HullData hull) => hull.MaxSpeedMps / (hull.TurnRateDps * RadsPerDeg);

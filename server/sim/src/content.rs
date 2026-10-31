@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x33fdd22e2b2f9d02;
+pub const CONTENT_HASH: u64 = 0xfc62fe23648321d6;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +42,8 @@ impl MoveMode {
 #[repr(u8)]
 pub enum Hull {
     Clipper = 0,
+    Skiff = 1,
+    FurrowCart = 2,
 }
 
 #[derive(Debug, PartialEq)]
@@ -75,10 +77,24 @@ pub struct Mount {
     pub facing_deg: f32,
 }
 
+/// A pack slot's place on deck.
+#[derive(Debug, PartialEq)]
+pub struct PackSlot {
+    /// Ship-local x, m.
+    pub x: f32,
+    /// Ship-local z, m.
+    pub z: f32,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct HullData {
     pub hull: Hull,
     pub id: &'static str,
+    pub name: &'static str,
+    /// Drives on land (`medium = "land"`) rather than sailing.
+    pub land: bool,
+    /// The wire of the vehicle item that summons it.
+    pub item: u16,
     /// Top speed ahead, m/s.
     pub max_speed_mps: f32,
     /// Top speed astern, m/s.
@@ -95,22 +111,30 @@ pub struct HullData {
     pub deck_half_length_m: f32,
     /// The deck's height above the water, m.
     pub deck_height_m: f32,
-    /// Depth below the water, m. Shallower water stops the ship.
+    /// Depth below the water, m. Shallower water stops the ship. For land hulls, the deepest water they ford.
     pub draft_m: f32,
+    /// Land hulls: the steepest ground they drive on, rise over run. 0 for sea hulls.
+    pub max_gradient: f32,
     /// Hit points when built.
     pub hp: i32,
     /// The helm's ship-local x, m.
     pub helm_x: f32,
     /// The helm's ship-local z, m.
     pub helm_z: f32,
+    /// Inert (all zero) for a hull without mounts.
     pub cannon: CannonData,
     pub mounts: &'static [Mount],
+    /// Pack slots, in order (docs/design/vehicles.md).
+    pub slots: &'static [PackSlot],
 }
 
-pub static HULLS: [HullData; 1] = [
+pub static HULLS: [HullData; 3] = [
     HullData {
         hull: Hull::Clipper,
         id: "clipper",
+        name: "Swiftgull",
+        land: false,
+        item: 702,
         max_speed_mps: 11.0,
         astern_speed_mps: 3.0,
         accel_mps2: 1.5,
@@ -120,6 +144,7 @@ pub static HULLS: [HullData; 1] = [
         deck_half_length_m: 9.0,
         deck_height_m: 2.0,
         draft_m: 1.2,
+        max_gradient: 0.0,
         hp: 12000,
         helm_x: 0.0,
         helm_z: 7.5,
@@ -127,6 +152,62 @@ pub static HULLS: [HullData; 1] = [
         mounts: &[
             Mount { x: -2.0, z: 0.0, facing_deg: 90.0 },
             Mount { x: 2.0, z: 0.0, facing_deg: -90.0 },
+        ],
+        slots: &[
+            PackSlot { x: -1.0, z: 4.5 },
+            PackSlot { x: 1.0, z: 4.5 },
+        ],
+    },
+    HullData {
+        hull: Hull::Skiff,
+        id: "skiff",
+        name: "Driftpine Skiff",
+        land: false,
+        item: 701,
+        max_speed_mps: 4.0,
+        astern_speed_mps: 1.5,
+        accel_mps2: 1.0,
+        drift_decel_mps2: 0.8,
+        turn_rate_dps: 30.0,
+        deck_half_width_m: 0.8,
+        deck_half_length_m: 2.0,
+        deck_height_m: 0.5,
+        draft_m: 0.4,
+        max_gradient: 0.0,
+        hp: 2000,
+        helm_x: 0.0,
+        helm_z: 1.5,
+        cannon: CannonData { muzzle_speed_mps: 0.0, muzzle_height_m: 0.0, arc_deg: 0.0, min_pitch_deg: 0.0, max_pitch_deg: 0.0, reload_s: 0.0, damage: 0, splash_m: 0.0 },
+        mounts: &[
+        ],
+        slots: &[
+        ],
+    },
+    HullData {
+        hull: Hull::FurrowCart,
+        id: "furrow_cart",
+        name: "Furrow Cart",
+        land: true,
+        item: 700,
+        max_speed_mps: 4.0,
+        astern_speed_mps: 1.5,
+        accel_mps2: 2.0,
+        drift_decel_mps2: 4.0,
+        turn_rate_dps: 22.9,
+        deck_half_width_m: 0.9,
+        deck_half_length_m: 1.6,
+        deck_height_m: 0.9,
+        draft_m: 0.4,
+        max_gradient: 0.6,
+        hp: 3000,
+        helm_x: 0.0,
+        helm_z: -1.2,
+        cannon: CannonData { muzzle_speed_mps: 0.0, muzzle_height_m: 0.0, arc_deg: 0.0, min_pitch_deg: 0.0, max_pitch_deg: 0.0, reload_s: 0.0, damage: 0, splash_m: 0.0 },
+        mounts: &[
+        ],
+        slots: &[
+            PackSlot { x: -0.45, z: 0.6 },
+            PackSlot { x: 0.45, z: 0.6 },
         ],
     },
 ];
@@ -139,6 +220,11 @@ impl Hull {
     pub fn data(self) -> &'static HullData {
         &HULLS[self as usize]
     }
+}
+
+/// The hull a vehicle item summons.
+pub fn hull_of_item(item: u16) -> Option<&'static HullData> {
+    HULLS.iter().find(|h| h.item == item)
 }
 
 /// Land-use classes (`content/land.toml`): the low 4 bits of a land-use texel. The discriminant
@@ -288,6 +374,7 @@ pub enum ItemKind {
     Deed = 3,
     Seed = 4,
     Pack = 5,
+    Vehicle = 6,
 }
 
 #[derive(Debug, PartialEq)]
@@ -303,7 +390,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 60] = [
+pub static ITEMS: [ItemData; 63] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -364,6 +451,9 @@ pub static ITEMS: [ItemData; 60] = [
     ItemData { wire: 608, id: "mossback_scute", name: "Mossback Scute", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 609, id: "ashwing_venom", name: "Ashwing Venom", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 610, id: "captains_compass", name: "Captain's Compass", kind: ItemKind::Material, stack: 1 },
+    ItemData { wire: 700, id: "furrow_cart", name: "Furrow Cart", kind: ItemKind::Vehicle, stack: 1 },
+    ItemData { wire: 701, id: "driftpine_skiff", name: "Driftpine Skiff", kind: ItemKind::Vehicle, stack: 1 },
+    ItemData { wire: 702, id: "swiftgull", name: "Swiftgull", kind: ItemKind::Vehicle, stack: 1 },
 ];
 
 /// Slots in every character's bag.
@@ -479,7 +569,7 @@ pub struct RecipeData {
 }
 
 /// Every recipe, sorted by wire, which is the index.
-pub static RECIPES: [RecipeData; 33] = [
+pub static RECIPES: [RecipeData; 35] = [
     RecipeData { wire: 0, id: "saltreed_twine", station: 0, inputs: &[Ingredient { item: 1, count: 4 }], output: 30, output_count: 1, labor: 5, craft_s: 2.0 },
     RecipeData { wire: 1, id: "reedcloth", station: 0, inputs: &[Ingredient { item: 30, count: 4 }], output: 31, output_count: 1, labor: 10, craft_s: 4.0 },
     RecipeData { wire: 2, id: "saltrope", station: 0, inputs: &[Ingredient { item: 30, count: 3 }], output: 32, output_count: 1, labor: 5, craft_s: 3.0 },
@@ -513,6 +603,8 @@ pub static RECIPES: [RecipeData; 33] = [
     RecipeData { wire: 30, id: "driftpine_sapling", station: 0, inputs: &[Ingredient { item: 20, count: 1 }, Ingredient { item: 30, count: 1 }], output: 407, output_count: 1, labor: 5, craft_s: 4.0 },
     RecipeData { wire: 31, id: "grain_bale", station: 3, inputs: &[Ingredient { item: 80, count: 20 }, Ingredient { item: 31, count: 2 }], output: 500, output_count: 1, labor: 40, craft_s: 6.0 },
     RecipeData { wire: 32, id: "preserves_crate", station: 3, inputs: &[Ingredient { item: 101, count: 6 }, Ingredient { item: 40, count: 4 }, Ingredient { item: 52, count: 10 }], output: 501, output_count: 1, labor: 40, craft_s: 6.0 },
+    RecipeData { wire: 33, id: "furrow_cart", station: 0, inputs: &[Ingredient { item: 41, count: 10 }, Ingredient { item: 42, count: 2 }, Ingredient { item: 53, count: 4 }], output: 700, output_count: 1, labor: 50, craft_s: 15.0 },
+    RecipeData { wire: 34, id: "driftpine_skiff", station: 0, inputs: &[Ingredient { item: 40, count: 12 }, Ingredient { item: 32, count: 2 }, Ingredient { item: 52, count: 6 }], output: 701, output_count: 1, labor: 30, craft_s: 10.0 },
 ];
 
 /// How close a character must stand to a station, horizontally and vertically, in metres.

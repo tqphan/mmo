@@ -12,6 +12,7 @@ pub struct ShipMotion {
     pub z: f32,
     pub yaw: f32,
     pub speed: f32,
+    pub y: f32,
 }
 
 impl __sdk::InModule for ShipMotion {
@@ -27,6 +28,7 @@ pub struct ShipMotionCols {
     pub z: __sdk::__query_builder::Col<ShipMotion, f32>,
     pub yaw: __sdk::__query_builder::Col<ShipMotion, f32>,
     pub speed: __sdk::__query_builder::Col<ShipMotion, f32>,
+    pub y: __sdk::__query_builder::Col<ShipMotion, f32>,
 }
 
 impl __sdk::__query_builder::HasCols for ShipMotion {
@@ -38,6 +40,7 @@ impl __sdk::__query_builder::HasCols for ShipMotion {
             z: __sdk::__query_builder::Col::new(table_name, "z"),
             yaw: __sdk::__query_builder::Col::new(table_name, "yaw"),
             speed: __sdk::__query_builder::Col::new(table_name, "speed"),
+            y: __sdk::__query_builder::Col::new(table_name, "y"),
         }
     }
 }

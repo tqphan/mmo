@@ -15,6 +15,8 @@ pub struct Vehicle {
     pub rudder: i8,
     pub helm: u64,
     pub cannon_ready_at: Vec<__sdk::Timestamp>,
+    pub owner: u64,
+    pub cargo: Vec<u16>,
 }
 
 impl __sdk::InModule for Vehicle {
@@ -33,6 +35,8 @@ pub struct VehicleCols {
     pub rudder: __sdk::__query_builder::Col<Vehicle, i8>,
     pub helm: __sdk::__query_builder::Col<Vehicle, u64>,
     pub cannon_ready_at: __sdk::__query_builder::Col<Vehicle, Vec<__sdk::Timestamp>>,
+    pub owner: __sdk::__query_builder::Col<Vehicle, u64>,
+    pub cargo: __sdk::__query_builder::Col<Vehicle, Vec<u16>>,
 }
 
 impl __sdk::__query_builder::HasCols for Vehicle {
@@ -47,6 +51,8 @@ impl __sdk::__query_builder::HasCols for Vehicle {
             rudder: __sdk::__query_builder::Col::new(table_name, "rudder"),
             helm: __sdk::__query_builder::Col::new(table_name, "helm"),
             cannon_ready_at: __sdk::__query_builder::Col::new(table_name, "cannon_ready_at"),
+            owner: __sdk::__query_builder::Col::new(table_name, "owner"),
+            cargo: __sdk::__query_builder::Col::new(table_name, "cargo"),
         }
     }
 }

@@ -23,13 +23,16 @@ namespace SpacetimeDB.Types
         public float Yaw;
         [DataMember(Name = "speed")]
         public float Speed;
+        [DataMember(Name = "y")]
+        public float Y;
 
         public ShipMotion(
             ulong EntityId,
             float X,
             float Z,
             float Yaw,
-            float Speed
+            float Speed,
+            float Y
         )
         {
             this.EntityId = EntityId;
@@ -37,6 +40,7 @@ namespace SpacetimeDB.Types
             this.Z = Z;
             this.Yaw = Yaw;
             this.Speed = Speed;
+            this.Y = Y;
         }
 
         public ShipMotion()

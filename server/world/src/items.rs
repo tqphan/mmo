@@ -13,6 +13,9 @@ pub mod place {
     /// Held for a character until mail delivers it (M2): a demolished plot's deed that didn't fit
     /// in the bag (docs/design/land.md). Slots only order the stacks.
     pub const RETURNS: u8 = 2;
+    /// A vehicle item whose vehicle is out in the world (docs/design/vehicles.md); the holder is
+    /// its `char_id` and the slot the hull's wire.
+    pub const OUT: u8 = 3;
 }
 
 /// Private: one stack. At most one per slot, and `1 ≤ count ≤` the item's stack size; the
@@ -145,6 +148,12 @@ pub fn destroy_item(ctx: &ReducerContext, item_id: u64, count: u32) -> Result<()
     let left = it.count - count;
     set_count(ctx, it, left);
     Ok(())
+}
+
+/// The lowest empty slot in `char_id`'s bag.
+pub fn free_slot(ctx: &ReducerContext, char_id: u64) -> Option<u16> {
+    let taken: Vec<u16> = ctx.db.item().by_slot().filter((char_id, place::BAG)).map(|i| i.slot).collect();
+    (0..BAG_SLOTS).find(|s| !taken.contains(s))
 }
 
 /// A stack in `char_id`'s bag.

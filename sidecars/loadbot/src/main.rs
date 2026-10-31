@@ -23,6 +23,7 @@ mod ship;
 mod swarm;
 mod terrain;
 mod trade;
+mod vehicle;
 mod visitor;
 
 use std::time::{Duration, Instant};
@@ -116,6 +117,7 @@ fn main() {
         "trade" => trade::scenario(&args),
         "combat" => combat::scenario(&args),
         "npc" => npc::scenario(&args),
+        "vehicle" => vehicle::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -138,7 +140,8 @@ fn main() {
                  farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot\n  \
                  trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock\n  \
                  combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn\n  \
-                 npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death"
+                 npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death\n  \
+                 vehicle          a bot summons a cart, loads packs, drives a rider and stows it; then rows a skiff and stows it"
             );
             std::process::exit(2);
         }

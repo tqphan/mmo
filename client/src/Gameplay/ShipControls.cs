@@ -95,6 +95,9 @@ namespace Mmo.Gameplay
             }
         }
 
+        /// <summary>We stand within reach of the helm or a cannon of the ship we're aboard.</summary>
+        public bool AtStation => Aboard is { } ship && Boarding.StationAt(ship.Hull, PlayerController.ToNumerics(player.Local)) is not null;
+
         /// <summary>The cannon we're manning can fire.</summary>
         public bool Loaded => cannon is byte m && Clock.Now >= readyAt.GetValueOrDefault((player.Parent, m));
 
@@ -103,6 +106,12 @@ namespace Mmo.Gameplay
         /// <summary>The world yaw the manned cannon would fire along, for the camera to look along.</summary>
         public float? AimWorldYaw =>
             Aboard is { } ship && cannon is byte m ? Ship.Muzzle(ship.Hull, ship.Pose, ship.Hull.Mounts[m], aimYaw).Yaw : null;
+
+        /// <summary>Demos: the helm input to hold while we have the helm, in place of the keyboard.</summary>
+        public ShipInput? DemoInput { get; set; }
+
+        /// <summary>We hold the helm (or a cart's reins), as the server says.</summary>
+        public bool HoldsHelm => AtHelm;
 
         /// <summary>What the HUD says about ships.</summary>
         public string Prompt { get; private set; } = "";
@@ -171,7 +180,17 @@ namespace Mmo.Gameplay
         private void Steer(ShipView ship, double now, PilotOrder order)
         {
             sbyte t = throttle, r = rudder;
-            if (options.Autopilot is null)
+            if (DemoInput is ShipInput demo)
+            {
+                (t, r) = (demo.Throttle, demo.Rudder);
+            }
+            else if (options.Autopilot is null && ship.Hull.Land)
+            {
+                // A cart is driven while W or S is held, and brakes when let go.
+                t = (sbyte)(((Input.IsActionPressed("forward") ? 1 : 0) - (Input.IsActionPressed("back") ? 1 : 0)) * Ship.InputMax);
+                r = (sbyte)(((Input.IsActionPressed("right") ? 1 : 0) - (Input.IsActionPressed("left") ? 1 : 0)) * Ship.InputMax);
+            }
+            else if (options.Autopilot is null)
             {
                 if (Input.IsActionJustPressed("forward"))
                     t = (sbyte)Math.Min(Ship.InputMax, t + ThrottleStep);
@@ -295,16 +314,21 @@ namespace Mmo.Gameplay
 
         private string ClimbPrompt()
         {
+            // A pack slot in reach takes F first (PlayerController).
+            if (player.Vehicles?.HasSlotAction == true)
+                return "";
             foreach (var d in entities.Decks)
                 if (Boarding.ClimbTarget(d, PlayerController.ToNumerics(player.GlobalPosition)) is not null)
-                    return $"{d.Hull.Id} #{d.Ship} alongside: F to climb aboard{(player.ClimbNote is { } note && note != "nothing to climb here" ? $" ({note})" : "")}";
+                    return $"{d.Hull.Name} #{d.Ship} alongside: F to climb aboard{(player.ClimbNote is { } note && note != "nothing to climb here" ? $" ({note})" : "")}";
             return "";
         }
 
         private string Describe(ShipView ship, Station? station)
         {
             var v = ship.Vehicle;
-            string head = $"aboard {ship.Hull.Id} #{ship.Id}  hp {v?.Hp ?? ship.Hull.Hp:N0}  {ship.Speed:F1} m/s  throttle {v?.Throttle ?? 0}%  rudder {v?.Rudder ?? 0}%";
+            string head = $"aboard {ship.Hull.Name} #{ship.Id}  hp {v?.Hp ?? ship.Hull.Hp:N0}  {ship.Speed:F1} m/s  throttle {v?.Throttle ?? 0}%  rudder {v?.Rudder ?? 0}%";
+            if (AtHelm && ship.Hull.Land)
+                return head + "\non the bench: hold W/S to drive, A/D to steer, F to get down";
             if (AtHelm)
                 return head + "\nat the helm: W/S throttle, hold A/D for the rudder, F to let go";
             if (cannon is byte m)
@@ -319,6 +343,7 @@ namespace Mmo.Gameplay
             return station switch
             {
                 { Kind: StationKind.Helm } when v is { Helm: not 0 } => head + "\nsomeone has the helm",
+                { Kind: StationKind.Helm } when ship.Hull.Land => head + "\nF to take the reins",
                 { Kind: StationKind.Helm } => head + "\nF to take the helm",
                 { Kind: StationKind.Cannon } => head + "\nF to man the cannon",
                 _ => head,

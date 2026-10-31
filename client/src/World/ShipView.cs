@@ -18,17 +18,32 @@ namespace Mmo.World
         private const double OwnInputS = 1.0;
 
         private readonly Label3D label;
+        private readonly Node3D[] slots;
+        private readonly ushort[] shownCargo;
         private ShipInput? ownInput;
         private double ownInputAt;
 
-        public ShipView(ulong id, HullData hull)
+        /// <param name="ground">The ground, so the predictor stands the vehicle where the server would (docs/design/vehicles.md).</param>
+        public ShipView(ulong id, HullData hull, System.Func<float, float, Ground?>? ground = null)
         {
             Id = id;
             Hull = hull;
-            Predictor = new ShipPredictor(hull);
+            Predictor = new ShipPredictor(hull, ground);
             Name = $"Ship{id}";
-            var size = new Vector3(hull.DeckHalfWidthM * 2, hull.DeckHeightM + hull.DraftM, hull.DeckHalfLengthM * 2);
+            // A cart's bed is a thin box on wheels; a boat's hull reaches down past the waterline.
+            var size = hull.Land
+                ? new Vector3(hull.DeckHalfWidthM * 2, 0.25f, hull.DeckHalfLengthM * 2)
+                : new Vector3(hull.DeckHalfWidthM * 2, hull.DeckHeightM + hull.DraftM, hull.DeckHalfLengthM * 2);
             AddChild(Views.Ship(size));
+            if (hull.Land)
+                AddChild(Views.Wheels(hull.DeckHalfWidthM, hull.DeckHalfLengthM, hull.DeckHeightM));
+            slots = new Node3D[hull.Slots.Count];
+            shownCargo = new ushort[hull.Slots.Count];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                slots[i] = Views.Slot(new Vector3(hull.Slots[i].X, 0, hull.Slots[i].Z));
+                AddChild(slots[i]);
+            }
             var body = new StaticBody3D { Name = "HullBody" };
             body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size }, Position = new Vector3(0, -size.Y / 2, 0) });
             AddChild(body);
@@ -38,13 +53,13 @@ namespace Mmo.World
             label = new Label3D
             {
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-                Position = new Vector3(0, 6.0f, 0),
+                Position = new Vector3(0, hull.Land ? 2.5f : 6.0f, 0),
                 FixedSize = true,
                 FontSize = 28,
                 PixelSize = 0.0012f,
                 OutlineSize = 6,
                 NoDepthTest = true,
-                Text = $"{hull.Id} #{id}",
+                Text = $"{hull.Name} #{id}",
             };
             AddChild(label);
         }
@@ -60,7 +75,7 @@ namespace Mmo.World
         public Deck Deck => new(Id, Hull, Pose, Speed);
 
         public void Push(Transform t, double now) =>
-            Predictor.Row(now, t.X, t.Z, Yaw.FromU16(t.Yaw), t.Speed / 100.0f);
+            Predictor.Row(now, t.X, t.Z, Yaw.FromU16(t.Yaw), t.Speed / 100.0f, t.Y);
 
         public void SetVehicle(Vehicle v, double now)
         {
@@ -70,7 +85,25 @@ namespace Mmo.World
                 ownInput = null;
             if (ownInput is null)
                 Predictor.SetInput(now, input);
-            label.Text = $"{Hull.Id} #{Id}  {v.Hp:N0}/{Hull.Hp:N0}";
+            label.Text = $"{Hull.Name} #{Id}  {v.Hp:N0}/{Hull.Hp:N0}";
+            for (int i = 0; i < slots.Length; i++)
+            {
+                ushort def = i < v.Cargo.Count ? v.Cargo[i] : (ushort)0;
+                if (def == shownCargo[i])
+                    continue;
+                shownCargo[i] = def;
+                if (slots[i].GetNodeOrNull<Node3D>("Pack") is { } old)
+                {
+                    slots[i].RemoveChild(old);
+                    old.QueueFree();
+                }
+                if (def != 0)
+                {
+                    var pack = Views.Pack(def);
+                    pack.Position = new Vector3(0, 0.08f, 0);
+                    slots[i].AddChild(pack);
+                }
+            }
         }
 
         /// <summary>Our own helm's input: predict it at once rather than waiting for the server.</summary>

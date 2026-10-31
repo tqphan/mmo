@@ -36,6 +36,7 @@ pub mod cancel_cast_reducer;
 pub mod cancel_craft_reducer;
 pub mod cancel_gather_reducer;
 pub mod cannon_shot_type;
+pub mod cargo_type;
 pub mod cast_job_type;
 pub mod character_private_type;
 pub mod character_public_table;
@@ -86,6 +87,7 @@ pub mod labor_type;
 pub mod land_chunk_type;
 pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
+pub mod load_pack_reducer;
 pub mod loot_corpse_reducer;
 pub mod loot_table;
 pub mod loot_type;
@@ -135,6 +137,8 @@ pub mod station_placement_type;
 pub mod station_table;
 pub mod station_type;
 pub mod status_slot_type;
+pub mod stow_vehicle_reducer;
+pub mod summon_vehicle_reducer;
 pub mod suspicion_type;
 pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
@@ -148,6 +152,7 @@ pub mod trade_post_table;
 pub mod trade_post_type;
 pub mod transform_table;
 pub mod transform_type;
+pub mod unload_pack_reducer;
 pub mod uproot_reducer;
 pub mod use_skill_reducer;
 pub mod vehicle_table;
@@ -186,6 +191,7 @@ pub use cancel_cast_reducer::cancel_cast;
 pub use cancel_craft_reducer::cancel_craft;
 pub use cancel_gather_reducer::cancel_gather;
 pub use cannon_shot_type::CannonShot;
+pub use cargo_type::Cargo;
 pub use cast_job_type::CastJob;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
@@ -236,6 +242,7 @@ pub use labor_type::Labor;
 pub use land_chunk_type::LandChunk;
 pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
+pub use load_pack_reducer::load_pack;
 pub use loot_corpse_reducer::loot_corpse;
 pub use loot_table::*;
 pub use loot_type::Loot;
@@ -285,6 +292,8 @@ pub use station_placement_type::StationPlacement;
 pub use station_table::*;
 pub use station_type::Station;
 pub use status_slot_type::StatusSlot;
+pub use stow_vehicle_reducer::stow_vehicle;
+pub use summon_vehicle_reducer::summon_vehicle;
 pub use suspicion_type::Suspicion;
 pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
@@ -298,6 +307,7 @@ pub use trade_post_table::*;
 pub use trade_post_type::TradePost;
 pub use transform_table::*;
 pub use transform_type::Transform;
+pub use unload_pack_reducer::unload_pack;
 pub use uproot_reducer::uproot;
 pub use use_skill_reducer::use_skill;
 pub use vehicle_table::*;
@@ -471,6 +481,10 @@ pub enum Reducer {
     },
     LeaveHelm,
     LeaveWorld,
+    LoadPack {
+        vehicle_id: u64,
+        slot: u8,
+    },
     LootCorpse {
         corpse: u64,
     },
@@ -524,7 +538,17 @@ pub enum Reducer {
         count: u32,
         to_slot: u16,
     },
+    StowVehicle {
+        vehicle_id: u64,
+    },
+    SummonVehicle {
+        item_id: u64,
+    },
     TakeHelm,
+    UnloadPack {
+        vehicle_id: u64,
+        slot: u8,
+    },
     Uproot {
         crop_id: u64,
     },
@@ -597,6 +621,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::Helm { .. } => "helm",
             Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
+            Reducer::LoadPack { .. } => "load_pack",
             Reducer::LootCorpse { .. } => "loot_corpse",
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
@@ -610,7 +635,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetPlotAccess { .. } => "set_plot_access",
             Reducer::SetTarget { .. } => "set_target",
             Reducer::SplitItem { .. } => "split_item",
+            Reducer::StowVehicle { .. } => "stow_vehicle",
+            Reducer::SummonVehicle { .. } => "summon_vehicle",
             Reducer::TakeHelm => "take_helm",
+            Reducer::UnloadPack { .. } => "unload_pack",
             Reducer::Uproot { .. } => "uproot",
             Reducer::UseSkill { .. } => "use_skill",
             _ => unreachable!(),
@@ -876,6 +904,12 @@ impl __sdk::Reducer for Reducer {
             }),
             Reducer::LeaveHelm => __sats::bsatn::to_vec(&leave_helm_reducer::LeaveHelmArgs {}),
             Reducer::LeaveWorld => __sats::bsatn::to_vec(&leave_world_reducer::LeaveWorldArgs {}),
+            Reducer::LoadPack { vehicle_id, slot } => {
+                __sats::bsatn::to_vec(&load_pack_reducer::LoadPackArgs {
+                    vehicle_id: vehicle_id.clone(),
+                    slot: slot.clone(),
+                })
+            }
             Reducer::LootCorpse { corpse } => {
                 __sats::bsatn::to_vec(&loot_corpse_reducer::LootCorpseArgs {
                     corpse: corpse.clone(),
@@ -956,7 +990,23 @@ impl __sdk::Reducer for Reducer {
                 count: count.clone(),
                 to_slot: to_slot.clone(),
             }),
+            Reducer::StowVehicle { vehicle_id } => {
+                __sats::bsatn::to_vec(&stow_vehicle_reducer::StowVehicleArgs {
+                    vehicle_id: vehicle_id.clone(),
+                })
+            }
+            Reducer::SummonVehicle { item_id } => {
+                __sats::bsatn::to_vec(&summon_vehicle_reducer::SummonVehicleArgs {
+                    item_id: item_id.clone(),
+                })
+            }
             Reducer::TakeHelm => __sats::bsatn::to_vec(&take_helm_reducer::TakeHelmArgs {}),
+            Reducer::UnloadPack { vehicle_id, slot } => {
+                __sats::bsatn::to_vec(&unload_pack_reducer::UnloadPackArgs {
+                    vehicle_id: vehicle_id.clone(),
+                    slot: slot.clone(),
+                })
+            }
             Reducer::Uproot { crop_id } => __sats::bsatn::to_vec(&uproot_reducer::UprootArgs {
                 crop_id: crop_id.clone(),
             }),

@@ -20,6 +20,8 @@ mod land;
 #[cfg(feature = "dev")]
 mod ships;
 mod trade;
+#[cfg(feature = "dev")]
+mod vehicles;
 
 const T0: i64 = 1_800_000_000_000_000; // an arbitrary start time, in µs
 

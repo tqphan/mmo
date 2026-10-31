@@ -744,6 +744,7 @@ namespace SpacetimeDB.Types
                 Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
+                Reducer.LoadPack args => Reducers.InvokeLoadPack(eventContext, args),
                 Reducer.LootCorpse args => Reducers.InvokeLootCorpse(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
@@ -757,7 +758,10 @@ namespace SpacetimeDB.Types
                 Reducer.SetPlotAccess args => Reducers.InvokeSetPlotAccess(eventContext, args),
                 Reducer.SetTarget args => Reducers.InvokeSetTarget(eventContext, args),
                 Reducer.SplitItem args => Reducers.InvokeSplitItem(eventContext, args),
+                Reducer.StowVehicle args => Reducers.InvokeStowVehicle(eventContext, args),
+                Reducer.SummonVehicle args => Reducers.InvokeSummonVehicle(eventContext, args),
                 Reducer.TakeHelm args => Reducers.InvokeTakeHelm(eventContext, args),
+                Reducer.UnloadPack args => Reducers.InvokeUnloadPack(eventContext, args),
                 Reducer.Uproot args => Reducers.InvokeUproot(eventContext, args),
                 Reducer.UseSkill args => Reducers.InvokeUseSkill(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")

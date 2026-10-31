@@ -126,6 +126,20 @@ namespace Mmo.World
             return Decode(samples[(j - CellZ * QuadsPerCell) * Width + i - CellX * QuadsPerCell]);
         }
 
+        /// <summary>
+        /// A corner of quad (<paramref name="qx"/>, <paramref name="qz"/>), counted in 2 m steps from
+        /// the map's corner: (qx + <paramref name="dx"/>, qz + <paramref name="dz"/>), dx and dz 0 or 1,
+        /// read the way <c>sim::terrain::quad</c> reads it, from the chunk of the cell the quad is in.
+        /// Null where the file has no such cell. For <see cref="Sim.Terrain.Ground"/>.
+        /// </summary>
+        public float? QuadCorner(int qx, int qz, int dx, int dz)
+        {
+            int cx = qx / QuadsPerCell, cz = qz / QuadsPerCell;
+            if (qx < 0 || qz < 0 || cx < CellX || cx >= CellX + CellsX || cz < CellZ || cz >= CellZ + CellsZ)
+                return null;
+            return Decode(samples[(qz + dz - CellZ * QuadsPerCell) * Width + qx + dx - CellX * QuadsPerCell]);
+        }
+
         /// <summary>Bilinear height at a world position, clamped to the file's edges.</summary>
         public float Height(float x, float z)
         {

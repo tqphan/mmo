@@ -54,14 +54,14 @@ The Packwright's Bench stands in Furrowdale, a hamlet on the west continent's co
 - A pack stays on the back when its carrier leaves the world and is there on return.
 - **The slowdown:** the speed check (docs/design/movement.md) multiplies the mode's limit by `carry_speed_pct` for a carrier, on land, swimming and on decks alike, and in the frame-change allowance. A move whose interval began before the pack went on (`on_at` after the last accepted move) is judged at the full limit, so a pick-up never corrects the step under way.
 - **No gliding, mounts or teleports with a pack.** None of them exist yet; each must refuse a carrier when it comes (gliders and mounts in M2, teleports with the return scroll).
-- A pack may be carried aboard ships. Ships' pack slots come with vehicles (BACKLOG M1).
+- A pack may be carried aboard ships, or loaded into a vehicle's pack slots (docs/design/vehicles.md).
 
 ### Making a pack
 - At a station, `craft(station, recipe, 1)` as usual (docs/design/crafting.md), with two more refusals when the recipe makes a pack: `count` above 1 ("packs are made one at a time") and a pack already on the back ("already carrying a pack"), checked when it starts and again when it finishes.
 - When it finishes, the inputs are taken and the labor spent as for any craft, and the pack goes onto the crafter's back, made at the station's position at that moment. Nothing goes in the bag.
 
 ### Dropping and picking up
-- **`drop_pack()`** puts the carried pack on the ground at the carrier's feet, as a row in the public **`dropped_pack`** table (Static tier): `id`, `cell`, `def`, `owner`, `x`, `y`, `z`, `yaw`, `origin_x`, `origin_z`, `made_at`, `dropped_at`. It needs the carrier in the world, on land (not aboard a ship, "can't drop a pack on a ship yet"; not swimming, "can't drop a pack in the water"). A spoiled pack (below) is destroyed instead.
+- **`drop_pack()`** puts the carried pack on the ground at the carrier's feet, as a row in the public **`dropped_pack`** table (Static tier): `id`, `cell`, `def`, `owner`, `x`, `y`, `z`, `yaw`, `origin_x`, `origin_z`, `made_at`, `dropped_at`. It needs the carrier in the world, on land (not aboard a ship, "load it into a pack slot instead" (docs/design/vehicles.md); not swimming, "can't drop a pack in the water"). A spoiled pack (below) is destroyed instead.
 - **`pick_up_pack(id)`** puts a dropped pack on the caller's back. Refused if the caller isn't in the world, is on a ship or swimming, already carries a pack, is out of reach, or the pack is spoiled ("this pack has spoiled") or gone ("no such pack").
 - Picking up a pack made by another account's character is **theft**: allowed, and logged for the crime task to turn into evidence and crime points (BACKLOG M1). The pack keeps its owner.
 

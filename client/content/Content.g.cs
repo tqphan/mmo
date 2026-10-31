@@ -24,6 +24,8 @@ namespace Mmo.Content
     public enum Hull : byte
     {
         Clipper = 0,
+        Skiff = 1,
+        FurrowCart = 2,
     }
 
     /// <param name="MuzzleSpeedMps">Shot speed leaving the muzzle, m/s.</param>
@@ -41,6 +43,11 @@ namespace Mmo.Content
     /// <param name="Z">Ship-local z, m.</param>
     /// <param name="FacingDeg">Yaw on deck: 0 the bow, 90 port, -90 starboard.</param>
     public sealed record Mount(float X, float Z, float FacingDeg);
+
+    /// <summary>A pack slot's place on deck (docs/design/vehicles.md).</summary>
+    /// <param name="X">Ship-local x, m.</param>
+    /// <param name="Z">Ship-local z, m.</param>
+    public sealed record PackSlot(float X, float Z);
 
     /// <summary>Land-use classes (content/land.toml): the low 4 bits of a land-use texel. The value is the wire value.</summary>
     public enum LandUse : byte
@@ -98,6 +105,7 @@ namespace Mmo.Content
         Deed = 3,
         Seed = 4,
         Pack = 5,
+        Vehicle = 6,
     }
 
     /// <param name="Wire">Stored in item rows. It never changes and is never reused.</param>
@@ -294,6 +302,8 @@ namespace Mmo.Content
     /// <param name="Wire">Stored in shrine rows.</param>
     public sealed record ShrineData(byte Wire, string Id, string Name);
 
+    /// <param name="Land">Drives on land rather than sailing.</param>
+    /// <param name="Item">The wire of the vehicle item that summons it.</param>
     /// <param name="MaxSpeedMps">Top speed ahead, m/s.</param>
     /// <param name="AsternSpeedMps">Top speed astern, m/s.</param>
     /// <param name="AccelMps2">How fast speed follows the throttle, m/s².</param>
@@ -302,16 +312,18 @@ namespace Mmo.Content
     /// <param name="DeckHalfWidthM">Half the deck's width (ship-local x), m.</param>
     /// <param name="DeckHalfLengthM">Half the deck's length (ship-local z), m.</param>
     /// <param name="DeckHeightM">The deck's height above the water, m.</param>
-    /// <param name="DraftM">Depth below the water, m. Shallower water stops the ship.</param>
+    /// <param name="DraftM">Depth below the water, m. Shallower water stops the ship. For land hulls, the deepest water they ford.</param>
+    /// <param name="MaxGradient">Land hulls: the steepest ground they drive on, rise over run. 0 for sea hulls.</param>
     /// <param name="Hp">Hit points when built.</param>
     /// <param name="HelmX">The helm's ship-local x, m.</param>
     /// <param name="HelmZ">The helm's ship-local z, m.</param>
-    public sealed record HullData(Hull Hull, string Id, float MaxSpeedMps, float AsternSpeedMps, float AccelMps2, float DriftDecelMps2, float TurnRateDps, float DeckHalfWidthM, float DeckHalfLengthM, float DeckHeightM, float DraftM, int Hp, float HelmX, float HelmZ, CannonData Cannon, IReadOnlyList<Mount> Mounts);
+    /// <param name="Cannon">Inert (all zero) for a hull without mounts.</param>
+    public sealed record HullData(Hull Hull, string Id, string Name, bool Land, ushort Item, float MaxSpeedMps, float AsternSpeedMps, float AccelMps2, float DriftDecelMps2, float TurnRateDps, float DeckHalfWidthM, float DeckHalfLengthM, float DeckHeightM, float DraftM, float MaxGradient, int Hp, float HelmX, float HelmZ, CannonData Cannon, IReadOnlyList<Mount> Mounts, IReadOnlyList<PackSlot> Slots);
 
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x33fdd22e2b2f9d02UL;
+        public const ulong Hash = 0xfc62fe23648321d6UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -324,10 +336,21 @@ namespace Mmo.Content
 
         public static readonly IReadOnlyList<HullData> Hulls = new HullData[]
         {
-            new(Hull.Clipper, "clipper", 11.0f, 3.0f, 1.5f, 0.8f, 12.0f, 2.5f, 9.0f, 2.0f, 1.2f, 12000, 0.0f, 7.5f, new CannonData(40.0f, 1.0f, 30.0f, -5.0f, 15.0f, 5.0f, 1500, 2.0f), new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }),
+            new(Hull.Clipper, "clipper", "Swiftgull", false, 702, 11.0f, 3.0f, 1.5f, 0.8f, 12.0f, 2.5f, 9.0f, 2.0f, 1.2f, 0.0f, 12000, 0.0f, 7.5f, new CannonData(40.0f, 1.0f, 30.0f, -5.0f, 15.0f, 5.0f, 1500, 2.0f), new Mount[] { new(-2.0f, 0.0f, 90.0f), new(2.0f, 0.0f, -90.0f) }, new PackSlot[] { new(-1.0f, 4.5f), new(1.0f, 4.5f) }),
+            new(Hull.Skiff, "skiff", "Driftpine Skiff", false, 701, 4.0f, 1.5f, 1.0f, 0.8f, 30.0f, 0.8f, 2.0f, 0.5f, 0.4f, 0.0f, 2000, 0.0f, 1.5f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] {  }),
+            new(Hull.FurrowCart, "furrow_cart", "Furrow Cart", true, 700, 4.0f, 1.5f, 2.0f, 4.0f, 22.9f, 0.9f, 1.6f, 0.9f, 0.4f, 0.6f, 3000, 0.0f, -1.2f, new CannonData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0.0f), new Mount[] {  }, new PackSlot[] { new(-0.45f, 0.6f), new(0.45f, 0.6f) }),
         };
 
         public static HullData Data(this Hull hull) => Hulls[(int)hull];
+
+        /// <summary>The hull a vehicle item summons, if it is a vehicle item.</summary>
+        public static HullData? HullOfItem(ushort item)
+        {
+            foreach (var h in Hulls)
+                if (h.Item == item)
+                    return h;
+            return null;
+        }
 
         public static readonly IReadOnlyList<LandUseData> LandUses = new LandUseData[]
         {
@@ -426,6 +449,9 @@ namespace Mmo.Content
             new(608, "mossback_scute", "Mossback Scute", ItemKind.Material, 1000),
             new(609, "ashwing_venom", "Ashwing Venom", ItemKind.Material, 1000),
             new(610, "captains_compass", "Captain's Compass", ItemKind.Material, 1),
+            new(700, "furrow_cart", "Furrow Cart", ItemKind.Vehicle, 1),
+            new(701, "driftpine_skiff", "Driftpine Skiff", ItemKind.Vehicle, 1),
+            new(702, "swiftgull", "Swiftgull", ItemKind.Vehicle, 1),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -505,6 +531,8 @@ namespace Mmo.Content
             new(30, "driftpine_sapling", 0, new Ingredient[] { new(20, 1), new(30, 1) }, 407, 1, 5, 4.0f),
             new(31, "grain_bale", 3, new Ingredient[] { new(80, 20), new(31, 2) }, 500, 1, 40, 6.0f),
             new(32, "preserves_crate", 3, new Ingredient[] { new(101, 6), new(40, 4), new(52, 10) }, 501, 1, 40, 6.0f),
+            new(33, "furrow_cart", 0, new Ingredient[] { new(41, 10), new(42, 2), new(53, 4) }, 700, 1, 50, 15.0f),
+            new(34, "driftpine_skiff", 0, new Ingredient[] { new(40, 12), new(32, 2), new(52, 6) }, 701, 1, 30, 10.0f),
         };
 
         /// <summary>The recipe stored as <paramref name="wire"/>, if it exists.</summary>

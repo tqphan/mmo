@@ -57,6 +57,8 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Vehicle, sbyte> Rudder { get; }
         public global::SpacetimeDB.Col<Vehicle, ulong> Helm { get; }
         public global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<SpacetimeDB.Timestamp>> CannonReadyAt { get; }
+        public global::SpacetimeDB.Col<Vehicle, ulong> Owner { get; }
+        public global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<ushort>> Cargo { get; }
 
         public VehicleCols(string tableName)
         {
@@ -68,6 +70,8 @@ namespace SpacetimeDB.Types
             Rudder = new global::SpacetimeDB.Col<Vehicle, sbyte>(tableName, "rudder");
             Helm = new global::SpacetimeDB.Col<Vehicle, ulong>(tableName, "helm");
             CannonReadyAt = new global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<SpacetimeDB.Timestamp>>(tableName, "cannon_ready_at");
+            Owner = new global::SpacetimeDB.Col<Vehicle, ulong>(tableName, "owner");
+            Cargo = new global::SpacetimeDB.Col<Vehicle, System.Collections.Generic.List<ushort>>(tableName, "cargo");
         }
     }
 

@@ -16,7 +16,6 @@ pub const SPAWN: [f32; 3] = [0.0, 0.0, 0.0];
 pub mod entity_kind {
     pub const CHARACTER: u8 = 1;
     /// `ref_id` is the hull's wire id (docs/design/ships.md).
-    #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_ship` makes ships until shipyards (M1)
     pub const SHIP: u8 = 2;
     /// A dev Straw Dummy (docs/design/combat.md).
     #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_dummy` makes dummies until NPCs (M1)

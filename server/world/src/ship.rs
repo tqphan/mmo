@@ -1,11 +1,13 @@
-//! Ships: the helm, cannons, and stepping ships in the world tick (docs/design/ships.md). The
-//! rules themselves live in `sim::ship`; moving decks are handled by `movement`.
+//! Ships and other vehicles: the helm, cannons, and stepping them in the world tick
+//! (docs/design/ships.md, docs/design/vehicles.md). The rules themselves live in `sim::ship`;
+//! moving decks are handled by `movement`, and owning, summoning and cargo by `vehicle`.
 
 use spacetimedb::{ReducerContext, ScheduleAt, Table, TimeDuration, Timestamp};
 use sim::ship::{Hull, HullData, Input, Motion, Pose};
 
 use crate::combat::{CombatEvent, combat_event, flags, skill};
-use crate::session::{Entity, Presence, Transform, entity, presence, transform};
+use crate::session::{Entity, Presence, Transform, entity, entity_kind, presence, transform};
+use sim::movement::MoveMode;
 use crate::terrain::Terrain;
 use crate::time::now;
 
@@ -26,6 +28,11 @@ pub struct Vehicle {
     pub helm: u64,
     /// When each mount may fire again, in the hull's mount order.
     pub cannon_ready_at: Vec<Timestamp>,
+    /// The character that summoned it, or 0 for a dev ship anyone may use.
+    pub owner: u64,
+    /// The pack item in each slot, in the hull's slot order; 0 is empty. The rest of each pack is
+    /// in the private `cargo` table.
+    pub cargo: Vec<u16>,
 }
 
 /// Private: the exact state the tick steps. `transform` carries a rounded copy at 5 Hz.
@@ -37,6 +44,8 @@ pub struct ShipMotion {
     pub z: f32,
     pub yaw: f32,
     pub speed: f32,
+    /// The deck's height: sea level plus the deck for ships, from the ground for land hulls.
+    pub y: f32,
 }
 
 /// Private: a cannon shot in flight, due when it lands.
@@ -60,11 +69,13 @@ pub struct Deck {
     pub ship: u64,
     pub hull: &'static HullData,
     pub motion: Motion,
+    /// The deck's height.
+    pub y: f32,
 }
 
 impl Deck {
     pub fn pose(&self) -> Pose {
-        self.motion.pose(self.hull)
+        self.motion.pose_at(self.y)
     }
 }
 
@@ -72,7 +83,7 @@ pub fn deck(ctx: &ReducerContext, ship: u64) -> Option<Deck> {
     let m = ctx.db.ship_motion().entity_id().find(ship)?;
     let v = ctx.db.vehicle().entity_id().find(ship)?;
     let hull = Hull::from_u8(v.hull)?.data();
-    Some(Deck { ship, hull, motion: Motion { x: m.x, z: m.z, yaw: m.yaw, speed: m.speed } })
+    Some(Deck { ship, hull, motion: Motion { x: m.x, z: m.z, yaw: m.yaw, speed: m.speed }, y: m.y })
 }
 
 /// A character's position in world coordinates, wherever it stands.
@@ -111,6 +122,9 @@ pub fn take_helm(ctx: &ReducerContext) -> Result<(), String> {
         && ctx.db.presence().entity_id().find(v.helm).is_some_and(|h| h.parent == d.ship);
     if held {
         return Err("someone else has the helm".into());
+    }
+    if v.owner != 0 && !crate::vehicle::same_account(ctx, v.owner) {
+        return Err("only the owner can drive this".into());
     }
     ctx.db.vehicle().entity_id().update(Vehicle { helm: p.entity_id, ..v });
     Ok(())
@@ -217,11 +231,13 @@ pub fn step_ships(ctx: &ReducerContext, dt: f32, publish: bool) {
         let Some(hull) = Hull::from_u8(v.hull).map(Hull::data) else { continue };
         let was = Motion { x: s.x, z: s.z, yaw: s.yaw, speed: s.speed };
         let mut next = sim::ship::step(was, hull, Input { throttle: v.throttle, rudder: v.rudder }, dt);
-        if !sim::ship::afloat(hull, &next, |x, z| terrain.ground(x, z)) {
-            next = Motion { speed: 0.0, ..was };
+        let mut y = s.y;
+        match sim::ship::stand(hull, &next, |x, z| terrain.ground(x, z)) {
+            Some(stood) => y = stood,
+            None => next = Motion { speed: 0.0, ..was },
         }
-        if next != was {
-            ctx.db.ship_motion().entity_id().update(ShipMotion { x: next.x, z: next.z, yaw: next.yaw, speed: next.speed, ..s });
+        if next != was || y != s.y {
+            ctx.db.ship_motion().entity_id().update(ShipMotion { x: next.x, z: next.z, yaw: next.yaw, speed: next.speed, y, ..s });
         }
         let id = s.entity_id;
         let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, next.x, next.z);
@@ -242,7 +258,7 @@ pub fn step_ships(ctx: &ReducerContext, dt: f32, publish: bool) {
         if (publish || new_cell)
             && let Some(t) = ctx.db.transform().entity_id().find(id)
         {
-            let shown = ship_transform(id, cell, hull, &next);
+            let shown = ship_transform(id, cell, &next, y);
             if shown != t {
                 ctx.db.transform().entity_id().update(shown);
             }
@@ -250,9 +266,9 @@ pub fn step_ships(ctx: &ReducerContext, dt: f32, publish: bool) {
     }
 }
 
-/// How a ship appears in `transform`: the deck's centre, yaw, and speed in cm/s.
-pub fn ship_transform(entity_id: u64, cell: u64, hull: &HullData, m: &Motion) -> Transform {
-    let pose = m.pose(hull);
+/// How a ship appears in `transform`: the deck's centre at height `y`, yaw, and speed in cm/s.
+pub fn ship_transform(entity_id: u64, cell: u64, m: &Motion, y: f32) -> Transform {
+    let pose = m.pose_at(y);
     Transform {
         entity_id,
         cell,
@@ -264,4 +280,50 @@ pub fn ship_transform(entity_id: u64, cell: u64, hull: &HullData, m: &Motion) ->
         speed: (m.speed * 100.0).round() as i16,
         mode: 0,
     }
+}
+
+/// Put a vehicle of `hull` in the world at `m`, its deck at `y`, at full HP and owned by `owner`
+/// (0 for none). The caller checked it stands there. Returns its entity id.
+pub fn launch(ctx: &ReducerContext, hull: Hull, m: Motion, y: f32, owner: u64) -> u64 {
+    let data = hull.data();
+    let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, m.x, m.z);
+    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::SHIP, ref_id: hull as u64, pack: 0 });
+    ctx.db.transform().insert(ship_transform(e.id, cell, &m, y));
+    ctx.db.vehicle().insert(Vehicle {
+        entity_id: e.id,
+        cell,
+        hull: hull as u8,
+        hp: data.hp,
+        throttle: 0,
+        rudder: 0,
+        helm: 0,
+        cannon_ready_at: vec![now(ctx); data.mounts.len()],
+        owner,
+        cargo: vec![0; data.slots.len()],
+    });
+    ctx.db.ship_motion().insert(ShipMotion { entity_id: e.id, x: m.x, z: m.z, yaw: m.yaw, speed: m.speed, y });
+    log::info!("vehicle {} ({}) of char {owner} out at ({:.1}, {:.1})", e.id, data.id, m.x, m.z);
+    e.id
+}
+
+/// Take a vehicle out of the world with its cargo and its shots still in the air. Anyone aboard is
+/// put where they stood, in the water off a boat or on the ground off a cart, and told to snap.
+pub fn remove(ctx: &ReducerContext, d: &Deck) {
+    let mode = if d.hull.land { MoveMode::Walk } else { MoveMode::Swim };
+    let aboard: Vec<Presence> = ctx.db.presence().parent().filter(d.ship).collect();
+    for p in aboard {
+        let [x, _, z] = d.pose().to_world([p.x, p.y, p.z]);
+        let id = p.entity_id;
+        crate::movement::relocate(ctx, p, x, z, mode, true);
+        crate::movement::mark_moved(ctx, id);
+    }
+    let shots: Vec<u64> = ctx.db.cannon_shot().iter().filter(|s| s.ship == d.ship).map(|s| s.scheduled_id).collect();
+    for id in shots {
+        ctx.db.cannon_shot().scheduled_id().delete(id);
+    }
+    crate::vehicle::clear_cargo(ctx, d.ship);
+    ctx.db.ship_motion().entity_id().delete(d.ship);
+    ctx.db.vehicle().entity_id().delete(d.ship);
+    ctx.db.transform().entity_id().delete(d.ship);
+    ctx.db.entity().id().delete(d.ship);
 }

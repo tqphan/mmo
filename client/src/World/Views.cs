@@ -93,6 +93,35 @@ namespace Mmo
             return root;
         }
 
+        /// <summary>A cart's four wheels under a deck of half width <paramref name="halfWidth"/> and half length <paramref name="halfLength"/>, <paramref name="height"/> above the ground.</summary>
+        public static Node3D Wheels(float halfWidth, float halfLength, float height)
+        {
+            var root = new Node3D { Name = "Wheels" };
+            var wood = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.17f, 0.1f) };
+            float r = height * 0.5f;
+            foreach (float x in new[] { -halfWidth - 0.08f, halfWidth + 0.08f })
+                foreach (float z in new[] { -halfLength * 0.6f, halfLength * 0.6f })
+                    root.AddChild(new MeshInstance3D
+                    {
+                        Mesh = new CylinderMesh { TopRadius = r, BottomRadius = r, Height = 0.12f, Material = wood },
+                        Position = new Vector3(x, -height + r, z),
+                        RotationDegrees = new Vector3(0, 0, 90),
+                    });
+            return root;
+        }
+
+        /// <summary>A pack slot: a low pallet on the deck at <paramref name="at"/>.</summary>
+        public static Node3D Slot(Vector3 at)
+        {
+            var root = new Node3D { Name = "Slot", Position = at };
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.8f, 0.08f, 0.8f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.5f, 0.32f) } },
+                Position = new Vector3(0, 0.04f, 0),
+            });
+            return root;
+        }
+
         /// <summary>The helm: a post with a wheel, standing on the deck at <paramref name="at"/>.</summary>
         public static Node3D Helm(Vector3 at)
         {

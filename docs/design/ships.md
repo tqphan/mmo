@@ -24,7 +24,7 @@ Every hull and cannon number below is a placeholder, confidence C, in `content/s
 - `local → world`: `wx = sx + lx·cos θ + lz·sin θ`, `wy = sy + ly`, `wz = sz − lx·sin θ + lz·cos θ`. That's Godot's `Basis(Vector3.UP, θ)`. Ships don't roll or pitch on the server; waves and roll are cosmetic (PLAN §4.2).
 
 ### Hulls (`content/ships.toml`)
-One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, deck size, deck height, draft, HP, the helm's position, a `[hull.cannon]` table and one `[[hull.mount]]` per cannon (position on deck and facing). contentgen emits `sim::content::{Hull, HullData, HULLS}` and the C# equivalents, and the hulls are part of the content hash. The clipper: 11 m/s, 3 m/s astern, 1.5 m/s² acceleration, 0.8 m/s² drift deceleration, 12°/s turn rate, an 18 × 5 m deck 2 m above the water, 1.2 m draft, 12,000 HP, the helm at the stern and one cannon on each side.
+One `[[hull]]` per ship type (and, since docs/design/vehicles.md, per land vehicle too, with a name, a medium, a summoning item and pack slots) with a wire id, speeds, acceleration, turn rate, deck size, deck height, draft, HP, the helm's position, a `[hull.cannon]` table and one `[[hull.mount]]` per cannon (position on deck and facing). contentgen emits `sim::content::{Hull, HullData, HULLS}` and the C# equivalents, and the hulls are part of the content hash. The clipper (shown to players as the Swiftgull): 11 m/s, 3 m/s astern, 1.5 m/s² acceleration, 0.8 m/s² drift deceleration, 12°/s turn rate, an 18 × 5 m deck 2 m above the water, 1.2 m draft, 12,000 HP, the helm at the stern and one cannon on each side.
 
 ### Ship motion (`sim::ship::step`)
 - **State:** position, yaw and signed speed (m/s). **Input:** `throttle` and `rudder`, each −100 to 100 percent. The helmsman sets them and they persist.
@@ -42,7 +42,7 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 | `entity` | public | A ship is `kind = 2` with `ref_id` = hull wire id |
 | `transform` | public | The ship's pose: deck height as `y`, `speed` in cm/s. Written at **5 Hz** (every other tick) and whenever the ship changes cell, only if it moved. Clients extrapolate with `sim::ship::step` and the input in `vehicle` |
 | `vehicle` | public, by `cell` | `hull`, `hp`, `throttle`, `rudder`, `helm` (the helmsman's entity id, or 0), `cannon_ready_at` per mount. Written only when these change |
-| `ship_motion` | private | The exact state (f32 yaw and speed) that the tick steps |
+| `ship_motion` | private | The exact state (f32 yaw and speed, and the deck's height `y`, docs/design/vehicles.md) that the tick steps |
 | `cannon_shot` | private, scheduled | One row per shot in flight, due when it lands |
 
 ### The tick
@@ -82,7 +82,7 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 - **Autopilot routes** for tests without a person: `deck:X,Z,S`, `helm:X,Z,R` and `gun:X,Z,M` (docs/design/client.md).
 
 ### Dev reducers
-- `dev_spawn_ship(hull, x, z, yaw)` puts a ship on the water at full HP. Ships are built at shipyards in M1.
+- `dev_spawn_ship(hull, x, z, yaw)` puts an unowned vehicle of any hull in the world at full HP (a land hull must stand there). Owned vehicles are summoned from the bag (docs/design/vehicles.md); the clipper comes from the shipyard in Vehicles B.
 - `dev_remove_ship(ship)` removes it. Its passengers are put in the water where they stood, swimming, with a correction so their clients snap.
 - `dev_teleport` also takes the caller off any ship.
 
@@ -90,7 +90,7 @@ One `[[hull]]` per ship type with a wire id, speeds, acceleration, turn rate, de
 - **The deck is a flat rectangle.** There are no masts, cabins, rails, stairs or tapering bow, and no walls to stop walking off the deck. Deck furniture needs ship-local obstacle outlines, which come with the obstacle work (docs/design/terrain.md §3).
 - **No ship-to-ship collisions** and **no coastline distance field** (PLAN §8.4). Ships stop at shallow water, tested at three points.
 - **Shots land at sea level.** Terrain doesn't stop them and they don't hit players. The hit test is the landing point, not the path, so a shot that skims over a ship's deck lands beyond it.
-- **No sinking, repairs, seats for passengers, ownership or Far tier.** Ships appear in the Near tier only, so they aren't yet seen from far away. These come with M1 ships and the Far tier.
+- **No sinking, repairs, seats for passengers or Far tier.** Ownership, summoning and pack slots came with docs/design/vehicles.md. Ships appear in the Near tier only, so they aren't yet seen from far away. These come with M1 ships and the Far tier.
 - **No buoyancy.** Waves, roll and pitch are cosmetic; the deck's height is constant.
 - **Changing frame trusts the client's view of the ship** within the lag allowance, so a cheater can gain about 6 m (11 m/s × 0.5 s) when boarding or stepping off a fast ship.
 - **A character who leaves the world on a deck** comes back at that spot in the water, with no ship. Ships don't persist players across sessions yet.

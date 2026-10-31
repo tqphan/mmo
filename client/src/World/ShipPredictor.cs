@@ -14,6 +14,10 @@ namespace Mmo.World
     /// A new row or input restarts the prediction from there. The difference between the old and
     /// new answers is kept as an offset that fades at <see cref="SmoothRate"/>, so the ship never
     /// jumps unless it was more than <see cref="SnapM"/> off.
+    ///
+    /// Given the ground, it also checks each step's footing with <see cref="Ship.Stand"/>, as the
+    /// server's tick does: a cart stops at the same bank or ford, a ship at the same shoal, and a
+    /// cart's deck rides the ground (docs/design/vehicles.md).
     /// </summary>
     public sealed class ShipPredictor
     {
@@ -25,14 +29,20 @@ namespace Mmo.World
         public const float SnapM = 8.0f;
 
         private readonly HullData hull;
-        /// <summary>The state <see cref="steps"/> whole steps after the last restart, at <see cref="start"/>.</summary>
+        private readonly Func<float, float, Ground?>? ground;
+        /// <summary>The state <see cref="steps"/> whole steps after the last restart, at <see cref="start"/>, and its deck's height.</summary>
         private ShipMotion state;
+        private float stateY;
         private double start = double.NaN;
         private int steps;
         private float offX, offZ, offYaw;
         private double offAt;
 
-        public ShipPredictor(HullData hull) => this.hull = hull;
+        public ShipPredictor(HullData hull, Func<float, float, Ground?>? ground = null)
+        {
+            this.hull = hull;
+            this.ground = ground;
+        }
 
         public HullData Hull => hull;
         public ShipInput Input { get; private set; }
@@ -40,9 +50,9 @@ namespace Mmo.World
 
         private double Stepped => start + steps * (double)StepS;
 
-        /// <summary>A <c>transform</c> row: position (deck height ignored), yaw and speed, received at <paramref name="now"/>.</summary>
-        public void Row(double now, float x, float z, float yaw, float speed) =>
-            Restart(now, new ShipMotion(x, z, yaw, speed));
+        /// <summary>A <c>transform</c> row: position, yaw and speed, and the deck's height if known, received at <paramref name="now"/>.</summary>
+        public void Row(double now, float x, float z, float yaw, float speed, float? y = null) =>
+            Restart(now, new ShipMotion(x, z, yaw, speed), y: y);
 
         /// <summary>The helm's input changed at <paramref name="now"/>, from <c>vehicle</c> or our own helm.</summary>
         public void SetInput(double now, ShipInput input)
@@ -50,12 +60,16 @@ namespace Mmo.World
             if (input == Input)
                 return;
             if (HasRow)
-                Restart(now, Advance(now), keepOffset: true);
+            {
+                var (m, y) = AdvanceWithDeck(now);
+                Restart(now, m, keepOffset: true, y: y);
+            }
             Input = input;
         }
 
-        private void Restart(double now, ShipMotion from, bool keepOffset = false)
+        private void Restart(double now, ShipMotion from, bool keepOffset = false, float? y = null)
         {
+            float deck = y ?? (HasRow ? stateY : from.Pose(hull).Y);
             if (HasRow && !keepOffset)
             {
                 // Carry what we were drawing over as an offset, so the switch doesn't show.
@@ -67,12 +81,24 @@ namespace Mmo.World
                     (offX, offZ, offYaw) = (0, 0, 0);
             }
             state = from;
+            stateY = deck;
             start = now;
             steps = 0;
         }
 
+        /// <summary>One step from <paramref name="m"/>, stopped where it can't stand.</summary>
+        private (ShipMotion, float) StepOnce(ShipMotion m, float y, float dt)
+        {
+            var next = Ship.Step(m, hull, Input, dt);
+            if (ground is null)
+                return (next, y);
+            return Ship.Stand(hull, next, ground) is float stood ? (next, stood) : (m with { Speed = 0 }, y);
+        }
+
         /// <summary>The exact predicted state at <paramref name="now"/>, without the fading offset.</summary>
-        public ShipMotion Advance(double now)
+        public ShipMotion Advance(double now) => AdvanceWithDeck(now).Motion;
+
+        private (ShipMotion Motion, float Y) AdvanceWithDeck(double now)
         {
             if (!HasRow)
                 throw new InvalidOperationException("no row yet");
@@ -80,17 +106,18 @@ namespace Mmo.World
             // than the last whole step gets that step: the prediction never runs backwards.
             while (now - Stepped >= StepS)
             {
-                state = Ship.Step(state, hull, Input, StepS);
+                (state, stateY) = StepOnce(state, stateY, StepS);
                 steps++;
             }
             float rest = (float)(now - Stepped);
-            return rest > 0 ? Ship.Step(state, hull, Input, rest) : state;
+            return rest > 0 ? StepOnce(state, stateY, rest) : (state, stateY);
         }
 
         /// <summary>Where to draw the ship, and where its deck is, at <paramref name="now"/>.</summary>
         public ShipPose Pose(double now)
         {
-            var pose = Advance(now).Pose(hull);
+            var (m, y) = AdvanceWithDeck(now);
+            var pose = m.PoseAt(y);
             float k = MathF.Exp(-SmoothRate * (float)Math.Max(0, now - offAt));
             return pose with { X = pose.X + offX * k, Z = pose.Z + offZ * k, Yaw = pose.Yaw + offYaw * k };
         }

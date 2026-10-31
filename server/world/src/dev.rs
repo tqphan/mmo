@@ -1,15 +1,13 @@
 //! Dev builds only: shortcuts for bots and load tests. Production builds compile all of this out.
 
 use spacetimedb::{ReducerContext, Table};
-use sim::movement::{MoveMode, SEA_LEVEL_M};
+use sim::movement::MoveMode;
 use sim::ship::{Hull, Motion};
 
 use crate::combat::{CombatEvent, combat_event, skill};
-use crate::movement::mark_moved;
-use crate::session::{Account, Entity, Presence, account, entity, entity_kind, presence, transform};
-use crate::ship::{ShipMotion, Vehicle, cannon_shot, deck, ship_motion, vehicle};
+use crate::session::{Account, account, presence, transform};
+use crate::ship::deck;
 use crate::terrain::Terrain;
-use crate::time::now;
 
 /// Make the caller a GM of any level, `gm::ADMIN` included. Bots use it to upload test terrain.
 #[spacetimedb::reducer]
@@ -55,7 +53,7 @@ pub fn dev_swing(ctx: &ReducerContext, target: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// Put a ship on the water at full HP, at rest. Ships are built at shipyards from M1.
+/// Put an unowned vehicle of any hull at (x, z), at full HP and at rest. A land hull must stand there.
 #[spacetimedb::reducer]
 pub fn dev_spawn_ship(ctx: &ReducerContext, hull: u8, x: f32, z: f32, yaw: f32) -> Result<(), String> {
     let kind = Hull::from_u8(hull).ok_or("no such hull")?;
@@ -64,58 +62,21 @@ pub fn dev_spawn_ship(ctx: &ReducerContext, hull: u8, x: f32, z: f32, yaw: f32) 
     }
     let data = kind.data();
     let m = Motion { x, z, yaw: yaw.rem_euclid(std::f32::consts::TAU), speed: 0.0 };
-    let cell = sim::cell::cell_of(sim::cell::OPEN_WORLD, x, z);
-    let e = ctx.db.entity().insert(Entity { id: 0, cell, kind: entity_kind::SHIP, ref_id: u64::from(hull), pack: 0 });
-    ctx.db.transform().insert(crate::ship::ship_transform(e.id, cell, data, &m));
-    ctx.db.vehicle().insert(Vehicle {
-        entity_id: e.id,
-        cell,
-        hull,
-        hp: data.hp,
-        throttle: 0,
-        rudder: 0,
-        helm: 0,
-        cannon_ready_at: vec![now(ctx); data.mounts.len()],
-    });
-    ctx.db.ship_motion().insert(ShipMotion { entity_id: e.id, x: m.x, z: m.z, yaw: m.yaw, speed: 0.0 });
-    log::info!("ship {} ({}) spawned at ({x:.1}, {z:.1})", e.id, data.id);
+    let mut terrain = Terrain::new(ctx);
+    let y = match sim::ship::stand(data, &m, |x, z| terrain.ground(x, z)) {
+        Some(y) => y,
+        None if data.land => return Err("a cart can't stand there".into()),
+        // Dev ships may be put in shallows, as before; they stop until moved off.
+        None => sim::movement::SEA_LEVEL_M + data.deck_height_m,
+    };
+    crate::ship::launch(ctx, kind, m, y, 0);
     Ok(())
 }
 
-/// Remove a ship. Anyone aboard is put in the water where they stood, swimming, and told to snap.
+/// Remove a vehicle and its cargo. Anyone aboard is put where they stood and told to snap.
 #[spacetimedb::reducer]
 pub fn dev_remove_ship(ctx: &ReducerContext, ship: u64) -> Result<(), String> {
     let d = deck(ctx, ship).ok_or("no such ship")?;
-    let at = now(ctx);
-    let mut terrain = Terrain::new(ctx);
-    let aboard: Vec<Presence> = ctx.db.presence().parent().filter(ship).collect();
-    for p in aboard {
-        let [x, _, z] = d.pose().to_world([p.x, p.y, p.z]);
-        let y = sim::movement::settle(terrain.ground(x, z), [x, SEA_LEVEL_M, z], MoveMode::Swim);
-        ctx.db.presence().identity().update(Presence {
-            parent: 0,
-            last_move_at: at,
-            corrections: p.corrections + 1,
-            x,
-            y,
-            z,
-            speed: 0,
-            mode: MoveMode::Swim as u8,
-            anchor_x: x,
-            anchor_y: y,
-            anchor_z: z,
-            contact_at: at,
-            ..p
-        });
-        mark_moved(ctx, p.entity_id);
-    }
-    let shots: Vec<u64> = ctx.db.cannon_shot().iter().filter(|s| s.ship == ship).map(|s| s.scheduled_id).collect();
-    for id in shots {
-        ctx.db.cannon_shot().scheduled_id().delete(id);
-    }
-    ctx.db.ship_motion().entity_id().delete(ship);
-    ctx.db.vehicle().entity_id().delete(ship);
-    ctx.db.transform().entity_id().delete(ship);
-    ctx.db.entity().id().delete(ship);
+    crate::ship::remove(ctx, &d);
     Ok(())
 }

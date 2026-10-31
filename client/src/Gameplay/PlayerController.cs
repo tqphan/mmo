@@ -75,6 +75,7 @@ namespace Mmo.Gameplay
 
         /// <summary>The helm and cannons; set by <see cref="Main"/>.</summary>
         public ShipControls? Controls { get; set; }
+        public Vehicles? Vehicles { get; set; }
 
         /// <summary>Gathering from resource nodes; set by <see cref="Main"/>. F on land gathers before it climbs.</summary>
         public Gathering? Gathering { get; set; }
@@ -186,8 +187,11 @@ namespace Mmo.Gameplay
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
             if (interact && Parent == 0
-                && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true
-                    || Crafting?.Interact() == true || Plots?.Interact() == true))
+                && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Vehicles?.Interact() == true
+                    || Trade?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
+                interact = false;
+            // Aboard, a pack slot takes F unless we stand at the helm or a cannon, or are working one.
+            if (interact && Parent != 0 && Controls?.Manning is null && Controls?.AtStation != true && Vehicles?.Interact() == true)
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.
             bool interactAboard = interact && Parent != 0;
@@ -310,6 +314,9 @@ namespace Mmo.Gameplay
             float speed = new Vector2(Velocity.X, Velocity.Z).Length();
             session.SendMove(sender.Force(Clock.Now, State(speed, swimming || IsOnFloor())));
         }
+
+        /// <summary>Demos: climb aboard the vehicle alongside, as F does, over the next second.</summary>
+        public void DemoClimb() => climbUntil = Clock.Now + ClimbWaitS;
 
         /// <summary>Climb aboard the ship alongside, if the server would allow the jump to its deck now.</summary>
         private bool TryClimb(double now, float maxSpeed)

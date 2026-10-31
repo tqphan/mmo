@@ -64,7 +64,7 @@ namespace Mmo
                 DirectionalShadowMaxDistance = 200,
             });
             AddChild(new WorldEnvironment { Environment = Presentation.StyleTest.Environment(fog: 0.00012f) });
-            var entities = new EntityRegistry(session, options.Trace);
+            var entities = new EntityRegistry(session, options.Trace, map);
             AddChild(entities);
             var ground = new TerrainCollision(map);
             AddChild(ground);
@@ -97,6 +97,9 @@ namespace Mmo
             var farming = new Farming(session, player, map, world.Land, plotRegistry, crops);
             AddChild(farming);
             player.Farming = farming;
+            var vehicles = new Vehicles(session, player, entities);
+            AddChild(vehicles);
+            player.Vehicles = vehicles;
             var tradeRegistry = new TradeRegistry(session);
             AddChild(tradeRegistry);
             var trade = new Trade(session, player, tradeRegistry);
@@ -122,14 +125,20 @@ namespace Mmo
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
             hud.Prompts.Add(() => looting.Prompt);
+            hud.Prompts.Add(() => vehicles.Prompt);
             hud.Prompts.Add(() => trade.Status);
             hud.Prompts.Add(() => trade.Prompt);
             hud.Prompts.Add(() => placement.Active is null && farming.Active is null ? plots.Prompt : "");
             AddChild(hud);
-            // Right-clicking a stack uses it: deeds place plots, seeds plant.
+            // Right-clicking a stack uses it: deeds place plots, seeds plant, vehicles are summoned.
             bool Use(BagStack s)
             {
-                if (placement.Begin(s))
+                if (vehicles.Begin(s))
+                {
+                    placement.Cancel();
+                    farming.Cancel();
+                }
+                else if (placement.Begin(s))
                     farming.Cancel();
                 else if (farming.Begin(s))
                     placement.Cancel();
@@ -151,6 +160,8 @@ namespace Mmo
                 AddChild(new FarmDemo(session, player, map, world.Land, bag, placement, plotRegistry, farming));
             if (options.TradeDemo)
                 AddChild(new TradeDemo(session, player, stations, crafting, craftWindow, tradeRegistry, trade));
+            if (options.VehicleDemo)
+                AddChild(new VehicleDemo(session, player, entities, controls, vehicles, map));
             if (options.CombatDemo)
                 AddChild(new CombatDemo(session, player, entities, combat));
             if (options.NpcDemo)
@@ -255,6 +266,7 @@ namespace Mmo
             Bind("target_clear", Key.Escape);
             Bind("respawn", Key.R);
             Bind("skillsets", Key.K);
+            Bind("stow_vehicle", Key.V);
         }
     }
 }
