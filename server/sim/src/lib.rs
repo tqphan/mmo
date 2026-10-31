@@ -5,6 +5,7 @@ pub mod cell;
 pub mod combat;
 pub mod content;
 pub mod craft;
+pub mod crime;
 pub mod farm;
 pub mod gather;
 pub mod labor;

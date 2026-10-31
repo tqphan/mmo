@@ -170,6 +170,9 @@ namespace Mmo.Gameplay
                 v.Level, v.Statuses.Select(s => new Slot(s.Status, s.Start.MicrosecondsSinceUnixEpoch, s.Until.MicrosecondsSinceUnixEpoch)).ToList());
         }
 
+        /// <summary>Whether an entity in view is Sought (docs/design/crime.md).</summary>
+        public bool Sought(ulong id) => id != 0 && session.Conn?.Db.Vitals.EntityId.Find(id)?.Sought == true;
+
         /// <summary>Where an entity is drawn: us, or another we can see.</summary>
         public Vector3? PositionOf(ulong id)
         {

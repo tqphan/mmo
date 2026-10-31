@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xc6a01c5e8a92ba74;
+pub const CONTENT_HASH: u64 = 0x87b24db79b283032;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1107,7 +1107,7 @@ pub struct StatusData {
 }
 
 /// Every status, sorted by wire, which is the index.
-pub static STATUSES: [StatusData; 10] = [
+pub static STATUSES: [StatusData; 11] = [
     StatusData { wire: 0, id: "slowed", name: "Slowed", debuff: true, control: Control::Snare, speed_pct: 60, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
     StatusData { wire: 1, id: "stunned", name: "Stunned", debuff: true, control: Control::Stun, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
     StatusData { wire: 2, id: "felled", name: "Felled", debuff: true, control: Control::Knockdown, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
@@ -1118,6 +1118,7 @@ pub static STATUSES: [StatusData; 10] = [
     StatusData { wire: 7, id: "fervor", name: "Fervor", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 20, taken_pct: 0, tick_ms: 0 },
     StatusData { wire: 8, id: "bulwark", name: "Bulwark", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: -30, tick_ms: 0 },
     StatusData { wire: 9, id: "renewal", name: "Renewal", debuff: false, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 1000 },
+    StatusData { wire: 10, id: "bloodmarked", name: "Bloodmarked", debuff: true, control: Control::None, speed_pct: 100, dealt_pct: 0, taken_pct: 0, tick_ms: 0 },
 ];
 
 /// The status stored as `wire`.
@@ -1160,6 +1161,29 @@ pub struct ControlRules {
 }
 
 pub static CONTROL: ControlRules = ControlRules { window_s: 15, steps_pct: &[100, 50, 25] };
+
+/// Evidence, reports and the attacker's mark (`[crime]` in `content/combat.toml`, docs/design/crime.md).
+#[derive(Debug, PartialEq)]
+pub struct CrimeRules {
+    /// The wire of the status an attacker gets.
+    pub mark: u8,
+    /// How long the mark lasts, s.
+    pub mark_s: i32,
+    /// How long evidence lies before it fades, s.
+    pub evidence_s: i32,
+    /// How close a reporter must stand, horizontally and vertically, m.
+    pub reach_m: f32,
+    /// Crime points for reported Footprints.
+    pub footprint_points: i32,
+    /// Crime points for a reported Bloodstain.
+    pub bloodstain_points: i32,
+    /// Crime points for a reported Blood Pool.
+    pub blood_pool_points: i32,
+    /// Crime points at or above this make a character Sought.
+    pub sought_points: i32,
+}
+
+pub static CRIME: CrimeRules = CrimeRules { mark: 10, mark_s: 30, evidence_s: 86400, reach_m: 4.0, footprint_points: 3, bloodstain_points: 1, blood_pool_points: 10, sought_points: 50 };
 
 /// NPC rules (`content/npcs.toml`, docs/design/npcs.md).
 #[derive(Debug, PartialEq)]

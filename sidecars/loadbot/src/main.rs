@@ -11,6 +11,7 @@
 mod module_bindings;
 mod combat;
 mod craft;
+mod crime;
 mod director;
 mod gather;
 mod items;
@@ -117,6 +118,7 @@ fn main() {
         "farm" => farm::scenario(&args),
         "trade" => trade::scenario(&args),
         "combat" => combat::scenario(&args),
+        "crime" => crime::scenario(&args),
         "npc" => npc::scenario(&args),
         "vehicle" => vehicle::scenario(&args),
         "shipyard" => shipyard::scenario(&args),
@@ -142,6 +144,7 @@ fn main() {
                  farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot\n  \
                  trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock\n  \
                  combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn\n  \
+                 crime            assault, murder and theft leave evidence; reports, crime points, Sought; evidence fades by the dev clock\n  \
                  npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death\n  \
                  vehicle          a bot summons a cart, loads packs, drives a rider and stows it; then rows a skiff and stows it\n  \
                  shipyard         two bots build a Swiftgull through every stage; it's hit, repaired, sunk, its pack taken from the water, and mended"

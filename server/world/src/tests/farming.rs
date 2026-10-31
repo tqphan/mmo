@@ -10,18 +10,18 @@ use sim::farm::{crop_by_id, growth_micros, withers_at};
 use sim::land::demolish_at;
 use sim::movement::MoveMode;
 
-fn crops(t: &TestContext) -> Vec<Crop> {
+pub(super) fn crops(t: &TestContext) -> Vec<Crop> {
     read(t, |ctx| ctx.db.crop().iter().collect())
 }
 
-fn sow(t: &TestContext, player: u128, seed: &str, x: f32, z: f32) -> Result<(), String> {
+pub(super) fn sow(t: &TestContext, player: u128, seed: &str, x: f32, z: f32) -> Result<(), String> {
     let char_id = presence_of(t, player).char_id;
     let item_id = stack(t, char_id, seed);
     call(t, player, |ctx| plant(ctx, item_id, x, z))
 }
 
 /// Arrive with plot deeds and seals, and seeds of every kind.
-fn farmer(t: &TestContext, player: u128, name: &str) -> Presence {
+pub(super) fn farmer(t: &TestContext, player: u128, name: &str) -> Presence {
     let p = settler(t, player, name);
     for seed in ["hearthgrain_seed", "dustbean_seed", "amberpear_sapling", "woolback_lamb"] {
         give(t, p.char_id, seed, 5);
@@ -40,7 +40,7 @@ fn only_crop(t: &TestContext) -> Crop {
 }
 
 /// Move the clock to just past `c` being ripe.
-fn ripen(t: &TestContext, c: &Crop) {
+pub(super) fn ripen(t: &TestContext, c: &Crop) {
     advance_us(t, c.ripe_at.to_micros_since_unix_epoch() - now_us(t) + 1);
 }
 

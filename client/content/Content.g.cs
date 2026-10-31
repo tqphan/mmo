@@ -258,6 +258,17 @@ namespace Mmo.Content
     /// <param name="StepsPct">The share of its duration each control in a row lands for; past the last, immune.</param>
     public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);
 
+    /// <summary>Evidence, reports and the attacker's mark ([crime] in content/combat.toml, docs/design/crime.md).</summary>
+    /// <param name="Mark">The wire of the status an attacker gets.</param>
+    /// <param name="MarkS">How long the mark lasts, s.</param>
+    /// <param name="EvidenceS">How long evidence lies before it fades, s.</param>
+    /// <param name="ReachM">How close a reporter must stand, horizontally and vertically, m.</param>
+    /// <param name="FootprintPoints">Crime points for reported Footprints.</param>
+    /// <param name="BloodstainPoints">Crime points for a reported Bloodstain.</param>
+    /// <param name="BloodPoolPoints">Crime points for a reported Blood Pool.</param>
+    /// <param name="SoughtPoints">Crime points at or above this make a character Sought.</param>
+    public sealed record CrimeRules(byte Mark, int MarkS, int EvidenceS, float ReachM, int FootprintPoints, int BloodstainPoints, int BloodPoolPoints, int SoughtPoints);
+
     /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>
     /// <param name="Npc">NPCs' skills: characters can't pick it, and its skills cost no mana.</param>
     public sealed record SkillsetData(byte Wire, string Id, string Name, bool Npc);
@@ -343,7 +354,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xc6a01c5e8a92ba74UL;
+        public const ulong Hash = 0x87b24db79b283032UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -722,6 +733,7 @@ namespace Mmo.Content
             new(7, "fervor", "Fervor", false, CrowdControl.None, 100, 20, 0, 0),
             new(8, "bulwark", "Bulwark", false, CrowdControl.None, 100, 0, -30, 0),
             new(9, "renewal", "Renewal", false, CrowdControl.None, 100, 0, 0, 1000),
+            new(10, "bloodmarked", "Bloodmarked", true, CrowdControl.None, 100, 0, 0, 0),
         };
 
         /// <summary>The status stored as <paramref name="wire"/>, if it exists.</summary>
@@ -730,6 +742,7 @@ namespace Mmo.Content
         public static readonly ProgressRules Progress = new(new uint[] { 100u, 150u, 220u, 300u, 400u, 520u, 660u, 820u, 1000u, 1200u, 1450u, 1750u, 2100u, 2500u }, new byte[] { 1, 5, 10 }, 100, 40, 40u, 20u, 25u, 5u);
 
         public static readonly ControlRules Diminishing = new(15u, new uint[] { 100u, 50u, 25u });
+        public static readonly CrimeRules Crime = new(10, 30, 86400, 4.0f, 3, 1, 10, 50);
 
         public static readonly NpcRules Npc = new(200, 120.0f, 160.0f, 40.0f, 500, 8, 20, 45, 150, 90, 30, 50, 50, 20, 4.0f);
 

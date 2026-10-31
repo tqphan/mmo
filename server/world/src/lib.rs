@@ -2,6 +2,7 @@
 
 mod combat;
 mod crafting;
+mod crime;
 #[cfg(feature = "dev")]
 mod dev;
 mod farming;

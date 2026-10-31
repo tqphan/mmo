@@ -507,7 +507,24 @@ struct CombatFile {
     shrine: Vec<ShrineDef>,
     progress: ProgressRules,
     control: ControlRules,
+    /// Checked to be there by `check_combat`.
+    crime: Option<CrimeRulesDef>,
     status: Vec<StatusDef>,
+}
+
+/// Evidence, reports and the attacker's mark (`[crime]` in combat.toml, docs/design/crime.md).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CrimeRulesDef {
+    /// The status an attacker gets: a plain debuff.
+    pub mark: String,
+    pub mark_s: u32,
+    pub evidence_s: u32,
+    pub reach_m: f32,
+    pub footprint_points: u32,
+    pub bloodstain_points: u32,
+    pub blood_pool_points: u32,
+    pub sought_points: u32,
 }
 
 /// Levels, experience and skillset picks.
@@ -751,6 +768,7 @@ pub struct Content {
     pub shrines: Vec<ShrineDef>,
     pub progress: ProgressRules,
     pub control: ControlRules,
+    pub crime: CrimeRulesDef,
     /// Sorted by `wire`, like the modes.
     pub statuses: Vec<StatusDef>,
     pub npc: NpcRules,
@@ -860,6 +878,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     }
     let Some(property) = land.property else { unreachable!("check_land reports a missing [property]") };
     let Some(vehicles) = hulls.vehicles else { unreachable!("check_vehicles reports a missing [vehicles]") };
+    let Some(crime) = combat.crime else { unreachable!("check_combat reports a missing [crime]") };
     let mut c = Content { move_modes: modes, hulls: hulls.hull, vehicles, shipyards: hulls.shipyard, land_uses: land.land_use, climates: land.climate, property, plots: land.plot, labor, bag: items.bag,
         items: items.item,
         gathering: gathering.gathering,
@@ -878,6 +897,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         shrines: combat.shrine,
         progress: combat.progress,
         control: combat.control,
+        crime,
         statuses: combat.status,
         npc: npcs.npc,
         npc_kinds: npcs.kind,
@@ -1593,6 +1613,36 @@ fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
             errors.push(format!("{at}: tick_ms must be 0 or from 250 to {MAX_STATUS_MS}"));
         }
     }
+    check_crime(k, errors);
+}
+
+fn check_crime(k: &CombatFile, errors: &mut Vec<String>) {
+    let Some(c) = &k.crime else {
+        errors.push("combat.toml: missing [crime]".into());
+        return;
+    };
+    let at = "combat.toml: crime";
+    match k.status.iter().find(|st| st.id == c.mark) {
+        None => errors.push(format!("{at}: mark: no status {:?}", c.mark)),
+        Some(st) if !st.debuff || st.control != "none" || st.tick_ms != 0 || st.dealt_pct != 0 || st.taken_pct != 0 => {
+            errors.push(format!("{at}: mark {:?} must be a debuff with no control, ticks or modifiers", c.mark));
+        }
+        Some(_) => {}
+    }
+    let mut range = |name: &str, v: u32, lo: u32, hi: u32| {
+        if !(lo..=hi).contains(&v) {
+            errors.push(format!("{at}: {name} must be from {lo} to {hi}"));
+        }
+    };
+    range("mark_s", c.mark_s, 1, 604_800);
+    range("evidence_s", c.evidence_s, 1, 604_800);
+    range("footprint_points", c.footprint_points, 1, 1000);
+    range("bloodstain_points", c.bloodstain_points, 1, 1000);
+    range("blood_pool_points", c.blood_pool_points, 1, 1000);
+    range("sought_points", c.sought_points, 1, 100_000);
+    if !(1.0..=20.0).contains(&c.reach_m) {
+        errors.push(format!("{at}: reach_m must be from 1 to 20"));
+    }
 }
 
 fn check_npcs(n: &NpcsFile, k: &CombatFile, items: &[ItemDef], errors: &mut Vec<String>) {
@@ -1890,6 +1940,11 @@ fn canonical(c: &Content) -> String {
     )
     .unwrap();
     writeln!(s, "control\t{}\t{:?}", c.control.window_s, c.control.steps_pct).unwrap();
+    write!(s, "crime\t{}", c.crime.mark).unwrap();
+    for f in crime_fields(&c.crime) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
     s += "npc";
     for f in npc_fields(&c.npc) {
         write!(s, "\t{}", f.value.bits()).unwrap();
@@ -2092,6 +2147,22 @@ fn combat_fields(k: &CombatRules) -> Vec<Field> {
         f("death_stack_s", "How long a death counts toward the next wait, s.", I32(k.death_stack_s)),
         f("respawn_pct", "HP and mana on respawning, in percent.", I32(k.respawn_pct)),
         f("dummy_hp", "A dev Straw Dummy's HP.", I32(k.dummy_hp)),
+    ]
+}
+
+fn crime_fields(c: &CrimeRulesDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    // Every whole number is checked to fit an i32 with room to spare.
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("mark_s", "How long the mark lasts, s.", i(c.mark_s)),
+        f("evidence_s", "How long evidence lies before it fades, s.", i(c.evidence_s)),
+        f("reach_m", "How close a reporter must stand, horizontally and vertically, m.", F32(c.reach_m)),
+        f("footprint_points", "Crime points for reported Footprints.", i(c.footprint_points)),
+        f("bloodstain_points", "Crime points for a reported Bloodstain.", i(c.bloodstain_points)),
+        f("blood_pool_points", "Crime points for a reported Blood Pool.", i(c.blood_pool_points)),
+        f("sought_points", "Crime points at or above this make a character Sought.", i(c.sought_points)),
     ]
 }
 
@@ -2743,6 +2814,12 @@ pub fn render_rust(c: &Content) -> String {
     s += "    /// The window runs this long past the end of the last control that landed, s.\n    pub window_s: u32,\n";
     s += "    /// The share of its duration each control in a row lands for; past the last, immune.\n    pub steps_pct: &'static [u32],\n}\n\n";
     writeln!(s, "pub static CONTROL: ControlRules = ControlRules {{ window_s: {}, steps_pct: &{:?} }};", c.control.window_s, c.control.steps_pct).unwrap();
+    let crime = crime_fields(&c.crime);
+    s += "\n/// Evidence, reports and the attacker's mark (`[crime]` in `content/combat.toml`, docs/design/crime.md).\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct CrimeRules {\n    /// The wire of the status an attacker gets.\n    pub mark: u8,\n";
+    rust_struct_fields(&mut s, &crime);
+    s += "}\n\n";
+    writeln!(s, "pub static CRIME: CrimeRules = CrimeRules {{ mark: {}, {} }};", c.status_wire(&c.crime.mark).unwrap_or(0), rust_values(&crime)).unwrap();
     let npc = npc_fields(&c.npc);
     s += "\n/// NPC rules (`content/npcs.toml`, docs/design/npcs.md).\n#[derive(Debug, PartialEq)]\npub struct NpcRules {\n";
     rust_struct_fields(&mut s, &npc);
@@ -2945,6 +3022,11 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <summary>Crowd control's diminishing returns (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    /// <param name=\"StepsPct\">The share of its duration each control in a row lands for; past the last, immune.</param>\n";
     s += "    public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);\n\n";
+    let crime = crime_fields(&c.crime);
+    s += "    /// <summary>Evidence, reports and the attacker's mark ([crime] in content/combat.toml, docs/design/crime.md).</summary>\n";
+    s += "    /// <param name=\"Mark\">The wire of the status an attacker gets.</param>\n";
+    csharp_param_docs(&mut s, &crime);
+    writeln!(s, "    public sealed record CrimeRules(byte Mark, {});\n", csharp_params(&crime)).unwrap();
     s += "    /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    /// <param name=\"Npc\">NPCs' skills: characters can't pick it, and its skills cost no mana.</param>\n";
     s += "    public sealed record SkillsetData(byte Wire, string Id, string Name, bool Npc);\n\n";
@@ -3295,6 +3377,7 @@ pub fn render_csharp(c: &Content) -> String {
         list(c.control.steps_pct.iter().map(|v| format!("{v}u")).collect())
     )
     .unwrap();
+    writeln!(s, "        public static readonly CrimeRules Crime = new({}, {});", c.status_wire(&c.crime.mark).unwrap_or(0), csharp_values(&crime_fields(&c.crime))).unwrap();
     writeln!(s, "\n        public static readonly NpcRules Npc = new({});\n", csharp_values(&npc_fields(&c.npc))).unwrap();
     s += "        /// <summary>Every NPC kind, sorted by wire, which is the index.</summary>\n";
     s += "        public static readonly IReadOnlyList<NpcKindData> NpcKinds = new NpcKindData[]\n        {\n";
@@ -3717,6 +3800,16 @@ mod tests {
         window_s = 15
         steps_pct = [100, 50]
 
+        [crime]
+        mark = "marked"
+        mark_s = 30
+        evidence_s = 86400
+        reach_m = 4.0
+        footprint_points = 3
+        bloodstain_points = 1
+        blood_pool_points = 10
+        sought_points = 50
+
         [[status]]
         wire = 1
         id = "burning"
@@ -3738,6 +3831,12 @@ mod tests {
         name = "Guarded"
         debuff = false
         taken_pct = -30
+
+        [[status]]
+        wire = 3
+        id = "marked"
+        name = "Marked"
+        debuff = true
 
         [[skillset]]
         wire = 1
@@ -4139,6 +4238,35 @@ mod tests {
         ] {
             assert_ne!(parse_ships(&changed).unwrap().hash, a, "{changed}");
         }
+    }
+
+    #[test]
+    fn crime_rules_reach_both_outputs_and_the_hash() {
+        let c = parse_combat(COMBAT).unwrap();
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(
+            rs.contains("pub static CRIME: CrimeRules = CrimeRules { mark: 3, mark_s: 30, evidence_s: 86400, reach_m: 4.0, footprint_points: 3, bloodstain_points: 1, blood_pool_points: 10, sought_points: 50 };"),
+            "{rs}"
+        );
+        assert!(cs.contains("public static readonly CrimeRules Crime = new(3, 30, 86400, 4.0f, 3, 1, 10, 50);"), "{cs}");
+        let a = c.hash;
+        for changed in [COMBAT.replace("mark_s = 30", "mark_s = 31"), COMBAT.replace("sought_points = 50", "sought_points = 51"), COMBAT.replace("reach_m = 4.0", "reach_m = 4.5")] {
+            assert_ne!(parse_combat(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_crime_rules_are_reported_together() {
+        let bad = COMBAT.replace("mark = \"marked\"", "mark = \"chilled\"").replace("mark_s = 30", "mark_s = 0").replace("reach_m = 4.0", "reach_m = 40.0").replace("blood_pool_points = 10", "blood_pool_points = 0");
+        let e = combat_errors(&bad);
+        for want in ["mark \"chilled\" must be a debuff with no control", "mark_s must be from 1", "reach_m must be from 1 to 20", "blood_pool_points must be from 1"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        assert!(combat_errors(&COMBAT.replace("mark = \"marked\"", "mark = \"gone\"")).contains("mark: no status \"gone\""));
+        let start = COMBAT.find("[crime]").unwrap();
+        let end = start + COMBAT[start..].find("sought_points = 50").unwrap() + "sought_points = 50".len();
+        let none = format!("{}{}", &COMBAT[..start], &COMBAT[end..]);
+        assert!(combat_errors(&none).contains("missing [crime]"), "{}", combat_errors(&none));
     }
 
     #[test]

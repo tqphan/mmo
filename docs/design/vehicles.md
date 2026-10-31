@@ -77,7 +77,7 @@ If it stands, the deck's height is the centre's higher triangulation plus `deck_
 - Public: **`vehicle.cargo`** is one pack item wire per slot (0 for empty), in the hull's slot order, so anyone near sees what's loaded.
 - Private: one **`cargo`** row per loaded pack: vehicle, slot, and the pack's item, maker, origin and craft time, exactly as on a back. Packs keep ageing in a slot.
 - **`load_pack(vehicle, slot)`**: the caller is alive, carries a pack, and stands within `CARGO_REACH_M` (3 m horizontally and vertically, in world coordinates) of the slot's world point, aboard or not; the slot exists and is empty. **Anyone** may load.
-- **`unload_pack(vehicle, slot)`**: the caller is alive, its back is free, it is in reach, the slot holds a pack, and the caller's account owns the vehicle (anyone, for an unowned one): "only the owner can unload this". The pack goes on its back. Taking a pack made by another account's character is logged as **theft** for the crime task. A spoiled pack falls apart instead.
+- **`unload_pack(vehicle, slot)`**: the caller is alive, its back is free, it is in reach, the slot holds a pack, and the caller's account owns the vehicle (anyone, for an unowned one): "only the owner can unload this". The pack goes on its back. Taking a pack made by another account's character is **theft**, and leaves Footprints at the taker's feet (docs/design/crime.md). A spoiled pack falls apart instead.
 - **`drop_pack` on a deck** is refused: "load it into a pack slot". **Dying aboard** puts the carried pack into the first free slot, if there is one; otherwise it stays on the back as before.
 - A vehicle's speed doesn't depend on its cargo.
 

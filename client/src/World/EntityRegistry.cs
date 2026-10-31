@@ -62,8 +62,8 @@ namespace Mmo.World
             db.Vehicle.OnUpdate += (_, _, v) => ships.GetValueOrDefault(v.EntityId)?.SetVehicle(v, Clock.Now);
             db.Entity.OnInsert += (_, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
             db.Entity.OnUpdate += (_, _, e) => views.GetValueOrDefault(e.Id)?.SetPack(e.Pack);
-            db.Vitals.OnInsert += (_, v) => views.GetValueOrDefault(v.EntityId)?.SetDead(v.DeadAt is not null);
-            db.Vitals.OnUpdate += (_, _, v) => views.GetValueOrDefault(v.EntityId)?.SetDead(v.DeadAt is not null);
+            db.Vitals.OnInsert += (_, v) => views.GetValueOrDefault(v.EntityId)?.SetVitals(v);
+            db.Vitals.OnUpdate += (_, _, v) => views.GetValueOrDefault(v.EntityId)?.SetVitals(v);
             db.CharacterPublic.OnInsert += (_, c) =>
             {
                 foreach (var v in views.Values)
@@ -107,7 +107,8 @@ namespace Mmo.World
                 else if (view.Kind == EntityKind.Npc && Gameplay.NpcModel.Kind(view.RefId) is { } npc)
                     view.SetLabel(npc.Name, Gameplay.NpcModel.Aggressive(npc) ? new Color(1.0f, 0.45f, 0.4f) : new Color(1.0f, 0.95f, 0.75f));
                 view.SetPack(e?.Pack ?? 0);
-                view.SetDead(session.Conn.Db.Vitals.EntityId.Find(t.EntityId)?.DeadAt is not null);
+                if (session.Conn.Db.Vitals.EntityId.Find(t.EntityId) is { } vitals)
+                    view.SetVitals(vitals);
                 session.Log($"sees entity {t.EntityId} ({view.Label}) at ({t.X:F1}, {t.Z:F1})");
             }
             view.Push(t, Clock.Now);
@@ -222,14 +223,33 @@ namespace Mmo.World
         public byte Kind { get; }
         public ulong RefId { get; }
         public ulong ParentId { get; private set; }
-        public string Label => label.Text;
+        private string name = "";
+        private bool sought;
 
-        public void SetLabel(string text) => label.Text = text;
+        /// <summary>The name, without any tag.</summary>
+        public string Label => name;
+
+        public void SetLabel(string text)
+        {
+            name = text;
+            label.Text = Gameplay.CrimeModel.Tagged(name, sought);
+        }
 
         public void SetLabel(string text, Color color)
         {
-            label.Text = text;
+            SetLabel(text);
             label.Modulate = color;
+        }
+
+        /// <summary>Lie down when dead; tag the name when Sought (docs/design/crime.md).</summary>
+        public void SetVitals(Vitals v)
+        {
+            SetDead(v.DeadAt is not null);
+            if (v.Sought != sought)
+            {
+                sought = v.Sought;
+                SetLabel(name);
+            }
         }
 
         private static Color NpcColor(NpcKindData k)

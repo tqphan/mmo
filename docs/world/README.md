@@ -80,6 +80,9 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Skill: Wellspring | Mending Word, Quick Balm, Brine Lash, Renewing Tide, Undertow, Cleansing Spring, Wavebreak, Tidal Ward | (`mending_word`, `quick_balm`, `brine_lash`, `renewing_tide`, `undertow`, `cleansing_spring`, `wavebreak`, `tidal_ward`) |
 | Debuff | Slowed, Stunned, Felled, Soaked, Scorched, Sundered, Shaken | Statuses skills put on foes: a snare, a stun, a knockdown, a combo mark, burning over time, more damage taken, less dealt (`content/combat.toml`) |
 | Buff | Fervor, Bulwark, Renewal | More damage dealt, less taken, healing over time (`content/combat.toml`) |
+| Status | Bloodmarked | On a character that harmed another who wasn't marked; anyone may fight it without crime (`bloodmarked`, docs/design/crime.md) |
+| Evidence | Footprints, Bloodstain, Blood Pool | Left by theft, assault and a kill (docs/design/crime.md) |
+| Crime | Notoriety, Sought | Notoriety: the permanent total of reported crime points. Sought: a character with enough crime points for a trial (M2) |
 | Wayshrine | Gullhaven Wayshrine, Furrowdale Wayshrine, Cairnwick Wayshrine, Redfen Wayshrine | Standing stones where the dead get up again, one in each town (`content/combat.toml`) |
 | Skillset | Wildcraft | What NPCs use; characters can't pick it (`wildcraft`, `content/combat.toml`) |
 | Skill: Wildcraft | Pinch, Gore, Bog Spit, Bite, Hamstring Bite, Cutlass Slash, Shield Knock, Brine Bolt, Sapping Hex, Rake, Pounce, Snap, Shell Slam, Searing Sting, Captain's Cleave, Grapeshot | NPCs' skills (`pinch`, `gore`, `bog_spit`, `bite`, `hamstring_bite`, `cutlass_slash`, `shield_knock`, `brine_bolt`, `sapping_hex`, `rake`, `pounce`, `snap`, `shell_slam`, `searing_sting`, `captains_cleave`, `grapeshot`) |

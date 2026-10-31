@@ -27,6 +27,7 @@ pub struct Vitals {
     pub level: u8,
     pub statuses: Vec<StatusSlot>,
     pub resists: Vec<Resist>,
+    pub sought: bool,
 }
 
 impl __sdk::InModule for Vitals {
@@ -54,6 +55,7 @@ pub struct VitalsCols {
     pub level: __sdk::__query_builder::Col<Vitals, u8>,
     pub statuses: __sdk::__query_builder::Col<Vitals, Vec<StatusSlot>>,
     pub resists: __sdk::__query_builder::Col<Vitals, Vec<Resist>>,
+    pub sought: __sdk::__query_builder::Col<Vitals, bool>,
 }
 
 impl __sdk::__query_builder::HasCols for Vitals {
@@ -77,6 +79,7 @@ impl __sdk::__query_builder::HasCols for Vitals {
             level: __sdk::__query_builder::Col::new(table_name, "level"),
             statuses: __sdk::__query_builder::Col::new(table_name, "statuses"),
             resists: __sdk::__query_builder::Col::new(table_name, "resists"),
+            sought: __sdk::__query_builder::Col::new(table_name, "sought"),
         }
     }
 }

@@ -72,7 +72,7 @@ Hearthgrain matches the barley example; every other number is ours, for the play
 
 ### Who may tend what
 - A planting **on a plot** may be harvested and uprooted by the plot owner's account, and by anyone while the plot is public. Planting there follows the same rule.
-- A planting **off any plot** may always be harvested (when ripe) and uprooted by the planter's account. Anyone else may harvest it once ripe and uproot it once ripe or withered. Harvesting or uprooting someone else's ripe planting off a plot is **theft**: it's allowed, and logged as a crime for the crime task to turn into evidence and crime points. Clearing a withered planting is no crime.
+- A planting **off any plot** may always be harvested (when ripe) and uprooted by the planter's account. Anyone else may harvest it once ripe and uproot it once ripe or withered. Harvesting or uprooting someone else's ripe planting off a plot is **theft**: it's allowed, and leaves Footprints at the planting (docs/design/crime.md). Clearing a withered planting is no crime.
 
 ### Harvest (`harvest(crop)`) and uproot (`uproot(crop)`)
 - Both need the caller in the world, on land and within reach, and the planting not gone.
@@ -90,7 +90,7 @@ Hearthgrain matches the barley example; every other number is ours, for the play
 ## 3. Deviations and not yet done
 - **No care.** Watering, feeding and medicine (and sickness) come in M2 with climates' full rules; until then plants grow unattended and crops only wither when left ripe.
 - **Instant harvest.** The original had a short harvest cast; ours finishes at once. A cast can reuse the gathering job if the playtest wants one.
-- **No crime yet.** Theft is logged; evidence and crime points come with the crime task (BACKLOG M1 #6).
+- **Theft isn't refused**; it leaves evidence for others to report (docs/design/crime.md).
 - **No seed merchants.** Seeds are crafted until gold exists.
 - **Planting costs no labor**; only harvests do.
 - **No growth rings for livestock offspring as pets or mounts**, only lambs.

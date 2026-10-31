@@ -10,6 +10,8 @@ use sim::content::CONTENT_HASH;
 #[cfg(feature = "dev")]
 mod combat;
 mod crafting;
+#[cfg(feature = "dev")]
+mod crime;
 mod farming;
 mod gathering;
 mod items;

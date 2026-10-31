@@ -5,6 +5,7 @@ use sim::movement::MoveMode;
 use sim::ship::{Hull, Motion};
 
 use crate::combat::{CombatEvent, combat_event, skill};
+use crate::crime::{CrimeRecord, crime_record};
 use crate::session::{Account, account, presence, transform};
 use crate::ship::{deck, vehicle};
 use crate::terrain::Terrain;
@@ -86,5 +87,15 @@ pub fn dev_remove_ship(ctx: &ReducerContext, ship: u64) -> Result<(), String> {
 pub fn dev_damage_vehicle(ctx: &ReducerContext, vehicle: u64, amount: i32) -> Result<(), String> {
     let v = ctx.db.vehicle().entity_id().find(vehicle).ok_or("no such vehicle")?;
     crate::ship::damage(ctx, v, amount);
+    Ok(())
+}
+
+/// Set the caller's character's crime points and Notoriety, as a trial will in M2: bots and the
+/// client's demo use it to be Sought (docs/design/crime.md).
+#[spacetimedb::reducer]
+pub fn dev_set_crime(ctx: &ReducerContext, crime_points: u32, notoriety: u32) -> Result<(), String> {
+    let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
+    let reports = ctx.db.crime_record().char_id().find(p.char_id).map_or(0, |r| r.reports);
+    crate::crime::record(ctx, CrimeRecord { char_id: p.char_id, owner: ctx.sender(), crime_points, notoriety, reports });
     Ok(())
 }

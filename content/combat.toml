@@ -58,6 +58,24 @@ death_xp_pct = 5
 window_s = 15
 steps_pct = [100, 50, 25]
 
+# Crime (docs/design/crime.md): evidence, reports and the mark that makes an attacker fair game.
+# The points are the original's older numbers (B); the 24 h evidence is the longer of two
+# remembered figures (C). Being Sought does nothing more until trials (M2).
+[crime]
+# The status an attacker gets, and how long it lasts (30 s, B).
+mark = "bloodmarked"
+mark_s = 30
+# How long evidence lies before it fades.
+evidence_s = 86400
+# How close a reporter must stand, horizontally and vertically.
+reach_m = 4.0
+# What each kind of evidence adds to the offender's crime points and Notoriety when reported.
+footprint_points = 3
+bloodstain_points = 1
+blood_pool_points = 10
+# Crime points at or above this make a character Sought.
+sought_points = 50
+
 # Statuses, the buffs and debuffs skills put on fighters, kept in their `vitals` row. `control` is
 # none, stun or knockdown (no moving or skills) or snare (`speed_pct` of the speed limit). `dealt_pct`
 # and `taken_pct` change direct damage dealt and taken. A status with `tick_ms` hurts (a debuff) or
@@ -132,6 +150,14 @@ id = "renewal"
 name = "Renewal"
 debuff = false
 tick_ms = 1000
+
+# Put on a character that harms another who isn't marked: anyone may harm it with no crime
+# (docs/design/crime.md). It does nothing else.
+[[status]]
+wire = 10
+id = "bloodmarked"
+name = "Bloodmarked"
+debuff = true
 
 [[skillset]]
 wire = 0

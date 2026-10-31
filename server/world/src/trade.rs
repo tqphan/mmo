@@ -173,9 +173,10 @@ fn account_of(ctx: &ReducerContext, char_id: u64) -> Option<Identity> {
     ctx.db.character_private().char_id().find(char_id).map(|c| c.owner)
 }
 
-/// Crime hook: the crime task (BACKLOG M1) turns this into evidence and crime points.
-fn theft(thief: u64, d: &DroppedPack) {
-    log::info!("crime: char {thief} took pack {} of char {} at ({}, {})", d.id, d.owner, d.x, d.z);
+/// Taking another's pack leaves footprints where it lay (docs/design/crime.md).
+fn theft(ctx: &ReducerContext, thief: u64, d: &DroppedPack) {
+    log::info!("crime: char {thief} took pack {} of char {}", d.id, d.owner);
+    crate::crime::theft(ctx, thief, d.owner, [d.x, d.y, d.z]);
 }
 
 /// Put the carried pack on the ground at the carrier's feet. A spoiled pack falls apart instead.
@@ -251,7 +252,7 @@ pub fn pick_up_pack(ctx: &ReducerContext, id: u64) -> Result<(), String> {
         return Err("this pack has spoiled".into());
     }
     if account_of(ctx, d.owner) != Some(ctx.sender()) {
-        theft(p.char_id, &d);
+        theft(ctx, p.char_id, &d);
     }
     ctx.db.dropped_pack().id().delete(d.id);
     put_on(ctx, &p, d.def, d.owner, d.origin_x, d.origin_z, d.made_at);

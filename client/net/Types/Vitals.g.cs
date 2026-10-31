@@ -47,6 +47,8 @@ namespace SpacetimeDB.Types
         public System.Collections.Generic.List<StatusSlot> Statuses;
         [DataMember(Name = "resists")]
         public System.Collections.Generic.List<Resist> Resists;
+        [DataMember(Name = "sought")]
+        public bool Sought;
 
         public Vitals(
             ulong EntityId,
@@ -65,7 +67,8 @@ namespace SpacetimeDB.Types
             SpacetimeDB.Timestamp? DeadAt,
             byte Level,
             System.Collections.Generic.List<StatusSlot> Statuses,
-            System.Collections.Generic.List<Resist> Resists
+            System.Collections.Generic.List<Resist> Resists,
+            bool Sought
         )
         {
             this.EntityId = EntityId;
@@ -85,6 +88,7 @@ namespace SpacetimeDB.Types
             this.Level = Level;
             this.Statuses = Statuses;
             this.Resists = Resists;
+            this.Sought = Sought;
         }
 
         public Vitals()

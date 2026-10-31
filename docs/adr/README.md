@@ -37,3 +37,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0031](0031-owned-vehicles-are-bag-items-carts-share-the-ship-step.md) | Owned vehicles are bag items that leave the bag while out; carts share the ships' step with a stored deck height; cargo is public by item and private in detail | Accepted |
 | [0032](0032-terrain3d-from-m2.md) | From M2 the world is built and drawn with Terrain3D v1.1.0, loaded whole; `world/` stays the server's source | Accepted |
 | [0033](0033-shipyards-staged-rows-wrecks-kept-by-the-owner.md) | Shipyards are public rows built stage by stage; a vehicle at 0 HP sinks on a timer, drops its cargo for anyone, and comes back to its owner as a wreck to mend | Accepted |
+| [0034](0034-evidence-public-offender-private-reports-add-points.md) | Evidence is public and its offender private; reports add crime points and Notoriety; the attacker's mark is a combat status; Sought is public in `vitals` | Accepted |

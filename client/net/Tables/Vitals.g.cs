@@ -66,6 +66,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Vitals, byte> Level { get; }
         public global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<StatusSlot>> Statuses { get; }
         public global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<Resist>> Resists { get; }
+        public global::SpacetimeDB.Col<Vitals, bool> Sought { get; }
 
         public VitalsCols(string tableName)
         {
@@ -86,6 +87,7 @@ namespace SpacetimeDB.Types
             Level = new global::SpacetimeDB.Col<Vitals, byte>(tableName, "level");
             Statuses = new global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<StatusSlot>>(tableName, "statuses");
             Resists = new global::SpacetimeDB.Col<Vitals, System.Collections.Generic.List<Resist>>(tableName, "resists");
+            Sought = new global::SpacetimeDB.Col<Vitals, bool>(tableName, "sought");
         }
     }
 

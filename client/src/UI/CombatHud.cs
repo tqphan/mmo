@@ -116,7 +116,7 @@ namespace Mmo.UI
             if (target is { } t)
             {
                 float tx = (size.X - BarW) / 2;
-                targetName.Text = $"{combat.NameOf(combat.Target)}  ·  level {t.Level}" + (t.Dead ? " (dead)" : "");
+                targetName.Text = CrimeModel.Tagged($"{combat.NameOf(combat.Target)}  ·  level {t.Level}", combat.Sought(combat.Target), "  ·  ") + (t.Dead ? " (dead)" : "");
                 targetName.Position = new Vector2(tx, 16);
                 int thp = t.HpNow(now);
                 targetHp.Place(new Vector2(tx, 46), BarW, 22, (float)thp / Mathf.Max(1, t.HpMax), CombatModel.Amounts(thp, t.HpMax));

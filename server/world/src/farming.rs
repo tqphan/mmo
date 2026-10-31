@@ -119,9 +119,10 @@ fn on_foot(ctx: &ReducerContext, what: &str) -> Result<crate::session::Presence,
     Ok(p)
 }
 
-/// Crime hook: the crime task (BACKLOG M1 #6) turns this into evidence and crime points.
-fn theft(thief: u64, c: &Crop, what: &str) {
-    log::info!("crime: char {thief} {what} crop {} of char {} at ({}, {})", c.id, c.owner, c.x, c.z);
+/// Taking another's planting leaves footprints at it (docs/design/crime.md).
+fn theft(ctx: &ReducerContext, thief: u64, c: &Crop, what: &str) {
+    log::info!("crime: char {thief} {what} crop {} of char {}", c.id, c.owner);
+    crate::crime::theft(ctx, thief, c.owner, [c.x, c.y, c.z]);
 }
 
 /// Plant the seed `item_id` at `(x, z)`.
@@ -220,7 +221,7 @@ pub fn harvest(ctx: &ReducerContext, crop_id: u64) -> Result<(), String> {
         crate::items::grant(ctx, p.char_id, kind.seed, 1)?;
     }
     if rights == Rights::Steal {
-        theft(p.char_id, &c, "harvested");
+        theft(ctx, p.char_id, &c, "harvested");
     }
     match regrown_at(kind, micros(t), c.ideal) {
         Some(again) => {
@@ -240,7 +241,7 @@ pub fn uproot(ctx: &ReducerContext, crop_id: u64) -> Result<(), String> {
     let (p, c, _) = in_reach_of(ctx, crop_id, "uproot")?;
     match rights(ctx, &c, ctx.sender()) {
         Rights::None => return Err("this isn't yours to uproot".into()),
-        Rights::Steal => theft(p.char_id, &c, "uprooted"),
+        Rights::Steal => theft(ctx, p.char_id, &c, "uprooted"),
         Rights::Tend => {}
     }
     ctx.db.crop().id().delete(c.id);

@@ -106,6 +106,8 @@ pub struct Vitals {
     pub statuses: Vec<StatusSlot>,
     /// Diminishing returns on crowd control.
     pub resists: Vec<Resist>,
+    /// A character with enough crime points (docs/design/crime.md).
+    pub sought: bool,
 }
 
 /// When one skill can be used again.
@@ -359,6 +361,7 @@ pub fn enter(ctx: &ReducerContext, owner: Identity, char_id: u64, entity_id: u64
         level: f.level,
         statuses: Vec::new(),
         resists: Vec::new(),
+        sought: crate::crime::is_sought(ctx, char_id),
     });
 }
 
@@ -604,6 +607,9 @@ fn land(ctx: &ReducerContext, source: u64, target: u64, s: &SkillData) {
 /// stops its gathering and crafting.
 fn afflict(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, status: u8, ms: u32, amount: i32) {
     let Some(d) = sim::combat::status(status) else { return };
+    if d.debuff {
+        crate::crime::harmed(ctx, source, &tv, false);
+    }
     let at = now(ctx);
     let t = micros(at);
     let mut v = tv;
@@ -651,6 +657,16 @@ fn afflict(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, status: u8
         crate::gathering::cancel(ctx, p.char_id);
         crate::crafting::cancel(ctx, p.char_id);
     }
+}
+
+/// Put status `status` on `entity_id` until `until`, replacing any it had, with no diminishing
+/// returns and no event: the crime mark (docs/design/crime.md), seen in `vitals` like any status.
+pub(crate) fn mark(ctx: &ReducerContext, entity_id: u64, status: u8, until: Timestamp) {
+    let Some(mut v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
+    let at = now(ctx);
+    v.statuses.retain(|s| s.until > at && s.status != status);
+    v.statuses.push(StatusSlot { status, source: entity_id, start: at, until, amount: 0 });
+    ctx.db.vitals().entity_id().update(v);
 }
 
 /// End `tv`'s crowd control: every debuff that stuns, knocks down or snares.
@@ -718,6 +734,7 @@ fn harm(ctx: &ReducerContext, source: u64, tv: Vitals, skill_id: u32, amount: i3
     ctx.db.vitals().entity_id().update(Vitals { hp, combat_until: later(v.combat_until, until), ..v.clone() });
     let dealt = i64::from(v.hp - hp);
     crate::npc::provoked(ctx, v.entity_id, source, dealt, dealt);
+    crate::crime::harmed(ctx, source, &v, hp == 0);
     if hp == 0 {
         die(ctx, v.entity_id, source);
     }
@@ -940,6 +957,7 @@ pub fn dev_spawn_dummy(ctx: &ReducerContext, x: f32, z: f32) -> Result<(), Strin
         level: 1,
         statuses: Vec::new(),
         resists: Vec::new(),
+        sought: false,
     });
     log::info!("Straw Dummy {} at ({x:.1}, {z:.1})", e.id);
     Ok(())

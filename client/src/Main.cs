@@ -115,6 +115,10 @@ namespace Mmo
             AddChild(combat);
             player.Combat = combat;
             AddChild(new CombatHud(combat));
+            var evidence = new EvidenceRegistry(session);
+            AddChild(evidence);
+            var crime = new Crime(session, player, evidence);
+            AddChild(crime);
             var looting = new Looting(session, player, entities);
             AddChild(looting);
             player.Looting = looting;
@@ -130,6 +134,8 @@ namespace Mmo
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
             hud.Prompts.Add(() => looting.Prompt);
+            hud.Prompts.Add(() => crime.RecordLine);
+            hud.Prompts.Add(() => crime.Prompt);
             hud.Prompts.Add(() => vehicles.Prompt);
             hud.Prompts.Add(() => shipyards.Prompt);
             hud.Prompts.Add(() => trade.Status);
@@ -175,6 +181,8 @@ namespace Mmo
                 AddChild(new CombatDemo(session, player, entities, combat));
             if (options.NpcDemo)
                 AddChild(new NpcDemo(session, player, entities, combat, looting));
+            if (options.CrimeDemo)
+                AddChild(new CrimeDemo(session, player, entities, combat, crime, evidence));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))
@@ -277,6 +285,7 @@ namespace Mmo
             Bind("skillsets", Key.K);
             Bind("stow_vehicle", Key.V);
             Bind("repair_vehicle", Key.H);
+            Bind("report", Key.J);
         }
     }
 }

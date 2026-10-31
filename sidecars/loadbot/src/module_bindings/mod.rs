@@ -48,6 +48,7 @@ pub mod cooldown_type;
 pub mod craft_job_type;
 pub mod craft_reducer;
 pub mod create_character_reducer;
+pub mod crime_record_type;
 pub mod crop_table;
 pub mod crop_type;
 pub mod destroy_item_reducer;
@@ -59,6 +60,7 @@ pub mod dev_grant_item_reducer;
 pub mod dev_remove_dummy_reducer;
 pub mod dev_remove_npc_reducer;
 pub mod dev_remove_ship_reducer;
+pub mod dev_set_crime_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
 pub mod dev_set_level_reducer;
@@ -76,6 +78,10 @@ pub mod dropped_pack_type;
 pub mod enter_world_reducer;
 pub mod entity_table;
 pub mod entity_type;
+pub mod evidence_fade_type;
+pub mod evidence_secret_type;
+pub mod evidence_table;
+pub mod evidence_type;
 pub mod fighter_type;
 pub mod fire_reducer;
 pub mod game_clock_table;
@@ -99,6 +105,7 @@ pub mod move_item_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
 pub mod my_craft_table;
+pub mod my_crime_table;
 pub mod my_fighter_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
@@ -125,6 +132,7 @@ pub mod post_placement_type;
 pub mod presence_type;
 pub mod purse_type;
 pub mod repair_vehicle_reducer;
+pub mod report_evidence_reducer;
 pub mod resist_type;
 pub mod resource_node_table;
 pub mod resource_node_type;
@@ -215,6 +223,7 @@ pub use cooldown_type::Cooldown;
 pub use craft_job_type::CraftJob;
 pub use craft_reducer::craft;
 pub use create_character_reducer::create_character;
+pub use crime_record_type::CrimeRecord;
 pub use crop_table::*;
 pub use crop_type::Crop;
 pub use destroy_item_reducer::destroy_item;
@@ -226,6 +235,7 @@ pub use dev_grant_item_reducer::dev_grant_item;
 pub use dev_remove_dummy_reducer::dev_remove_dummy;
 pub use dev_remove_npc_reducer::dev_remove_npc;
 pub use dev_remove_ship_reducer::dev_remove_ship;
+pub use dev_set_crime_reducer::dev_set_crime;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
 pub use dev_set_level_reducer::dev_set_level;
@@ -243,6 +253,10 @@ pub use dropped_pack_type::DroppedPack;
 pub use enter_world_reducer::enter_world;
 pub use entity_table::*;
 pub use entity_type::Entity;
+pub use evidence_fade_type::EvidenceFade;
+pub use evidence_secret_type::EvidenceSecret;
+pub use evidence_table::*;
+pub use evidence_type::Evidence;
 pub use fighter_type::Fighter;
 pub use fire_reducer::fire;
 pub use game_clock_table::*;
@@ -266,6 +280,7 @@ pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
 pub use my_craft_table::*;
+pub use my_crime_table::*;
 pub use my_fighter_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
@@ -292,6 +307,7 @@ pub use post_placement_type::PostPlacement;
 pub use presence_type::Presence;
 pub use purse_type::Purse;
 pub use repair_vehicle_reducer::repair_vehicle;
+pub use report_evidence_reducer::report_evidence;
 pub use resist_type::Resist;
 pub use resource_node_table::*;
 pub use resource_node_type::ResourceNode;
@@ -451,6 +467,10 @@ pub enum Reducer {
     DevRemoveShip {
         ship: u64,
     },
+    DevSetCrime {
+        crime_points: u32,
+        notoriety: u32,
+    },
     DevSetGm {
         level: u8,
     },
@@ -562,6 +582,9 @@ pub enum Reducer {
     RepairVehicle {
         vehicle_id: u64,
     },
+    ReportEvidence {
+        id: u64,
+    },
     Respawn,
     SellPack {
         post_id: u64,
@@ -648,6 +671,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevRemoveDummy { .. } => "dev_remove_dummy",
             Reducer::DevRemoveNpc { .. } => "dev_remove_npc",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
+            Reducer::DevSetCrime { .. } => "dev_set_crime",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
             Reducer::DevSetLevel { .. } => "dev_set_level",
@@ -678,6 +702,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PlaceShipyard { .. } => "place_shipyard",
             Reducer::Plant { .. } => "plant",
             Reducer::RepairVehicle { .. } => "repair_vehicle",
+            Reducer::ReportEvidence { .. } => "report_evidence",
             Reducer::Respawn => "respawn",
             Reducer::SellPack { .. } => "sell_pack",
             Reducer::SetPlotAccess { .. } => "set_plot_access",
@@ -879,6 +904,13 @@ impl __sdk::Reducer for Reducer {
                     ship: ship.clone(),
                 })
             }
+            Reducer::DevSetCrime {
+                crime_points,
+                notoriety,
+            } => __sats::bsatn::to_vec(&dev_set_crime_reducer::DevSetCrimeArgs {
+                crime_points: crime_points.clone(),
+                notoriety: notoriety.clone(),
+            }),
             Reducer::DevSetGm { level } => {
                 __sats::bsatn::to_vec(&dev_set_gm_reducer::DevSetGmArgs {
                     level: level.clone(),
@@ -1039,6 +1071,11 @@ impl __sdk::Reducer for Reducer {
                     vehicle_id: vehicle_id.clone(),
                 })
             }
+            Reducer::ReportEvidence { id } => {
+                __sats::bsatn::to_vec(&report_evidence_reducer::ReportEvidenceArgs {
+                    id: id.clone(),
+                })
+            }
             Reducer::Respawn => __sats::bsatn::to_vec(&respawn_reducer::RespawnArgs {}),
             Reducer::SellPack { post_id } => {
                 __sats::bsatn::to_vec(&sell_pack_reducer::SellPackArgs {
@@ -1111,10 +1148,12 @@ pub struct DbUpdate {
     dev_tick: __sdk::TableUpdate<TickState>,
     dropped_pack: __sdk::TableUpdate<DroppedPack>,
     entity: __sdk::TableUpdate<Entity>,
+    evidence: __sdk::TableUpdate<Evidence>,
     game_clock: __sdk::TableUpdate<GameClock>,
     loot: __sdk::TableUpdate<Loot>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_craft: __sdk::TableUpdate<CraftJob>,
+    my_crime: __sdk::TableUpdate<CrimeRecord>,
     my_fighter: __sdk::TableUpdate<Fighter>,
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
@@ -1160,6 +1199,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(entity_table::parse_table_update(table_update)?),
+                "evidence" => db_update
+                    .evidence
+                    .append(evidence_table::parse_table_update(table_update)?),
                 "game_clock" => db_update
                     .game_clock
                     .append(game_clock_table::parse_table_update(table_update)?),
@@ -1172,6 +1214,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_craft" => db_update
                     .my_craft
                     .append(my_craft_table::parse_table_update(table_update)?),
+                "my_crime" => db_update
+                    .my_crime
+                    .append(my_crime_table::parse_table_update(table_update)?),
                 "my_fighter" => db_update
                     .my_fighter
                     .append(my_fighter_table::parse_table_update(table_update)?),
@@ -1268,6 +1313,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.entity = cache
             .apply_diff_to_table::<Entity>("entity", &self.entity)
             .with_updates_by_pk(|row| &row.id);
+        diff.evidence = cache
+            .apply_diff_to_table::<Evidence>("evidence", &self.evidence)
+            .with_updates_by_pk(|row| &row.id);
         diff.game_clock = cache
             .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
             .with_updates_by_pk(|row| &row.id);
@@ -1311,6 +1359,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
         diff.my_craft = cache.apply_diff_to_table::<CraftJob>("my_craft", &self.my_craft);
+        diff.my_crime = cache.apply_diff_to_table::<CrimeRecord>("my_crime", &self.my_crime);
         diff.my_fighter = cache.apply_diff_to_table::<Fighter>("my_fighter", &self.my_fighter);
         diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
@@ -1344,6 +1393,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "evidence" => db_update
+                    .evidence
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "game_clock" => db_update
                     .game_clock
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -1355,6 +1407,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_craft" => db_update
                     .my_craft
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_crime" => db_update
+                    .my_crime
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_fighter" => db_update
                     .my_fighter
@@ -1444,6 +1499,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "entity" => db_update
                     .entity
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "evidence" => db_update
+                    .evidence
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "game_clock" => db_update
                     .game_clock
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -1455,6 +1513,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_craft" => db_update
                     .my_craft
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_crime" => db_update
+                    .my_crime
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_fighter" => db_update
                     .my_fighter
@@ -1534,10 +1595,12 @@ pub struct AppliedDiff<'r> {
     dev_tick: __sdk::TableAppliedDiff<'r, TickState>,
     dropped_pack: __sdk::TableAppliedDiff<'r, DroppedPack>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
+    evidence: __sdk::TableAppliedDiff<'r, Evidence>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
     loot: __sdk::TableAppliedDiff<'r, Loot>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
+    my_crime: __sdk::TableAppliedDiff<'r, CrimeRecord>,
     my_fighter: __sdk::TableAppliedDiff<'r, Fighter>,
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
@@ -1588,6 +1651,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
+        callbacks.invoke_table_row_callbacks::<Evidence>("evidence", &self.evidence, event);
         callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
         callbacks.invoke_table_row_callbacks::<Loot>("loot", &self.loot, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
@@ -1596,6 +1660,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<CraftJob>("my_craft", &self.my_craft, event);
+        callbacks.invoke_table_row_callbacks::<CrimeRecord>("my_crime", &self.my_crime, event);
         callbacks.invoke_table_row_callbacks::<Fighter>("my_fighter", &self.my_fighter, event);
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
@@ -2293,10 +2358,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         dev_tick_table::register_table(client_cache);
         dropped_pack_table::register_table(client_cache);
         entity_table::register_table(client_cache);
+        evidence_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
         loot_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_craft_table::register_table(client_cache);
+        my_crime_table::register_table(client_cache);
         my_fighter_table::register_table(client_cache);
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
@@ -2324,10 +2391,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "dev_tick",
         "dropped_pack",
         "entity",
+        "evidence",
         "game_clock",
         "loot",
         "my_characters",
         "my_craft",
+        "my_crime",
         "my_fighter",
         "my_inventory",
         "my_labor",

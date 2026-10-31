@@ -234,6 +234,7 @@ fn spawn_npc(ctx: &ReducerContext, s: Spawn, at: Timestamp) -> Option<u64> {
         level: kind.level,
         statuses: Vec::new(),
         resists: Vec::new(),
+        sought: false,
     });
     let t = micros(at);
     ctx.db.npc().insert(Npc {

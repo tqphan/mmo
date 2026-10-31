@@ -63,7 +63,7 @@ The Packwright's Bench stands in Furrowdale, a hamlet on the west continent's co
 ### Dropping and picking up
 - **`drop_pack()`** puts the carried pack on the ground at the carrier's feet, as a row in the public **`dropped_pack`** table (Static tier): `id`, `cell`, `def`, `owner`, `x`, `y`, `z`, `yaw`, `origin_x`, `origin_z`, `made_at`, `dropped_at`. It needs the carrier in the world, on land (not aboard a ship, "load it into a pack slot instead" (docs/design/vehicles.md); not swimming, "can't drop a pack in the water"). A spoiled pack (below) is destroyed instead.
 - **`pick_up_pack(id)`** puts a dropped pack on the caller's back. Refused if the caller isn't in the world, is on a ship or swimming, already carries a pack, is out of reach, or the pack is spoiled ("this pack has spoiled") or gone ("no such pack").
-- Picking up a pack made by another account's character is **theft**: allowed, and logged for the crime task to turn into evidence and crime points (BACKLOG M1). The pack keeps its owner.
+- Picking up a pack made by another account's character is **theft**: allowed, and it leaves Footprints where the pack lay (docs/design/crime.md). The pack keeps its owner.
 
 ### Posts and selling
 - The public **`trade_post`** table (Static tier): `id`, `cell`, `kind` (the post's wire), `x`, `y`, `z`, `yaw`. Placed from **`world/posts.tsv`** (`kind x y z yaw-degrees`, as `stations.tsv`), written by `worldtool posts` and uploaded by `cargo xtask world`. Admins have `admin_put_posts`, `admin_remove_posts` and `admin_clear_posts`.
@@ -84,7 +84,7 @@ The Packwright's Bench stands in Furrowdale, a hamlet on the west continent's co
 - **Distance, not zone tables.** The original priced each route from a table by origin zone and destination. Ours uses the distance from where the pack was made, so any bench works anywhere and routes need no table. Regional recipes (each zone's bench making its own packs from its own produce) can come with the zones.
 - **No special currency and no cargo.** Ship currency, trade towers and cargo with value decay are M3 (PLAN §8.3).
 - **No pack slots on carts or ships yet** (the vehicles task), so a pack crosses the sea on its carrier's back.
-- **Theft is logged, not punished**, until the crime task.
+- **Theft isn't refused**; it leaves evidence for others to report (docs/design/crime.md).
 - **No seller's cut, taxes or proficiency bonuses.**
 - Spoiled packs on the ground stay as rows until someone tries to pick them up; a sweep can come if they pile up.
 - Posts and the bench are placeholder placements until the coast task lays out the zone.

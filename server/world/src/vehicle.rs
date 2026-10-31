@@ -213,6 +213,7 @@ pub fn unload_pack(ctx: &ReducerContext, vehicle_id: u64, slot: u8) -> Result<()
     }
     if !same_account(ctx, c.owner) {
         log::info!("crime: char {} took pack {} of char {} off vehicle {vehicle_id}", p.char_id, c.def, c.owner);
+        crate::crime::theft(ctx, p.char_id, c.owner, crate::ship::world_position(ctx, &p));
     }
     crate::trade::put_on(ctx, &p, c.def, c.owner, c.origin_x, c.origin_z, c.made_at);
     Ok(())

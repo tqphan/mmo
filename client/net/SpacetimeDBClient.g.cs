@@ -33,10 +33,12 @@ namespace SpacetimeDB.Types
             AddTable(DevTick = new(conn));
             AddTable(DroppedPack = new(conn));
             AddTable(Entity = new(conn));
+            AddTable(Evidence = new(conn));
             AddTable(GameClock = new(conn));
             AddTable(Loot = new(conn));
             AddTable(MyCharacters = new(conn));
             AddTable(MyCraft = new(conn));
+            AddTable(MyCrime = new(conn));
             AddTable(MyFighter = new(conn));
             AddTable(MyInventory = new(conn));
             AddTable(MyLabor = new(conn));
@@ -558,10 +560,12 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.DevTick().ToSql(),
             new QueryBuilder().From.DroppedPack().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
+            new QueryBuilder().From.Evidence().ToSql(),
             new QueryBuilder().From.GameClock().ToSql(),
             new QueryBuilder().From.Loot().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
             new QueryBuilder().From.MyCraft().ToSql(),
+            new QueryBuilder().From.MyCrime().ToSql(),
             new QueryBuilder().From.MyFighter().ToSql(),
             new QueryBuilder().From.MyInventory().ToSql(),
             new QueryBuilder().From.MyLabor().ToSql(),
@@ -593,10 +597,12 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<TickState, DevTickCols, DevTickIxCols> DevTick() => new("dev_tick", new DevTickCols("dev_tick"), new DevTickIxCols("dev_tick"));
         public global::SpacetimeDB.Table<DroppedPack, DroppedPackCols, DroppedPackIxCols> DroppedPack() => new("dropped_pack", new DroppedPackCols("dropped_pack"), new DroppedPackIxCols("dropped_pack"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
+        public global::SpacetimeDB.Table<Evidence, EvidenceCols, EvidenceIxCols> Evidence() => new("evidence", new EvidenceCols("evidence"), new EvidenceIxCols("evidence"));
         public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
         public global::SpacetimeDB.Table<Loot, LootCols, LootIxCols> Loot() => new("loot", new LootCols("loot"), new LootIxCols("loot"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
         public global::SpacetimeDB.Table<CraftJob, MyCraftCols, MyCraftIxCols> MyCraft() => new("my_craft", new MyCraftCols("my_craft"), new MyCraftIxCols("my_craft"));
+        public global::SpacetimeDB.Table<CrimeRecord, MyCrimeCols, MyCrimeIxCols> MyCrime() => new("my_crime", new MyCrimeCols("my_crime"), new MyCrimeIxCols("my_crime"));
         public global::SpacetimeDB.Table<Fighter, MyFighterCols, MyFighterIxCols> MyFighter() => new("my_fighter", new MyFighterCols("my_fighter"), new MyFighterIxCols("my_fighter"));
         public global::SpacetimeDB.Table<Item, MyInventoryCols, MyInventoryIxCols> MyInventory() => new("my_inventory", new MyInventoryCols("my_inventory"), new MyInventoryIxCols("my_inventory"));
         public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
@@ -737,6 +743,7 @@ namespace SpacetimeDB.Types
                 Reducer.DevRemoveDummy args => Reducers.InvokeDevRemoveDummy(eventContext, args),
                 Reducer.DevRemoveNpc args => Reducers.InvokeDevRemoveNpc(eventContext, args),
                 Reducer.DevRemoveShip args => Reducers.InvokeDevRemoveShip(eventContext, args),
+                Reducer.DevSetCrime args => Reducers.InvokeDevSetCrime(eventContext, args),
                 Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
                 Reducer.DevSetLabor args => Reducers.InvokeDevSetLabor(eventContext, args),
                 Reducer.DevSetLevel args => Reducers.InvokeDevSetLevel(eventContext, args),
@@ -767,6 +774,7 @@ namespace SpacetimeDB.Types
                 Reducer.PlaceShipyard args => Reducers.InvokePlaceShipyard(eventContext, args),
                 Reducer.Plant args => Reducers.InvokePlant(eventContext, args),
                 Reducer.RepairVehicle args => Reducers.InvokeRepairVehicle(eventContext, args),
+                Reducer.ReportEvidence args => Reducers.InvokeReportEvidence(eventContext, args),
                 Reducer.Respawn args => Reducers.InvokeRespawn(eventContext, args),
                 Reducer.SellPack args => Reducers.InvokeSellPack(eventContext, args),
                 Reducer.SetPlotAccess args => Reducers.InvokeSetPlotAccess(eventContext, args),
