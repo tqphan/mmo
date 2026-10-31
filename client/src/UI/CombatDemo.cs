@@ -58,7 +58,7 @@ namespace Mmo.UI
             await Until(() => combat.Level == Sim.Combat.LevelMax, 5);
             combat.Picking = true;
             await Wait(2.0);
-            foreach (var set in Content.GameContent.Skillsets.Where(s => !combat.Picks.Contains(s.Wire)))
+            foreach (var set in Content.GameContent.Skillsets.Where(s => !s.Npc && !combat.Picks.Contains(s.Wire)))
             {
                 combat.PickSkillset(set.Wire);
                 await Wait(0.8);

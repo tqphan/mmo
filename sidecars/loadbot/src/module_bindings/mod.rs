@@ -12,12 +12,14 @@ pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
 pub mod admin_clear_posts_reducer;
 pub mod admin_clear_shrines_reducer;
+pub mod admin_clear_spawns_reducer;
 pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
 pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
 pub mod admin_put_posts_reducer;
 pub mod admin_put_shrines_reducer;
+pub mod admin_put_spawns_reducer;
 pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
 pub mod admin_remove_crops_reducer;
@@ -27,6 +29,7 @@ pub mod admin_remove_nodes_reducer;
 pub mod admin_remove_plots_reducer;
 pub mod admin_remove_posts_reducer;
 pub mod admin_remove_shrines_reducer;
+pub mod admin_remove_spawns_reducer;
 pub mod admin_remove_stations_reducer;
 pub mod admin_remove_terrain_reducer;
 pub mod cancel_cast_reducer;
@@ -51,12 +54,14 @@ pub mod dev_discard_pack_reducer;
 pub mod dev_give_pack_reducer;
 pub mod dev_grant_item_reducer;
 pub mod dev_remove_dummy_reducer;
+pub mod dev_remove_npc_reducer;
 pub mod dev_remove_ship_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
 pub mod dev_set_level_reducer;
 pub mod dev_set_vitals_reducer;
 pub mod dev_spawn_dummy_reducer;
+pub mod dev_spawn_npc_reducer;
 pub mod dev_spawn_ship_reducer;
 pub mod dev_spend_labor_reducer;
 pub mod dev_swing_reducer;
@@ -81,6 +86,9 @@ pub mod labor_type;
 pub mod land_chunk_type;
 pub mod leave_helm_reducer;
 pub mod leave_world_reducer;
+pub mod loot_corpse_reducer;
+pub mod loot_table;
+pub mod loot_type;
 pub mod move_event_reducer;
 pub mod move_item_reducer;
 pub mod moved_type;
@@ -93,6 +101,7 @@ pub mod my_pack_table;
 pub mod my_presence_table;
 pub mod my_purse_table;
 pub mod node_placement_type;
+pub mod npc_type;
 pub mod owner_type;
 pub mod pack_type;
 pub mod pay_tax_reducer;
@@ -119,6 +128,8 @@ pub mod shrine_placement_type;
 pub mod shrine_table;
 pub mod shrine_type;
 pub mod skill_impact_type;
+pub mod spawn_placement_type;
+pub mod spawn_type;
 pub mod split_item_reducer;
 pub mod station_placement_type;
 pub mod station_table;
@@ -129,6 +140,7 @@ pub mod take_helm_reducer;
 pub mod terrain_chunk_type;
 pub mod terrain_info_table;
 pub mod terrain_info_type;
+pub mod threat_type;
 pub mod tick_state_type;
 pub mod trade_demand_table;
 pub mod trade_demand_type;
@@ -150,12 +162,14 @@ pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
 pub use admin_clear_posts_reducer::admin_clear_posts;
 pub use admin_clear_shrines_reducer::admin_clear_shrines;
+pub use admin_clear_spawns_reducer::admin_clear_spawns;
 pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
 pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_posts_reducer::admin_put_posts;
 pub use admin_put_shrines_reducer::admin_put_shrines;
+pub use admin_put_spawns_reducer::admin_put_spawns;
 pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use admin_remove_crops_reducer::admin_remove_crops;
@@ -165,6 +179,7 @@ pub use admin_remove_nodes_reducer::admin_remove_nodes;
 pub use admin_remove_plots_reducer::admin_remove_plots;
 pub use admin_remove_posts_reducer::admin_remove_posts;
 pub use admin_remove_shrines_reducer::admin_remove_shrines;
+pub use admin_remove_spawns_reducer::admin_remove_spawns;
 pub use admin_remove_stations_reducer::admin_remove_stations;
 pub use admin_remove_terrain_reducer::admin_remove_terrain;
 pub use cancel_cast_reducer::cancel_cast;
@@ -189,12 +204,14 @@ pub use dev_discard_pack_reducer::dev_discard_pack;
 pub use dev_give_pack_reducer::dev_give_pack;
 pub use dev_grant_item_reducer::dev_grant_item;
 pub use dev_remove_dummy_reducer::dev_remove_dummy;
+pub use dev_remove_npc_reducer::dev_remove_npc;
 pub use dev_remove_ship_reducer::dev_remove_ship;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
 pub use dev_set_level_reducer::dev_set_level;
 pub use dev_set_vitals_reducer::dev_set_vitals;
 pub use dev_spawn_dummy_reducer::dev_spawn_dummy;
+pub use dev_spawn_npc_reducer::dev_spawn_npc;
 pub use dev_spawn_ship_reducer::dev_spawn_ship;
 pub use dev_spend_labor_reducer::dev_spend_labor;
 pub use dev_swing_reducer::dev_swing;
@@ -219,6 +236,9 @@ pub use labor_type::Labor;
 pub use land_chunk_type::LandChunk;
 pub use leave_helm_reducer::leave_helm;
 pub use leave_world_reducer::leave_world;
+pub use loot_corpse_reducer::loot_corpse;
+pub use loot_table::*;
+pub use loot_type::Loot;
 pub use move_event_reducer::move_event;
 pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
@@ -231,6 +251,7 @@ pub use my_pack_table::*;
 pub use my_presence_table::*;
 pub use my_purse_table::*;
 pub use node_placement_type::NodePlacement;
+pub use npc_type::Npc;
 pub use owner_type::Owner;
 pub use pack_type::Pack;
 pub use pay_tax_reducer::pay_tax;
@@ -257,6 +278,8 @@ pub use shrine_placement_type::ShrinePlacement;
 pub use shrine_table::*;
 pub use shrine_type::Shrine;
 pub use skill_impact_type::SkillImpact;
+pub use spawn_placement_type::SpawnPlacement;
+pub use spawn_type::Spawn;
 pub use split_item_reducer::split_item;
 pub use station_placement_type::StationPlacement;
 pub use station_table::*;
@@ -267,6 +290,7 @@ pub use take_helm_reducer::take_helm;
 pub use terrain_chunk_type::TerrainChunk;
 pub use terrain_info_table::*;
 pub use terrain_info_type::TerrainInfo;
+pub use threat_type::Threat;
 pub use tick_state_type::TickState;
 pub use trade_demand_table::*;
 pub use trade_demand_type::TradeDemand;
@@ -297,6 +321,7 @@ pub enum Reducer {
     AdminClearNodes,
     AdminClearPosts,
     AdminClearShrines,
+    AdminClearSpawns,
     AdminClearStations,
     AdminClearTerrain,
     AdminPutLand {
@@ -310,6 +335,9 @@ pub enum Reducer {
     },
     AdminPutShrines {
         shrines: Vec<ShrinePlacement>,
+    },
+    AdminPutSpawns {
+        spawns: Vec<SpawnPlacement>,
     },
     AdminPutStations {
         stations: Vec<StationPlacement>,
@@ -336,6 +364,9 @@ pub enum Reducer {
         ids: Vec<u64>,
     },
     AdminRemoveShrines {
+        ids: Vec<u64>,
+    },
+    AdminRemoveSpawns {
         ids: Vec<u64>,
     },
     AdminRemoveStations {
@@ -373,6 +404,9 @@ pub enum Reducer {
     DevRemoveDummy {
         id: u64,
     },
+    DevRemoveNpc {
+        entity_id: u64,
+    },
     DevRemoveShip {
         ship: u64,
     },
@@ -390,6 +424,11 @@ pub enum Reducer {
         mp: i32,
     },
     DevSpawnDummy {
+        x: f32,
+        z: f32,
+    },
+    DevSpawnNpc {
+        kind: String,
         x: f32,
         z: f32,
     },
@@ -432,6 +471,9 @@ pub enum Reducer {
     },
     LeaveHelm,
     LeaveWorld,
+    LootCorpse {
+        corpse: u64,
+    },
     MoveEvent {
         seq: u32,
         parent: u64,
@@ -504,12 +546,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearPosts => "admin_clear_posts",
             Reducer::AdminClearShrines => "admin_clear_shrines",
+            Reducer::AdminClearSpawns => "admin_clear_spawns",
             Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
             Reducer::AdminPutLand { .. } => "admin_put_land",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutPosts { .. } => "admin_put_posts",
             Reducer::AdminPutShrines { .. } => "admin_put_shrines",
+            Reducer::AdminPutSpawns { .. } => "admin_put_spawns",
             Reducer::AdminPutStations { .. } => "admin_put_stations",
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::AdminRemoveCrops { .. } => "admin_remove_crops",
@@ -519,6 +563,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
             Reducer::AdminRemovePosts { .. } => "admin_remove_posts",
             Reducer::AdminRemoveShrines { .. } => "admin_remove_shrines",
+            Reducer::AdminRemoveSpawns { .. } => "admin_remove_spawns",
             Reducer::AdminRemoveStations { .. } => "admin_remove_stations",
             Reducer::AdminRemoveTerrain { .. } => "admin_remove_terrain",
             Reducer::CancelCast => "cancel_cast",
@@ -532,12 +577,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevGivePack { .. } => "dev_give_pack",
             Reducer::DevGrantItem { .. } => "dev_grant_item",
             Reducer::DevRemoveDummy { .. } => "dev_remove_dummy",
+            Reducer::DevRemoveNpc { .. } => "dev_remove_npc",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
             Reducer::DevSetLevel { .. } => "dev_set_level",
             Reducer::DevSetVitals { .. } => "dev_set_vitals",
             Reducer::DevSpawnDummy { .. } => "dev_spawn_dummy",
+            Reducer::DevSpawnNpc { .. } => "dev_spawn_npc",
             Reducer::DevSpawnShip { .. } => "dev_spawn_ship",
             Reducer::DevSpendLabor { .. } => "dev_spend_labor",
             Reducer::DevSwing { .. } => "dev_swing",
@@ -550,6 +597,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::Helm { .. } => "helm",
             Reducer::LeaveHelm => "leave_helm",
             Reducer::LeaveWorld => "leave_world",
+            Reducer::LootCorpse { .. } => "loot_corpse",
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
             Reducer::PayTax { .. } => "pay_tax",
@@ -588,6 +636,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearShrines => {
                 __sats::bsatn::to_vec(&admin_clear_shrines_reducer::AdminClearShrinesArgs {})
             }
+            Reducer::AdminClearSpawns => {
+                __sats::bsatn::to_vec(&admin_clear_spawns_reducer::AdminClearSpawnsArgs {})
+            }
             Reducer::AdminClearStations => {
                 __sats::bsatn::to_vec(&admin_clear_stations_reducer::AdminClearStationsArgs {})
             }
@@ -612,6 +663,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutShrines { shrines } => {
                 __sats::bsatn::to_vec(&admin_put_shrines_reducer::AdminPutShrinesArgs {
                     shrines: shrines.clone(),
+                })
+            }
+            Reducer::AdminPutSpawns { spawns } => {
+                __sats::bsatn::to_vec(&admin_put_spawns_reducer::AdminPutSpawnsArgs {
+                    spawns: spawns.clone(),
                 })
             }
             Reducer::AdminPutStations { stations } => {
@@ -656,6 +712,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::AdminRemoveShrines { ids } => {
                 __sats::bsatn::to_vec(&admin_remove_shrines_reducer::AdminRemoveShrinesArgs {
+                    ids: ids.clone(),
+                })
+            }
+            Reducer::AdminRemoveSpawns { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_spawns_reducer::AdminRemoveSpawnsArgs {
                     ids: ids.clone(),
                 })
             }
@@ -720,6 +781,11 @@ impl __sdk::Reducer for Reducer {
                     id: id.clone(),
                 })
             }
+            Reducer::DevRemoveNpc { entity_id } => {
+                __sats::bsatn::to_vec(&dev_remove_npc_reducer::DevRemoveNpcArgs {
+                    entity_id: entity_id.clone(),
+                })
+            }
             Reducer::DevRemoveShip { ship } => {
                 __sats::bsatn::to_vec(&dev_remove_ship_reducer::DevRemoveShipArgs {
                     ship: ship.clone(),
@@ -748,6 +814,13 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::DevSpawnDummy { x, z } => {
                 __sats::bsatn::to_vec(&dev_spawn_dummy_reducer::DevSpawnDummyArgs {
+                    x: x.clone(),
+                    z: z.clone(),
+                })
+            }
+            Reducer::DevSpawnNpc { kind, x, z } => {
+                __sats::bsatn::to_vec(&dev_spawn_npc_reducer::DevSpawnNpcArgs {
+                    kind: kind.clone(),
                     x: x.clone(),
                     z: z.clone(),
                 })
@@ -803,6 +876,11 @@ impl __sdk::Reducer for Reducer {
             }),
             Reducer::LeaveHelm => __sats::bsatn::to_vec(&leave_helm_reducer::LeaveHelmArgs {}),
             Reducer::LeaveWorld => __sats::bsatn::to_vec(&leave_world_reducer::LeaveWorldArgs {}),
+            Reducer::LootCorpse { corpse } => {
+                __sats::bsatn::to_vec(&loot_corpse_reducer::LootCorpseArgs {
+                    corpse: corpse.clone(),
+                })
+            }
             Reducer::MoveEvent {
                 seq,
                 parent,
@@ -904,6 +982,7 @@ pub struct DbUpdate {
     dropped_pack: __sdk::TableUpdate<DroppedPack>,
     entity: __sdk::TableUpdate<Entity>,
     game_clock: __sdk::TableUpdate<GameClock>,
+    loot: __sdk::TableUpdate<Loot>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
     my_craft: __sdk::TableUpdate<CraftJob>,
     my_fighter: __sdk::TableUpdate<Fighter>,
@@ -951,6 +1030,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "game_clock" => db_update
                     .game_clock
                     .append(game_clock_table::parse_table_update(table_update)?),
+                "loot" => db_update
+                    .loot
+                    .append(loot_table::parse_table_update(table_update)?),
                 "my_characters" => db_update
                     .my_characters
                     .append(my_characters_table::parse_table_update(table_update)?),
@@ -1047,6 +1129,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.game_clock = cache
             .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
             .with_updates_by_pk(|row| &row.id);
+        diff.loot = cache
+            .apply_diff_to_table::<Loot>("loot", &self.loot)
+            .with_updates_by_pk(|row| &row.id);
         diff.plot = cache
             .apply_diff_to_table::<Plot>("plot", &self.plot)
             .with_updates_by_pk(|row| &row.id);
@@ -1114,6 +1199,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "game_clock" => db_update
                     .game_clock
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "loot" => db_update
+                    .loot
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
@@ -1203,6 +1291,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "game_clock" => db_update
                     .game_clock
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "loot" => db_update
+                    .loot
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -1279,6 +1370,7 @@ pub struct AppliedDiff<'r> {
     dropped_pack: __sdk::TableAppliedDiff<'r, DroppedPack>,
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
+    loot: __sdk::TableAppliedDiff<'r, Loot>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
     my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
     my_fighter: __sdk::TableAppliedDiff<'r, Fighter>,
@@ -1329,6 +1421,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
         callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
+        callbacks.invoke_table_row_callbacks::<Loot>("loot", &self.loot, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
             "my_characters",
             &self.my_characters,
@@ -2030,6 +2123,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         dropped_pack_table::register_table(client_cache);
         entity_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
+        loot_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
         my_craft_table::register_table(client_cache);
         my_fighter_table::register_table(client_cache);
@@ -2057,6 +2151,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "dropped_pack",
         "entity",
         "game_clock",
+        "loot",
         "my_characters",
         "my_craft",
         "my_fighter",

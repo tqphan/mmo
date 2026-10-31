@@ -10,6 +10,7 @@ pub mod gather;
 pub mod labor;
 pub mod land;
 pub mod movement;
+pub mod npc;
 pub mod ship;
 pub mod terrain;
 pub mod tick;

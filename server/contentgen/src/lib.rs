@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 11";
+const FORMAT: &str = "contentgen 12";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -70,6 +70,7 @@ pub struct Sources {
     pub farming: String,
     pub trade: String,
     pub combat: String,
+    pub npcs: String,
 }
 
 impl Sources {
@@ -88,6 +89,7 @@ impl Sources {
             farming: read("farming.toml")?,
             trade: read("trade.toml")?,
             combat: read("combat.toml")?,
+            npcs: read("npcs.toml")?,
         })
     }
 }
@@ -500,6 +502,9 @@ pub struct SkillsetDef {
     pub wire: u8,
     pub id: String,
     pub name: String,
+    /// NPCs' skills: characters can't pick it, and its skills cost no mana.
+    #[serde(default)]
+    pub npc: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -551,6 +556,65 @@ pub struct ShrineDef {
     pub name: String,
 }
 
+/// `npcs.toml`: NPC rules and kinds (docs/design/npcs.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NpcsFile {
+    npc: NpcRules,
+    kind: Vec<NpcKindDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NpcRules {
+    pub brain_ms: i32,
+    pub wake_m: f32,
+    pub sleep_m: f32,
+    pub leash_m: f32,
+    pub heartbeat_ms: i32,
+    pub wander_min_s: i32,
+    pub wander_max_s: i32,
+    pub walk_pct: i32,
+    pub return_pct: i32,
+    pub corpse_s: i32,
+    pub free_s: i32,
+    pub tag_pct: i32,
+    pub heal_threat_pct: i32,
+    pub status_threat: i32,
+    pub loot_m: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NpcKindDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub level: u8,
+    pub hp: i32,
+    pub speed_mps: f32,
+    /// 0 attacks only when attacked.
+    pub aggro_m: f32,
+    pub wander_m: f32,
+    pub respawn_s: u32,
+    pub size_m: f32,
+    /// 0xRRGGBB, for the placeholder body.
+    pub color: u32,
+    /// Skill ids, tried in order.
+    pub skills: Vec<String>,
+    pub loot: Vec<LootDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LootDef {
+    /// An item id.
+    pub item: String,
+    pub min: u32,
+    pub max: u32,
+    pub pct: u32,
+}
+
 /// Checked content, ready to emit.
 #[derive(Debug)]
 pub struct Content {
@@ -595,6 +659,9 @@ pub struct Content {
     pub control: ControlRules,
     /// Sorted by `wire`, like the modes.
     pub statuses: Vec<StatusDef>,
+    pub npc: NpcRules,
+    /// Sorted by `wire`, like the modes.
+    pub npc_kinds: Vec<NpcKindDef>,
     pub hash: u64,
 }
 
@@ -615,6 +682,10 @@ impl Content {
     }
 
     /// The wire of a status, if `id` names one; parsing checked any it's given exists.
+    fn skill_wire(&self, id: &str) -> u16 {
+        self.skills.iter().find(|s| s.id == id).map_or(0, |s| s.wire)
+    }
+
     fn status_wire(&self, id: &str) -> Option<u8> {
         self.statuses.iter().find(|s| s.id == id).map(|s| s.wire)
     }
@@ -638,10 +709,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let farming: Result<FarmingFile, _> = from_toml("farming.toml", &src.farming);
     let trade: Result<TradeFile, _> = from_toml("trade.toml", &src.trade);
     let combat: Result<CombatFile, _> = from_toml("combat.toml", &src.combat);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat) =
-        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k)) => (m.mode, s.hull, l, b, i, g, c, f, t, k),
-            (m, s, l, b, i, g, c, f, t, k) => {
+    let npcs: Result<NpcsFile, _> = from_toml("npcs.toml", &src.npcs);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n)) => (m.mode, s.hull, l, b, i, g, c, f, t, k, n),
+            (m, s, l, b, i, g, c, f, t, k, n) => {
                 let all = m
                     .err()
                     .into_iter()
@@ -653,7 +725,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
                     .chain(c.err())
                     .chain(f.err())
                     .chain(t.err())
-                    .chain(k.err());
+                    .chain(k.err())
+                    .chain(n.err());
                 return Err(all.flatten().collect());
             }
         };
@@ -674,6 +747,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     combat.skill.sort_by_key(|s| s.wire);
     combat.shrine.sort_by_key(|s| s.wire);
     combat.status.sort_by_key(|s| s.wire);
+    npcs.kind.sort_by_key(|k| k.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls, &mut errors);
     check_land(&land, &items.item, &mut errors);
@@ -684,6 +758,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_farming(&farming, &items.item, &land.climate, &mut errors);
     check_trade(&trade, &items.item, &crafting.recipe, &mut errors);
     check_combat(&combat, &mut errors);
+    check_npcs(&npcs, &combat, &items.item, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -707,6 +782,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         progress: combat.progress,
         control: combat.control,
         statuses: combat.status,
+        npc: npcs.npc,
+        npc_kinds: npcs.kind,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -1265,7 +1342,15 @@ fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
             errors.push(format!("{at}: an {} skill heals, buffs or cleanses, and doesn't deal damage or debuff", sk.target));
         }
     }
-    check_progress(file, &k.progress, k.skillset.len(), errors);
+    for sk in &k.skill {
+        if k.skillset.iter().any(|s| s.id == sk.skillset && s.npc) && (sk.target != "enemy" || sk.cost_mp != 0) {
+            errors.push(format!("{file}: skill {:?}: an npc skillset's skills are enemy skills costing no mana", sk.id));
+        }
+    }
+    check_progress(file, &k.progress, k.skillset.iter().filter(|s| !s.npc).count(), errors);
+    if k.skillset.iter().any(|s| s.npc && k.skillset.iter().any(|o| !o.npc && o.wire > s.wire)) {
+        errors.push(format!("{file}: npc skillsets come after every player skillset, so players' are wires 0, 1, 2, …"));
+    }
     let c = &k.control;
     if !(1..=3600).contains(&c.window_s) {
         errors.push(format!("{file}: control.window_s must be from 1 to 3600"));
@@ -1297,6 +1382,93 @@ fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
         }
         if st.tick_ms != 0 && !(250..=MAX_STATUS_MS).contains(&st.tick_ms) {
             errors.push(format!("{at}: tick_ms must be 0 or from 250 to {MAX_STATUS_MS}"));
+        }
+    }
+}
+
+fn check_npcs(n: &NpcsFile, k: &CombatFile, items: &[ItemDef], errors: &mut Vec<String>) {
+    let file = "npcs.toml";
+    let r = &n.npc;
+    let mut num = |name: &str, v: i32, lo: i32, hi: i32| {
+        if !(lo..=hi).contains(&v) {
+            errors.push(format!("{file}: npc.{name} must be from {lo} to {hi}"));
+        }
+    };
+    num("brain_ms", r.brain_ms, 100, 2000);
+    num("heartbeat_ms", r.heartbeat_ms, 100, 5000);
+    num("wander_min_s", r.wander_min_s, 0, 600);
+    num("wander_max_s", r.wander_max_s, 0, 600);
+    num("walk_pct", r.walk_pct, 10, 100);
+    num("return_pct", r.return_pct, 50, 300);
+    num("corpse_s", r.corpse_s, 1, 3600);
+    num("free_s", r.free_s, 0, 3600);
+    num("tag_pct", r.tag_pct, 0, 100);
+    num("heal_threat_pct", r.heal_threat_pct, 0, 1000);
+    num("status_threat", r.status_threat, 0, 100_000);
+    check_range(file, "npc.wake_m", r.wake_m, 10.0, 500.0, errors);
+    check_range(file, "npc.sleep_m", r.sleep_m, 10.0, 600.0, errors);
+    check_range(file, "npc.leash_m", r.leash_m, 5.0, 500.0, errors);
+    check_range(file, "npc.loot_m", r.loot_m, 1.0, 20.0, errors);
+    if r.brain_ms % 100 != 0 {
+        errors.push(format!("{file}: npc.brain_ms must be a multiple of the 100 ms tick"));
+    }
+    if r.wake_m >= r.sleep_m {
+        errors.push(format!("{file}: npc.wake_m must be less than sleep_m"));
+    }
+    if r.wander_min_s > r.wander_max_s {
+        errors.push(format!("{file}: npc.wander_min_s must be at most wander_max_s"));
+    }
+    if r.free_s > r.corpse_s {
+        errors.push(format!("{file}: npc.free_s must be at most corpse_s"));
+    }
+    check_ids(file, "kind", n.kind.iter().map(|k| (k.id.as_str(), usize::from(k.wire))), errors);
+    let level_max = k.progress.xp_to_next.len() + 1;
+    let mut names = std::collections::HashSet::new();
+    for kd in &n.kind {
+        let at = format!("{file}: kind {:?}", kd.id);
+        if !is_item_name(&kd.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(kd.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", kd.name));
+        }
+        if !(1..=level_max).contains(&usize::from(kd.level)) {
+            errors.push(format!("{at}: level must be from 1 to {level_max}"));
+        }
+        if !(1..=1_000_000).contains(&kd.hp) {
+            errors.push(format!("{at}: hp must be from 1 to 1000000"));
+        }
+        check_range(&at, "speed_mps", kd.speed_mps, 1.0, 15.0, errors);
+        check_range(&at, "aggro_m", kd.aggro_m, 0.0, 40.0, errors);
+        check_range(&at, "wander_m", kd.wander_m, 0.0, r.leash_m, errors);
+        check_range(&at, "size_m", kd.size_m, 0.3, 8.0, errors);
+        if !(u32::try_from(r.corpse_s).unwrap_or(0)..=86_400).contains(&kd.respawn_s) {
+            errors.push(format!("{at}: respawn_s must be from npc.corpse_s to 86400"));
+        }
+        if kd.color > 0xff_ffff {
+            errors.push(format!("{at}: color is 0xRRGGBB"));
+        }
+        if !(1..=8).contains(&kd.skills.len()) {
+            errors.push(format!("{at}: one to eight skills"));
+        }
+        for id in &kd.skills {
+            let npc_skill = k.skill.iter().find(|s| &s.id == id).is_some_and(|s| k.skillset.iter().any(|set| set.id == s.skillset && set.npc));
+            if !npc_skill {
+                errors.push(format!("{at}: no skill {id:?} in an npc skillset"));
+            }
+        }
+        for l in &kd.loot {
+            match items.iter().find(|i| i.id == l.item) {
+                None => errors.push(format!("{at}: loot: no item {:?}", l.item)),
+                Some(i) => {
+                    if l.min < 1 || l.min > l.max || l.max > i.stack {
+                        errors.push(format!("{at}: loot {:?}: 1 <= min <= max <= the item's stack", l.item));
+                    }
+                }
+            }
+            if !(1..=100).contains(&l.pct) {
+                errors.push(format!("{at}: loot {:?}: pct must be from 1 to 100", l.item));
+            }
         }
     }
 }
@@ -1459,7 +1631,7 @@ fn canonical(c: &Content) -> String {
     }
     s += "\n";
     for k in &c.skillsets {
-        writeln!(s, "skillset\t{}\t{}\t{}", k.wire, k.id, k.name).unwrap();
+        writeln!(s, "skillset\t{}\t{}\t{}\t{}", k.wire, k.id, k.name, k.npc).unwrap();
     }
     for k in &c.skills {
         write!(
@@ -1495,6 +1667,34 @@ fn canonical(c: &Content) -> String {
     )
     .unwrap();
     writeln!(s, "control\t{}\t{:?}", c.control.window_s, c.control.steps_pct).unwrap();
+    s += "npc";
+    for f in npc_fields(&c.npc) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
+    for k in &c.npc_kinds {
+        write!(
+            s,
+            "kind\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}",
+            k.wire,
+            k.id,
+            k.name,
+            k.level,
+            k.hp,
+            Value::F32(k.speed_mps).bits(),
+            Value::F32(k.aggro_m).bits(),
+            Value::F32(k.wander_m).bits(),
+            k.respawn_s,
+            Value::F32(k.size_m).bits(),
+            k.color,
+            k.skills
+        )
+        .unwrap();
+        for l in &k.loot {
+            write!(s, "\t{}:{}:{}:{}", l.item, l.min, l.max, l.pct).unwrap();
+        }
+        s += "\n";
+    }
     for k in &c.statuses {
         writeln!(
             s,
@@ -1654,6 +1854,28 @@ fn combat_fields(k: &CombatRules) -> Vec<Field> {
         f("death_stack_s", "How long a death counts toward the next wait, s.", I32(k.death_stack_s)),
         f("respawn_pct", "HP and mana on respawning, in percent.", I32(k.respawn_pct)),
         f("dummy_hp", "A dev Straw Dummy's HP.", I32(k.dummy_hp)),
+    ]
+}
+
+fn npc_fields(n: &NpcRules) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    vec![
+        f("brain_ms", "How often the brain thinks, ms: a multiple of the tick.", I32(n.brain_ms)),
+        f("wake_m", "A spawn point with a living character this close has its NPC, m.", F32(n.wake_m)),
+        f("sleep_m", "An idle NPC with no character this close goes away, m.", F32(n.sleep_m)),
+        f("leash_m", "This far from home an NPC gives up the fight, m.", F32(n.leash_m)),
+        f("heartbeat_ms", "How often a moving NPC's position is published, ms.", I32(n.heartbeat_ms)),
+        f("wander_min_s", "The shortest pause between strolls, s.", I32(n.wander_min_s)),
+        f("wander_max_s", "The longest pause between strolls, s.", I32(n.wander_max_s)),
+        f("walk_pct", "A stroll's share of the kind's speed, in percent.", I32(n.walk_pct)),
+        f("return_pct", "A return home's share of the kind's speed, in percent.", I32(n.return_pct)),
+        f("corpse_s", "How long a corpse lies, s.", I32(n.corpse_s)),
+        f("free_s", "When a corpse's loot is anyone's, s after the death.", I32(n.free_s)),
+        f("tag_pct", "The share of the damage the first hitter needs to own the loot, in percent.", I32(n.tag_pct)),
+        f("heal_threat_pct", "Threat from healing someone an NPC fights, as a share of the HP healed, in percent.", I32(n.heal_threat_pct)),
+        f("status_threat", "Threat from a debuff that deals no damage.", I32(n.status_threat)),
+        f("loot_m", "How close a looter must stand, m.", F32(n.loot_m)),
     ]
 }
 
@@ -2117,11 +2339,11 @@ pub fn render_rust(c: &Content) -> String {
     s += "    /// A status effect's status wire, and how long it lasts.\n    pub status: Option<u8>,\n    pub ms: u32,\n";
     s += "    /// The status the target must have for this effect to happen (a combo).\n    pub when: Option<u8>,\n}\n\n";
     s += "/// Skillsets (`content/combat.toml`, docs/design/combat.md).\n";
-    s += "#[derive(Debug, PartialEq)]\npub struct SkillsetData {\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n}\n\n";
+    s += "#[derive(Debug, PartialEq)]\npub struct SkillsetData {\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n    /// NPCs' skills: characters can't pick it, and its skills cost no mana.\n    pub npc: bool,\n}\n\n";
     s += "/// Every skillset, sorted by wire, which is the index.\n";
     writeln!(s, "pub static SKILLSETS: [SkillsetData; {}] = [", c.skillsets.len()).unwrap();
     for k in &c.skillsets {
-        writeln!(s, "    SkillsetData {{ wire: {}, id: {:?}, name: {:?} }},", k.wire, k.id, k.name).unwrap();
+        writeln!(s, "    SkillsetData {{ wire: {}, id: {:?}, name: {:?}, npc: {} }},", k.wire, k.id, k.name, k.npc).unwrap();
     }
     s += "];\n\n";
     s += "/// Skills (`content/combat.toml`, docs/design/combat.md).\n";
@@ -2230,6 +2452,32 @@ pub fn render_rust(c: &Content) -> String {
     s += "    /// The window runs this long past the end of the last control that landed, s.\n    pub window_s: u32,\n";
     s += "    /// The share of its duration each control in a row lands for; past the last, immune.\n    pub steps_pct: &'static [u32],\n}\n\n";
     writeln!(s, "pub static CONTROL: ControlRules = ControlRules {{ window_s: {}, steps_pct: &{:?} }};", c.control.window_s, c.control.steps_pct).unwrap();
+    let npc = npc_fields(&c.npc);
+    s += "\n/// NPC rules (`content/npcs.toml`, docs/design/npcs.md).\n#[derive(Debug, PartialEq)]\npub struct NpcRules {\n";
+    rust_struct_fields(&mut s, &npc);
+    s += "}\n\n";
+    writeln!(s, "pub static NPC: NpcRules = NpcRules {{ {} }};\n", rust_values(&npc)).unwrap();
+    s += "/// One line of a kind's loot: `min` to `max` of `item` with chance `pct`%.\n#[derive(Debug, PartialEq)]\npub struct LootData {\n    /// The item's wire.\n    pub item: u16,\n    pub min: u32,\n    pub max: u32,\n    pub pct: u32,\n}\n\n";
+    s += "/// NPC kinds (`content/npcs.toml`, docs/design/npcs.md).\n#[derive(Debug, PartialEq)]\npub struct NpcKindData {\n    /// Stored in `entity.ref_id`.\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see.\n    pub name: &'static str,\n";
+    s += "    pub level: u8,\n    pub hp: i32,\n    pub speed_mps: f32,\n    /// 0 attacks only when attacked.\n    pub aggro_m: f32,\n    pub wander_m: f32,\n    pub respawn_s: u32,\n";
+    s += "    /// The placeholder body's height and colour (0xRRGGBB).\n    pub size_m: f32,\n    pub color: u32,\n    /// Skill wires, tried in order.\n    pub skills: &'static [u16],\n    pub loot: &'static [LootData],\n}\n\n";
+    s += "/// Every NPC kind, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static NPC_KINDS: [NpcKindData; {}] = [", c.npc_kinds.len()).unwrap();
+    for k in &c.npc_kinds {
+        let skills: Vec<String> = k.skills.iter().map(|id| c.skill_wire(id).to_string()).collect();
+        let loot: Vec<String> = k.loot.iter().map(|l| format!("LootData {{ item: {}, min: {}, max: {}, pct: {} }}", c.item_wire(&l.item), l.min, l.max, l.pct)).collect();
+        writeln!(
+            s,
+            "    NpcKindData {{ wire: {}, id: {:?}, name: {:?}, level: {}, hp: {}, speed_mps: {:?}, aggro_m: {:?}, wander_m: {:?}, respawn_s: {}, size_m: {:?}, color: 0x{:06x}, skills: &[{}], loot: &[{}] }},",
+            k.wire, k.id, k.name, k.level, k.hp, k.speed_mps, k.aggro_m, k.wander_m, k.respawn_s, k.size_m, k.color, skills.join(", "), loot.join(", ")
+        )
+        .unwrap();
+    }
+    s += "];\n\n";
+    s += "/// The NPC kind stored as `wire`.\n";
+    s += "pub fn npc_kind(wire: u8) -> Option<&'static NpcKindData> {\n    NPC_KINDS.get(usize::from(wire))\n}\n\n";
+    s += "/// The NPC kind with content id `id`.\n";
+    s += "pub fn npc_kind_by_id(id: &str) -> Option<&'static NpcKindData> {\n    NPC_KINDS.iter().find(|d| d.id == id)\n}\n";
     s
 }
 
@@ -2404,7 +2652,20 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"StepsPct\">The share of its duration each control in a row lands for; past the last, immune.</param>\n";
     s += "    public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);\n\n";
     s += "    /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>\n";
-    s += "    public sealed record SkillsetData(byte Wire, string Id, string Name);\n\n";
+    s += "    /// <param name=\"Npc\">NPCs' skills: characters can't pick it, and its skills cost no mana.</param>\n";
+    s += "    public sealed record SkillsetData(byte Wire, string Id, string Name, bool Npc);\n\n";
+    let npc = npc_fields(&c.npc);
+    s += "    /// <summary>NPC rules (content/npcs.toml, docs/design/npcs.md).</summary>\n";
+    csharp_param_docs(&mut s, &npc);
+    writeln!(s, "    public sealed record NpcRules({});\n", csharp_params(&npc)).unwrap();
+    s += "    /// <summary>One line of an NPC kind's loot: <paramref name=\"Min\"/> to <paramref name=\"Max\"/> of the item with chance <paramref name=\"Pct\"/>%.</summary>\n";
+    s += "    public sealed record LootData(ushort Item, uint Min, uint Max, uint Pct);\n\n";
+    s += "    /// <summary>NPC kinds (content/npcs.toml, docs/design/npcs.md).</summary>\n";
+    s += "    /// <param name=\"Wire\">Stored in <c>entity.ref_id</c>.</param>\n";
+    s += "    /// <param name=\"AggroM\">0 attacks only when attacked.</param>\n";
+    s += "    /// <param name=\"Color\">The placeholder body's colour, 0xRRGGBB; <paramref name=\"SizeM\"/> its height.</param>\n";
+    s += "    /// <param name=\"Skills\">Skill wires, tried in order.</param>\n";
+    s += "    public sealed record NpcKindData(byte Wire, string Id, string Name, byte Level, int Hp, float SpeedMps, float AggroM, float WanderM, uint RespawnS, float SizeM, uint Color, IReadOnlyList<ushort> Skills, IReadOnlyList<LootData> Loot);\n\n";
     s += "    /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    /// <param name=\"Wire\">Stored in casts and combat events.</param>\n";
     s += "    /// <param name=\"Skillset\">The skillset's wire.</param>\n";
@@ -2621,7 +2882,7 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        /// <summary>Every skillset, sorted by wire, which is the index.</summary>\n";
     s += "        public static readonly IReadOnlyList<SkillsetData> Skillsets = new SkillsetData[]\n        {\n";
     for k in &c.skillsets {
-        writeln!(s, "            new({}, {:?}, {:?}),", k.wire, k.id, k.name).unwrap();
+        writeln!(s, "            new({}, {:?}, {:?}, {}),", k.wire, k.id, k.name, if k.npc { "true" } else { "false" }).unwrap();
     }
     s += "        };\n\n";
     s += "        /// <summary>Every skill, sorted by wire.</summary>\n";
@@ -2706,6 +2967,34 @@ pub fn render_csharp(c: &Content) -> String {
         list(c.control.steps_pct.iter().map(|v| format!("{v}u")).collect())
     )
     .unwrap();
+    writeln!(s, "\n        public static readonly NpcRules Npc = new({});\n", csharp_values(&npc_fields(&c.npc))).unwrap();
+    s += "        /// <summary>Every NPC kind, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<NpcKindData> NpcKinds = new NpcKindData[]\n        {\n";
+    for k in &c.npc_kinds {
+        let skills: Vec<String> = k.skills.iter().map(|id| c.skill_wire(id).to_string()).collect();
+        let loot: Vec<String> = k.loot.iter().map(|l| format!("new({}, {}u, {}u, {}u)", c.item_wire(&l.item), l.min, l.max, l.pct)).collect();
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, {}, {}, {}, {}, {}, {}u, {}, 0x{:06x}u, new ushort[] {{ {} }}, new LootData[] {{ {} }}),",
+            k.wire,
+            k.id,
+            k.name,
+            k.level,
+            k.hp,
+            Value::F32(k.speed_mps).csharp(),
+            Value::F32(k.aggro_m).csharp(),
+            Value::F32(k.wander_m).csharp(),
+            k.respawn_s,
+            Value::F32(k.size_m).csharp(),
+            k.color,
+            skills.join(", "),
+            loot.join(", ")
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The NPC kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static NpcKindData? NpcKind(byte wire) => wire < NpcKinds.Count ? NpcKinds[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -3092,6 +3381,27 @@ mod tests {
         id = "blade"
         name = "Blade"
 
+        [[skillset]]
+        wire = 2
+        id = "beast"
+        name = "Beast"
+        npc = true
+
+        [[skill]]
+        wire = 400
+        id = "claw"
+        name = "Claw"
+        skillset = "beast"
+        level = 1
+        target = "enemy"
+        cast_ms = 0
+        cooldown_ms = 2000
+        range_m = 3.0
+        cost_mp = 0
+        speed_mps = 0.0
+        facing = true
+        effects = [{ kind = "damage", amount = 40 }]
+
         [[skill]]
         wire = 210
         id = "mend"
@@ -3128,6 +3438,55 @@ mod tests {
         name = "Town Shrine"
     "#;
 
+    const NPCS: &str = r#"
+        [npc]
+        brain_ms = 200
+        wake_m = 120.0
+        sleep_m = 160.0
+        leash_m = 40.0
+        heartbeat_ms = 500
+        wander_min_s = 8
+        wander_max_s = 20
+        walk_pct = 45
+        return_pct = 150
+        corpse_s = 90
+        free_s = 30
+        tag_pct = 50
+        heal_threat_pct = 50
+        status_threat = 20
+        loot_m = 4.0
+
+        [[kind]]
+        wire = 1
+        id = "wolf"
+        name = "Wolf"
+        level = 2
+        hp = 800
+        speed_mps = 6.0
+        aggro_m = 15.0
+        wander_m = 16.0
+        respawn_s = 150
+        size_m = 1.1
+        color = 0x8a8f96
+        skills = ["claw"]
+        loot = [{ item = "driftpine_log", min = 1, max = 3, pct = 60 }]
+
+        [[kind]]
+        wire = 0
+        id = "crab"
+        name = "Crab"
+        level = 1
+        hp = 300
+        speed_mps = 4.0
+        aggro_m = 0.0
+        wander_m = 10.0
+        respawn_s = 90
+        size_m = 0.6
+        color = 0xd0603a
+        skills = ["claw"]
+        loot = []
+    "#;
+
     fn sources() -> Sources {
         Sources {
             movement: MOVEMENT.into(),
@@ -3140,7 +3499,12 @@ mod tests {
             farming: FARMING.into(),
             trade: TRADE.into(),
             combat: COMBAT.into(),
+            npcs: NPCS.into(),
         }
+    }
+
+    fn parse_npcs(npcs: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { npcs: npcs.into(), ..sources() })
     }
 
     fn parse_combat(combat: &str) -> Result<Content, Vec<String>> {
@@ -3344,9 +3708,10 @@ mod tests {
             farming: "[farming\n".into(),
             trade: "[trade\n".into(),
             combat: "[combat\n".into(),
+            npcs: "[npc\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml", "npcs.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -3542,6 +3907,7 @@ mod tests {
                 crafting: CRAFTING.replace(from, to),
                 land: LAND.replace(from, to),
                 farming: FARMING.replace(from, to),
+                npcs: NPCS.replace(from, to),
                 ..sources()
             });
             assert_ne!(c.unwrap().hash, a, "{changed}");
@@ -3898,8 +4264,8 @@ mod tests {
     #[test]
     fn combat_parses_in_order_and_reaches_both_outputs() {
         let c = parse_combat(COMBAT).unwrap();
-        assert_eq!(c.skills.iter().map(|k| k.wire).collect::<Vec<_>>(), [100, 210]);
-        assert_eq!(c.skillsets.iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["blade", "frost"]);
+        assert_eq!(c.skills.iter().map(|k| k.wire).collect::<Vec<_>>(), [100, 210, 400]);
+        assert_eq!(c.skillsets.iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["blade", "frost", "beast"]);
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains("pub static COMBAT: CombatRules = CombatRules { hp_max: 1000, mp_max: 800, hp_regen_out: 20, hp_regen_in: 4, mp_regen_out: 16, mp_regen_in: 6, combat_s: 6, gcd_ms: 1000, cast_move_m: 0.5, cast_leeway_m: 3.0, respawn_first_s: 5, respawn_step_s: 25, respawn_max_s: 180, death_stack_s: 600, respawn_pct: 50, dummy_hp: 5000 };"), "{rs}");
         assert!(rs.contains("Caster = 2,") && cs.contains("Caster = 2,") && rs.contains("Heal = 1,"), "{rs}");
@@ -3914,6 +4280,67 @@ mod tests {
         assert!(cs.contains("public static readonly CombatRules Combat = new(1000, 800, 20, 4, 16, 6, 6, 1000, 0.5f, 3.0f, 5, 25, 180, 600, 50, 5000);"), "{cs}");
         assert!(cs.contains(r#"new(210, "mend", "Mend", 1, 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260, null, 0, null), new(EffectKind.Status, 0, 2, 5000, null), new(EffectKind.Cleanse, 0, null, 0, null) }),"#), "{cs}");
         assert!(cs.contains(r#"new(0, "town_shrine", "Town Shrine"),"#), "{cs}");
+    }
+
+    #[test]
+    fn npcs_parse_in_order_and_reach_both_outputs() {
+        let c = parse_npcs(NPCS).unwrap();
+        assert_eq!(c.npc_kinds.iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["crab", "wolf"]);
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains(r#"SkillsetData { wire: 2, id: "beast", name: "Beast", npc: true },"#), "{rs}");
+        assert!(cs.contains(r#"new(2, "beast", "Beast", true),"#), "{cs}");
+        assert!(rs.contains("pub static NPC: NpcRules = NpcRules { brain_ms: 200, wake_m: 120.0, sleep_m: 160.0, leash_m: 40.0, heartbeat_ms: 500, wander_min_s: 8, wander_max_s: 20, walk_pct: 45, return_pct: 150, corpse_s: 90, free_s: 30, tag_pct: 50, heal_threat_pct: 50, status_threat: 20, loot_m: 4.0 };"), "{rs}");
+        assert!(rs.contains(r#"NpcKindData { wire: 1, id: "wolf", name: "Wolf", level: 2, hp: 800, speed_mps: 6.0, aggro_m: 15.0, wander_m: 16.0, respawn_s: 150, size_m: 1.1, color: 0x8a8f96, skills: &[400], loot: &[LootData { item: 20, min: 1, max: 3, pct: 60 }] },"#), "{rs}");
+        assert!(cs.contains("public static readonly NpcRules Npc = new(200, 120.0f, 160.0f, 40.0f, 500, 8, 20, 45, 150, 90, 30, 50, 50, 20, 4.0f);"), "{cs}");
+        assert!(cs.contains(r#"new(1, "wolf", "Wolf", 2, 800, 6.0f, 15.0f, 16.0f, 150u, 1.1f, 0x8a8f96u, new ushort[] { 400 }, new LootData[] { new(20, 1u, 3u, 60u) }),"#), "{cs}");
+    }
+
+    #[test]
+    fn bad_npcs_are_reported_together() {
+        let bad = NPCS
+            .replace("brain_ms = 200", "brain_ms = 250")
+            .replace("sleep_m = 160.0", "sleep_m = 100.0")
+            .replace("free_s = 30", "free_s = 300")
+            .replace("level = 2", "level = 9")
+            .replace("hp = 800", "hp = 0")
+            .replace("speed_mps = 6.0", "speed_mps = 60.0")
+            .replace("wander_m = 16.0", "wander_m = 50.0")
+            .replace("respawn_s = 90", "respawn_s = 10")
+            .replace("color = 0xd0603a", "color = 0x1000000")
+            .replace("skills = [\"claw\"]\n        loot = []", "skills = [\"bolt\"]\n        loot = [{ item = \"gold\", min = 1, max = 1, pct = 0 }]")
+            .replace("min = 1, max = 3", "min = 3, max = 2");
+        let e = parse_npcs(&bad).unwrap_err().join("\n");
+        for want in [
+            "npc.brain_ms must be a multiple",
+            "npc.wake_m must be less than sleep_m",
+            "npc.free_s must be at most corpse_s",
+            "kind \"wolf\": level must be from 1 to 3",
+            "kind \"wolf\": hp must be",
+            "kind \"wolf\": speed_mps",
+            "kind \"wolf\": wander_m",
+            "kind \"crab\": respawn_s must be",
+            "kind \"crab\": color is 0xRRGGBB",
+            "kind \"crab\": no skill \"bolt\" in an npc skillset",
+            "kind \"crab\": loot: no item \"gold\"",
+            "loot \"gold\": pct must be",
+            "kind \"wolf\": loot \"driftpine_log\": 1 <= min <= max",
+        ] {
+            assert!(e.contains(want), "{want:?} missing from:\n{e}");
+        }
+        let combat = COMBAT.replace("cost_mp = 0\n", "cost_mp = 5\n").replace("wire = 2\n        id = \"beast\"", "wire = 0\n        id = \"beast\"").replace("wire = 0\n        id = \"blade\"", "wire = 2\n        id = \"blade\"");
+        let e = parse_combat(&combat).unwrap_err().join("\n");
+        assert!(e.contains("skill \"claw\": an npc skillset's skills are enemy skills costing no mana"), "{e}");
+        assert!(e.contains("npc skillsets come after every player skillset"), "{e}");
+    }
+
+    #[test]
+    fn any_npc_change_changes_the_hash() {
+        let a = parse_npcs(NPCS).unwrap().hash;
+        for (from, to) in [("brain_ms = 200", "brain_ms = 300"), ("loot_m = 4.0", "loot_m = 5.0"), ("hp = 300", "hp = 301"), ("pct = 60", "pct = 61"), ("color = 0xd0603a", "color = 0xd0603b")] {
+            assert_ne!(parse_npcs(&NPCS.replace(from, to)).unwrap().hash, a, "{from}");
+        }
+        let b = parse(&Sources { combat: COMBAT.replace("npc = true", "npc = false"), ..sources() });
+        assert!(b.is_err(), "a kind's skills must be in an npc skillset");
     }
 
     #[test]

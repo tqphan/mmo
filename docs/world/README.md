@@ -81,6 +81,19 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Debuff | Slowed, Stunned, Felled, Soaked, Scorched, Sundered, Shaken | Statuses skills put on foes: a snare, a stun, a knockdown, a combo mark, burning over time, more damage taken, less dealt (`content/combat.toml`) |
 | Buff | Fervor, Bulwark, Renewal | More damage dealt, less taken, healing over time (`content/combat.toml`) |
 | Wayshrine | Gullhaven Wayshrine, Furrowdale Wayshrine, Cairnwick Wayshrine, Redfen Wayshrine | Standing stones where the dead get up again, one in each town (`content/combat.toml`) |
-| Dev target | Straw Dummy | A practice target on a post, dev builds only, until NPCs |
+| Skillset | Wildcraft | What NPCs use; characters can't pick it (`wildcraft`, `content/combat.toml`) |
+| Skill: Wildcraft | Pinch, Gore, Bog Spit, Bite, Hamstring Bite, Cutlass Slash, Shield Knock, Brine Bolt, Sapping Hex, Rake, Pounce, Snap, Shell Slam, Searing Sting, Captain's Cleave, Grapeshot | NPCs' skills (`pinch`, `gore`, `bog_spit`, `bite`, `hamstring_bite`, `cutlass_slash`, `shield_knock`, `brine_bolt`, `sapping_hex`, `rake`, `pounce`, `snap`, `shell_slam`, `searing_sting`, `captains_cleave`, `grapeshot`) |
+| NPC: beast | Shore Skitter | A red shore crab the size of a dog; passive (`shore_skitter`, `content/npcs.toml`) |
+| NPC: beast | Bristleback Boar | A bristly hill boar; passive (`bristleback_boar`) |
+| NPC: beast | Fen Croaker | A big marsh toad that spits bog water (`fen_croaker`) |
+| NPC: beast | Greymane Wolf | A grey coastal wolf that hamstrings its prey (`greymane_wolf`) |
+| NPC: people | Wreck Brigand | A raider who lives off wrecks, with cutlass and shield (`wreck_brigand`) |
+| NPC: people | Brine Hexer | A sea-witch who sours her foes and throws brine (`brine_hexer`) |
+| NPC: beast | Cliff Stalker | A tawny cat of the cliffs that pounces (`cliff_stalker`) |
+| NPC: beast | Mossback Tortoise | A huge, slow, moss-grown tortoise; passive (`mossback_tortoise`) |
+| NPC: beast | Ashwing Drone | A fist-sized ember-winged wasp with a burning sting (`ashwing_drone`) |
+| NPC: people | Wreck Captain | The brigands' leader, with a grapeshot pistol and a heavy cleaver (`wreck_captain`) |
+| Item: trophy | Skitter Shell, Coarse Hide, Boar Tusk, Fen Gland, Wolf Fang, Brigand's Token, Brine Pearl, Stalker Claw, Mossback Scute, Ashwing Venom, Captain's Compass | Dropped by NPCs; no recipes yet (`skitter_shell`, `coarse_hide`, `boar_tusk`, `fen_gland`, `wolf_fang`, `brigands_token`, `brine_pearl`, `stalker_claw`, `mossback_scute`, `ashwing_venom`, `captains_compass`) |
+| Dev target | Straw Dummy | A practice target on a post, dev builds only |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

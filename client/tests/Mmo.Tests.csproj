@@ -22,6 +22,7 @@
     <Compile Include="../src/Gameplay/CraftModel.cs" Link="Client/Gameplay/CraftModel.cs" />
     <Compile Include="../src/Gameplay/TradeModel.cs" Link="Client/Gameplay/TradeModel.cs" />
     <Compile Include="../src/Gameplay/CombatModel.cs" Link="Client/Gameplay/CombatModel.cs" />
+    <Compile Include="../src/Gameplay/NpcModel.cs" Link="Client/Gameplay/NpcModel.cs" />
     <Compile Include="../src/World/ShipPredictor.cs" Link="Client/World/ShipPredictor.cs" />
     <Compile Include="../content/*.cs" Link="Client/Content/%(Filename)%(Extension)" />
   </ItemGroup>

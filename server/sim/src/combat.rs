@@ -493,13 +493,14 @@ mod tests {
 
     #[test]
     fn content_skills_are_usable_as_specified() {
-        assert_eq!(SKILLS.len(), 24);
-        for set in &SKILLSETS {
+        assert_eq!(SKILLS.iter().filter(|s| !SKILLSETS[usize::from(s.skillset)].npc).count(), 24);
+        for set in SKILLSETS.iter().filter(|s| !s.npc) {
             assert_eq!(SKILLS.iter().filter(|s| s.skillset == set.wire).count(), 8, "{}", set.name);
             assert!(SKILLS.iter().any(|s| s.skillset == set.wire && s.level == 1), "{} has a skill at level 1", set.name);
         }
         assert!(SKILLS.iter().all(|s| s.wire >= 100));
-        assert_eq!(SKILLSETS.iter().map(|s| s.name).collect::<Vec<_>>(), ["Emberlore", "Ironvow", "Wellspring"]);
+        assert_eq!(SKILLSETS.iter().map(|s| (s.name, s.npc)).collect::<Vec<_>>(), [("Emberlore", false), ("Ironvow", false), ("Wellspring", false), ("Wildcraft", true)]);
+        assert!(SKILLS.iter().filter(|s| SKILLSETS[usize::from(s.skillset)].npc).all(|s| s.cost_mp == 0 && s.target == SkillTarget::Enemy));
         assert_eq!(skill(100).map(|s| s.id), Some("cinder_dart"));
         assert!(skill(99).is_none());
         assert_eq!(shrine_by_id("gullhaven_wayshrine").map(|s| s.wire), Some(0));

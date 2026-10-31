@@ -61,6 +61,11 @@ pub fn world_tick(ctx: &ReducerContext, _timer: WorldTickTimer) -> Result<(), St
     // Statuses that deal or heal over time, found by when they're due.
     crate::combat::run_periodic(ctx);
 
+    // NPCs near players think every `brain_ms` (docs/design/npcs.md).
+    if ticks.is_multiple_of(sim::npc::brain_ticks()) {
+        crate::npc::think(ctx);
+    }
+
     ctx.db.tick_state().id().delete(0);
     ctx.db.tick_state().insert(TickState { id: 0, ticks, last_at: at, last_dt: dt });
     Ok(())

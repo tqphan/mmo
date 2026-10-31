@@ -148,6 +148,13 @@ wire = 2
 id = "wellspring"
 name = "Wellspring"
 
+# NPCs' skills (docs/design/npcs.md): characters can't pick it, and its skills cost no mana.
+[[skillset]]
+wire = 3
+id = "wildcraft"
+name = "Wildcraft"
+npc = true
+
 # Emberlore: fire and frost at range. Frostspike stuns the Soaked (Wellspring's Brine Lash), and
 # its Slowed lets Ironvow's Threefold Cut fell.
 [[skill]]
@@ -511,6 +518,247 @@ cost_mp = 70
 speed_mps = 0.0
 facing = false
 effects = [{ kind = "status", status = "bulwark", ms = 6000 }]
+
+# Wildcraft: what NPCs use (docs/design/npcs.md). No mana, and no facing check for NPCs.
+[[skill]]
+wire = 400
+id = "pinch"
+name = "Pinch"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2000
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 40 }]
+
+[[skill]]
+wire = 401
+id = "gore"
+name = "Gore"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2500
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 60 }]
+
+[[skill]]
+wire = 402
+id = "bog_spit"
+name = "Bog Spit"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 1000
+cooldown_ms = 4000
+range_m = 15.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 50 }, { kind = "status", status = "soaked", ms = 6000 }]
+
+[[skill]]
+wire = 403
+id = "bite"
+name = "Bite"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2000
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 70 }]
+
+[[skill]]
+wire = 404
+id = "hamstring_bite"
+name = "Hamstring Bite"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 12000
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 40 }, { kind = "status", status = "slowed", ms = 4000 }]
+
+[[skill]]
+wire = 405
+id = "cutlass_slash"
+name = "Cutlass Slash"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2000
+range_m = 4.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 90 }]
+
+[[skill]]
+wire = 406
+id = "shield_knock"
+name = "Shield Knock"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 15000
+range_m = 4.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 40 }, { kind = "status", status = "stunned", ms = 1500 }]
+
+[[skill]]
+wire = 407
+id = "brine_bolt"
+name = "Brine Bolt"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 1500
+cooldown_ms = 2500
+range_m = 25.0
+cost_mp = 0
+speed_mps = 25.0
+facing = true
+effects = [{ kind = "damage", amount = 120 }]
+
+[[skill]]
+wire = 408
+id = "sapping_hex"
+name = "Sapping Hex"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 15000
+range_m = 20.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "status", status = "shaken", ms = 6000 }]
+
+[[skill]]
+wire = 409
+id = "rake"
+name = "Rake"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2000
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 110 }]
+
+[[skill]]
+wire = 410
+id = "pounce"
+name = "Pounce"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 18000
+range_m = 8.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 60 }, { kind = "status", status = "felled", ms = 1500 }]
+
+[[skill]]
+wire = 411
+id = "snap"
+name = "Snap"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2500
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 90 }]
+
+[[skill]]
+wire = 412
+id = "shell_slam"
+name = "Shell Slam"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 1500
+cooldown_ms = 14000
+range_m = 4.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 200 }, { kind = "status", status = "stunned", ms = 2000 }]
+
+[[skill]]
+wire = 413
+id = "searing_sting"
+name = "Searing Sting"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 3000
+range_m = 3.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 60 }, { kind = "status", status = "scorched", amount = 15, ms = 6000 }]
+
+[[skill]]
+wire = 414
+id = "captains_cleave"
+name = "Captain's Cleave"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 0
+cooldown_ms = 2500
+range_m = 5.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 180 }, { kind = "status", status = "sundered", ms = 6000 }]
+
+[[skill]]
+wire = 415
+id = "grapeshot"
+name = "Grapeshot"
+skillset = "wildcraft"
+level = 1
+target = "enemy"
+cast_ms = 2000
+cooldown_ms = 12000
+range_m = 20.0
+cost_mp = 0
+speed_mps = 0.0
+facing = true
+effects = [{ kind = "damage", amount = 260 }]
 
 # Wayshrines, where the dead respawn. Each is placed once, from world/shrines.tsv.
 [[shrine]]

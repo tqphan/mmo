@@ -34,6 +34,7 @@ namespace SpacetimeDB.Types
             AddTable(DroppedPack = new(conn));
             AddTable(Entity = new(conn));
             AddTable(GameClock = new(conn));
+            AddTable(Loot = new(conn));
             AddTable(MyCharacters = new(conn));
             AddTable(MyCraft = new(conn));
             AddTable(MyFighter = new(conn));
@@ -555,6 +556,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.DroppedPack().ToSql(),
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.GameClock().ToSql(),
+            new QueryBuilder().From.Loot().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
             new QueryBuilder().From.MyCraft().ToSql(),
             new QueryBuilder().From.MyFighter().ToSql(),
@@ -586,6 +588,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<DroppedPack, DroppedPackCols, DroppedPackIxCols> DroppedPack() => new("dropped_pack", new DroppedPackCols("dropped_pack"), new DroppedPackIxCols("dropped_pack"));
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
+        public global::SpacetimeDB.Table<Loot, LootCols, LootIxCols> Loot() => new("loot", new LootCols("loot"), new LootIxCols("loot"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
         public global::SpacetimeDB.Table<CraftJob, MyCraftCols, MyCraftIxCols> MyCraft() => new("my_craft", new MyCraftCols("my_craft"), new MyCraftIxCols("my_craft"));
         public global::SpacetimeDB.Table<Fighter, MyFighterCols, MyFighterIxCols> MyFighter() => new("my_fighter", new MyFighterCols("my_fighter"), new MyFighterIxCols("my_fighter"));
@@ -690,12 +693,14 @@ namespace SpacetimeDB.Types
                 Reducer.AdminClearNodes args => Reducers.InvokeAdminClearNodes(eventContext, args),
                 Reducer.AdminClearPosts args => Reducers.InvokeAdminClearPosts(eventContext, args),
                 Reducer.AdminClearShrines args => Reducers.InvokeAdminClearShrines(eventContext, args),
+                Reducer.AdminClearSpawns args => Reducers.InvokeAdminClearSpawns(eventContext, args),
                 Reducer.AdminClearStations args => Reducers.InvokeAdminClearStations(eventContext, args),
                 Reducer.AdminClearTerrain args => Reducers.InvokeAdminClearTerrain(eventContext, args),
                 Reducer.AdminPutLand args => Reducers.InvokeAdminPutLand(eventContext, args),
                 Reducer.AdminPutNodes args => Reducers.InvokeAdminPutNodes(eventContext, args),
                 Reducer.AdminPutPosts args => Reducers.InvokeAdminPutPosts(eventContext, args),
                 Reducer.AdminPutShrines args => Reducers.InvokeAdminPutShrines(eventContext, args),
+                Reducer.AdminPutSpawns args => Reducers.InvokeAdminPutSpawns(eventContext, args),
                 Reducer.AdminPutStations args => Reducers.InvokeAdminPutStations(eventContext, args),
                 Reducer.AdminPutTerrain args => Reducers.InvokeAdminPutTerrain(eventContext, args),
                 Reducer.AdminRemoveCrops args => Reducers.InvokeAdminRemoveCrops(eventContext, args),
@@ -705,6 +710,7 @@ namespace SpacetimeDB.Types
                 Reducer.AdminRemovePlots args => Reducers.InvokeAdminRemovePlots(eventContext, args),
                 Reducer.AdminRemovePosts args => Reducers.InvokeAdminRemovePosts(eventContext, args),
                 Reducer.AdminRemoveShrines args => Reducers.InvokeAdminRemoveShrines(eventContext, args),
+                Reducer.AdminRemoveSpawns args => Reducers.InvokeAdminRemoveSpawns(eventContext, args),
                 Reducer.AdminRemoveStations args => Reducers.InvokeAdminRemoveStations(eventContext, args),
                 Reducer.AdminRemoveTerrain args => Reducers.InvokeAdminRemoveTerrain(eventContext, args),
                 Reducer.CancelCast args => Reducers.InvokeCancelCast(eventContext, args),
@@ -718,12 +724,14 @@ namespace SpacetimeDB.Types
                 Reducer.DevGivePack args => Reducers.InvokeDevGivePack(eventContext, args),
                 Reducer.DevGrantItem args => Reducers.InvokeDevGrantItem(eventContext, args),
                 Reducer.DevRemoveDummy args => Reducers.InvokeDevRemoveDummy(eventContext, args),
+                Reducer.DevRemoveNpc args => Reducers.InvokeDevRemoveNpc(eventContext, args),
                 Reducer.DevRemoveShip args => Reducers.InvokeDevRemoveShip(eventContext, args),
                 Reducer.DevSetGm args => Reducers.InvokeDevSetGm(eventContext, args),
                 Reducer.DevSetLabor args => Reducers.InvokeDevSetLabor(eventContext, args),
                 Reducer.DevSetLevel args => Reducers.InvokeDevSetLevel(eventContext, args),
                 Reducer.DevSetVitals args => Reducers.InvokeDevSetVitals(eventContext, args),
                 Reducer.DevSpawnDummy args => Reducers.InvokeDevSpawnDummy(eventContext, args),
+                Reducer.DevSpawnNpc args => Reducers.InvokeDevSpawnNpc(eventContext, args),
                 Reducer.DevSpawnShip args => Reducers.InvokeDevSpawnShip(eventContext, args),
                 Reducer.DevSpendLabor args => Reducers.InvokeDevSpendLabor(eventContext, args),
                 Reducer.DevSwing args => Reducers.InvokeDevSwing(eventContext, args),
@@ -736,6 +744,7 @@ namespace SpacetimeDB.Types
                 Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
+                Reducer.LootCorpse args => Reducers.InvokeLootCorpse(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
                 Reducer.PayTax args => Reducers.InvokePayTax(eventContext, args),

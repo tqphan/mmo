@@ -6,6 +6,7 @@ pub mod nodes;
 pub mod placeholder;
 pub mod posts;
 pub mod shrines;
+pub mod spawns;
 pub mod region;
 pub mod stations;
 

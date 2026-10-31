@@ -1,0 +1,21 @@
+# 0030: NPCs exist only near players, move by timed segments published as moves, and think every 200 ms in the tick
+
+- **Status:** Accepted, 2026-10-31
+- **Context:**
+  - M1 needs about ten NPC kinds with a simple brain, threat, loot and experience (BACKLOG M1 #1, docs/design/npcs.md).
+  - PLAN §4.4 runs NPC logic only in cells near players, and PLAN §5 has NPCs move as timed segments that clients interpolate. The `npc-brain` sidecar for paths isn't needed until the coast has terrain that straight lines can't cross.
+  - The client already draws other entities from `transform` with a 200 ms interpolation buffer and dead reckoning (ADR 0015), fed by moves on start, stop and turn and a 0.5 s heartbeat.
+  - The world will have hundreds of spawn points, most of them far from anyone at any moment.
+  - Combat (ADRs 0028 and 0029) already applies skills, statuses and death to any entity with `vitals`.
+- **Decision:**
+  - **Spawn points are private rows** placed from `world/spawns.tsv` like Wayshrines. A spawn point spawns its NPC (`entity` kind 4, `transform`, `vitals`, private `npc`) only when a character is within `wake_m` (120 m, the Near tier's reach) and it is past its `ready_at`. An idle, stopped NPC with no character within `sleep_m` (160 m) is deleted and its spawn point is ready at once. So nothing far from players exists or costs anything.
+  - **The brain runs inside `world_tick` every `brain_ms` (200 ms)**, not in a sidecar. It wanders, notices, chases, uses skills in content order, and gives up past the leash. It walks straight lines and stops at water.
+  - **Movement is a segment** (start point, heading, speed, start and end time) in the private `npc` row. Positions come from the segment's timestamps; the server uses them for range and sight. `transform` is written only when a segment starts, ends or turns, and every 0.5 s while moving. That is exactly the stream a client's moves make, so clients need nothing new to draw NPCs.
+  - **NPC skills are content skills** in a Wildcraft skillset marked `npc`, which characters can't pick. They land through the same `land` as players' skills, with no mana and no facing check. Timed casts live in `vitals` and the brain finishes them when due; controls interrupt them as they do characters' casts.
+  - **Threat is a private table** fed from `harm`, `afflict` and `heal`. **Loot is a public table** in the Near tier, so anyone nearby can see a corpse has loot; the first hitter owns it if it did at least half the damage, and anyone may take it after 30 s.
+- **Consequences:**
+  - A spawn point with nobody near never respawns its NPC, so camps fill up only as players arrive. A corpse and its loot still lie for `corpse_s` once someone leaves.
+  - The brain's cost grows with NPCs near players, not with the world. A crowd fighting many NPCs is untested; a throughput run with NPCs belongs with M3's large battles.
+  - NPC casts can land up to `brain_ms` late.
+  - No pathfinding: NPCs can be kited round water or cliffs. The leash (which also drops a target that is itself beyond `leash_m` from home) stops an NPC stuck at a shore forever.
+  - The schema changed (new `spawn`, `npc`, `threat` and `loot`, entity kind 4), so run `cargo xtask publish --clear` and then `cargo xtask world` once.

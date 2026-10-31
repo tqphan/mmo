@@ -19,6 +19,7 @@ pub const SHRINE_STEP_M: f32 = 3.0;
 
 /// One hit, heal or miss, broadcast to the cell it happened in.
 #[spacetimedb::table(accessor = combat_event, public, event)]
+#[derive(Debug)]
 pub struct CombatEvent {
     pub cell: u64,
     pub source: u64,
@@ -280,7 +281,7 @@ fn event(ctx: &ReducerContext, cell: u64, source: u64, target: u64, skill_id: u3
 }
 
 /// End every status on `entity_id` and stop what it deals over time.
-fn clear_statuses(ctx: &ReducerContext, entity_id: u64) {
+pub(crate) fn clear_statuses(ctx: &ReducerContext, entity_id: u64) {
     for row in ctx.db.periodic().entity_id().filter(entity_id).collect::<Vec<_>>() {
         ctx.db.periodic().id().delete(row.id);
     }
@@ -304,14 +305,17 @@ pub fn require_alive(ctx: &ReducerContext, p: &Presence) -> Result<(), String> {
 
 /// Where an entity is in world coordinates: a character wherever it stands, anything else where
 /// its transform says.
-fn world_at(ctx: &ReducerContext, entity_id: u64) -> Option<[f32; 3]> {
+pub(crate) fn world_at(ctx: &ReducerContext, entity_id: u64) -> Option<[f32; 3]> {
+    if let Some(at) = crate::npc::position(ctx, entity_id) {
+        return Some(at);
+    }
     match ctx.db.presence().entity_id().find(entity_id) {
         Some(p) => Some(crate::ship::world_position(ctx, &p)),
         None => ctx.db.transform().entity_id().find(entity_id).filter(|t| t.parent == 0).map(|t| [t.x, t.y, t.z]),
     }
 }
 
-fn in_sight(ctx: &ReducerContext, from: [f32; 3], to: [f32; 3]) -> bool {
+pub(crate) fn in_sight(ctx: &ReducerContext, from: [f32; 3], to: [f32; 3]) -> bool {
     sim::terrain::line_of_sight(&mut Terrain::new(ctx), [from[0], from[1] + EYE_M, from[2]], [to[0], to[1] + CHEST_M, to[2]])
 }
 
@@ -362,6 +366,7 @@ pub fn enter(ctx: &ReducerContext, owner: Identity, char_id: u64, entity_id: u64
 /// fighter row.
 pub fn leave(ctx: &ReducerContext, char_id: u64, entity_id: u64) {
     ctx.db.cast_job().entity_id().delete(entity_id);
+    crate::npc::forget(ctx, entity_id);
     clear_statuses(ctx, entity_id);
     let Some(v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
     let v = settled(&v, now(ctx));
@@ -539,19 +544,19 @@ fn finish(ctx: &ReducerContext, p: &Presence, s: &'static SkillData, target: u64
         }
         ctx.db.fighter().char_id().update(Fighter { cooldowns, ..f });
     }
-    let flight = sim::combat::impact_micros(sim::combat::distance(me, them), s.speed_mps);
-    if flight == 0 {
-        land(ctx, p.entity_id, target, s);
-    } else {
-        ctx.db.skill_impact().insert(SkillImpact {
-            scheduled_id: 0,
-            scheduled_at: after(ctx.timestamp, flight).into(),
-            source: p.entity_id,
-            target,
-            skill: s.wire,
-        });
-    }
+    release(ctx, p.entity_id, me, target, s);
     Ok(())
+}
+
+/// A skill leaves `source` at `from`: it lands now, or its projectile is sent. Every check and cost
+/// is already behind it.
+pub(crate) fn release(ctx: &ReducerContext, source: u64, from: [f32; 3], target: u64, s: &'static SkillData) {
+    let flight = world_at(ctx, target).map_or(0, |them| sim::combat::impact_micros(sim::combat::distance(from, them), s.speed_mps));
+    if flight == 0 {
+        land(ctx, source, target, s);
+    } else {
+        ctx.db.skill_impact().insert(SkillImpact { scheduled_id: 0, scheduled_at: after(ctx.timestamp, flight).into(), source, target, skill: s.wire });
+    }
 }
 
 /// A projectile arrives. It homes, so it lands wherever its target went, if it's still alive.
@@ -628,6 +633,9 @@ fn afflict(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, status: u8
         status,
     });
     ctx.db.vitals().entity_id().update(v);
+    if d.debuff && source != entity_id {
+        crate::npc::provoked(ctx, entity_id, source, i64::from(sim::npc::NPC.status_threat), 0);
+    }
     if let Some(old) = ctx.db.periodic().entity_id().filter(entity_id).find(|r| r.status == status) {
         ctx.db.periodic().id().delete(old.id);
     }
@@ -708,6 +716,8 @@ fn harm(ctx: &ReducerContext, source: u64, tv: Vitals, skill_id: u32, amount: i3
     let flags = if hp == 0 { hit | flags::KILL } else { hit };
     event(ctx, v.cell, source, v.entity_id, skill_id, amount, flags);
     ctx.db.vitals().entity_id().update(Vitals { hp, combat_until: later(v.combat_until, until), ..v.clone() });
+    let dealt = i64::from(v.hp - hp);
+    crate::npc::provoked(ctx, v.entity_id, source, dealt, dealt);
     if hp == 0 {
         die(ctx, v.entity_id, source);
     }
@@ -720,6 +730,7 @@ fn heal(ctx: &ReducerContext, source: u64, tv: Vitals, skill: u16, amount: i32, 
     let hp = (v.hp + amount).min(v.hp_max).max(v.hp);
     event(ctx, v.cell, source, v.entity_id, u32::from(skill), hp - v.hp, flags);
     let fighting = v.combat_until > at;
+    crate::npc::healed(ctx, source, v.entity_id, hp - v.hp);
     ctx.db.vitals().entity_id().update(Vitals { hp, ..v });
     if fighting && source != tv.entity_id {
         engage(ctx, source, at);
@@ -732,7 +743,8 @@ fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     let Some(v) = ctx.db.vitals().entity_id().find(entity_id) else { return };
     clear_statuses(ctx, entity_id);
     let character = |id: u64| ctx.db.entity().id().find(id).is_some_and(|e| e.kind == entity_kind::CHARACTER);
-    if !character(entity_id) && killer != entity_id {
+    let npc = crate::npc::is_npc(ctx, entity_id);
+    if !character(entity_id) && killer != entity_id && !npc {
         reward(ctx, killer, v.level);
     }
     if ctx.db.entity().id().find(entity_id).is_some_and(|e| e.kind == entity_kind::DUMMY) {
@@ -740,7 +752,12 @@ fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
         return;
     }
     ctx.db.cast_job().entity_id().delete(entity_id);
-    ctx.db.vitals().entity_id().update(no_cast(Vitals { hp: 0, at, dead_at: Some(at), statuses: Vec::new(), resists: Vec::new(), ..v }));
+    ctx.db.vitals().entity_id().update(no_cast(Vitals { hp: 0, at, dead_at: Some(at), target: 0, statuses: Vec::new(), resists: Vec::new(), ..v }));
+    if npc {
+        crate::npc::died(ctx, entity_id, killer);
+        return;
+    }
+    crate::npc::forget(ctx, entity_id);
     let Some(p) = ctx.db.presence().entity_id().find(entity_id) else { return };
     let pve = killer == entity_id || !character(killer);
     crate::gathering::cancel(ctx, p.char_id);
@@ -756,7 +773,7 @@ fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
 }
 
 /// A character's kill of a foe at `victim` that isn't a character: experience, and maybe levels.
-fn reward(ctx: &ReducerContext, killer: u64, victim: u8) {
+pub(crate) fn reward(ctx: &ReducerContext, killer: u64, victim: u8) {
     let Some(p) = ctx.db.presence().entity_id().find(killer) else { return };
     let Some(f) = ctx.db.fighter().char_id().find(p.char_id) else { return };
     let gained = sim::combat::kill_xp(victim, f.level);
@@ -789,7 +806,7 @@ fn set_level(ctx: &ReducerContext, entity_id: u64, level: u8) {
 #[spacetimedb::reducer]
 pub fn pick_skillset(ctx: &ReducerContext, skillset: u8) -> Result<(), String> {
     let p = ctx.db.presence().identity().find(ctx.sender()).ok_or("not in the world")?;
-    if usize::from(skillset) >= sim::combat::SKILLSETS.len() {
+    if sim::combat::SKILLSETS.get(usize::from(skillset)).is_none_or(|s| s.npc) {
         return Err("no such skillset".into());
     }
     let mut f = ctx.db.fighter().char_id().find(p.char_id).ok_or("no fighter")?;

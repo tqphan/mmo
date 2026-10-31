@@ -1,6 +1,6 @@
 # Combat
 
-Status: v0.3, 2026-10-31. M1 task 1: combat A (vitals, targeting, skills with casts, cooldowns and impacts, death and respawn) and combat B (statuses, crowd control with diminishing returns, combos, damage and healing over time, levels 1–15 with experience, skillset picks, eight skills per skillset). Code: `content/combat.toml`, `server/sim/src/combat.rs`, `server/world/src/combat.rs`; `tools/worldtool/src/shrines.rs`, `world/shrines.tsv`; `sidecars/loadbot/src/combat.rs`; client `client/src/Sim/Combat.cs`, `Gameplay/Combat.cs`, `Gameplay/CombatModel.cs`, `UI/CombatHud.cs`, `UI/CombatDemo.cs`. Related: PLAN §4.2, §4.4, §5.2–5.4; docs/design/trade.md (packs dropped on death); ADRs 0028 and 0029.
+Status: v0.4, 2026-10-31 (NPCs: docs/design/npcs.md). M1 task 1: combat A (vitals, targeting, skills with casts, cooldowns and impacts, death and respawn) and combat B (statuses, crowd control with diminishing returns, combos, damage and healing over time, levels 1–15 with experience, skillset picks, eight skills per skillset). Code: `content/combat.toml`, `server/sim/src/combat.rs`, `server/world/src/combat.rs`; `tools/worldtool/src/shrines.rs`, `world/shrines.tsv`; `sidecars/loadbot/src/combat.rs`; client `client/src/Sim/Combat.cs`, `Gameplay/Combat.cs`, `Gameplay/CombatModel.cs`, `UI/CombatHud.cs`, `UI/CombatDemo.cs`. Related: PLAN §4.2, §4.4, §5.2–5.4; docs/design/trade.md (packs dropped on death); ADRs 0028 and 0029.
 
 ## 1. How the original worked
 
@@ -118,9 +118,9 @@ Enemy skills need the target in front; ally and caster skills don't. The two cro
 - Dying and respawning clear statuses and resists; so does leaving the world (§3).
 
 ### Levels and skillsets
-- Characters start at level 1, with `hp_max` + `hp_per_level` × (level − 1) HP and the same for mana; `vitals.level` and the maximums follow `fighter.level`. A Straw Dummy is level 1.
+- Characters start at level 1, with `hp_max` + `hp_per_level` × (level − 1) HP and the same for mana; `vitals.level` and the maximums follow `fighter.level`. A Straw Dummy is level 1; an NPC is its kind's level (docs/design/npcs.md), which is what killing it is worth.
 - **Experience** comes from killing anything but a character: `kill_xp` + `kill_xp_per_level` × (its level − 1), less `kill_xp_gap_pct`% per level the killer is above it, to nothing (no bonus for killing above your level). It carries over levels and stops at the cap. A level gained raises the maximums and adds what they grew to HP and mana. `XP` and `LEVEL` events tell the cell.
-- **Deaths:** a death to anything but another character (a dummy can't kill, so for now the dev self-kill or, later, NPCs) loses `death_xp_pct`% of what the level needs, never below the level's start. Dying to a character costs nothing.
+- **Deaths:** a death to anything but another character (an NPC, or the dev self-kill) loses `death_xp_pct`% of what the level needs, never below the level's start. Dying to a character costs nothing.
 - **`pick_skillset(skillset)`** adds a skillset, one for each of `skillset_at` (levels 1, 5 and 10) the character has reached; refusals: "no such skillset", "already picked", "you can pick another skillset at level N", "every skillset slot is taken". Picks are kept; there's no swapping yet.
 - A skill can be used only with its skillset picked and the character at its `level` or above.
 - `dev_set_level(level)` (dev builds) sets the level with no experience into it and full HP and mana, forgetting the latest picks beyond its slots.
@@ -137,13 +137,13 @@ Enemy skills need the target in front; ally and caster skills don't. The two cro
 - Four for now, one in each town: Gullhaven, Furrowdale, Cairnwick and Redfen.
 
 ### Straw Dummies (dev builds)
-- **`dev_spawn_dummy(x, z)`** puts a Straw Dummy (entity kind 3) on the ground with `dummy_hp` HP; `dev_remove_dummy(id)` removes it. A dummy is an `enemy` target that never fights back. At 0 HP it is "killed" (a `KILL` event) and back to full at once. NPCs replace them (BACKLOG M1).
+- **`dev_spawn_dummy(x, z)`** puts a Straw Dummy (entity kind 3) on the ground with `dummy_hp` HP; `dev_remove_dummy(id)` removes it. A dummy is an `enemy` target that never fights back. At 0 HP it is "killed" (a `KILL` event) and back to full at once. NPCs (docs/design/npcs.md) are the real foes; dummies stay for practice and tests.
 - `dev_set_vitals(hp, mp)` sets the caller's own, for bots and demos; an HP of 0 kills as a hit would (a death to no character: it costs experience).
 
 ### The client
 - **Targeting:** Tab cycles through living others within 40 m, those in front first, nearest first within each; F1 targets ourselves; Escape clears (it also closes windows). A ring marks the target.
 - **Hotbar:** one row of eight per skillset picked, in the order picked, each its skills in table order: keys 1–8 use the first row, Shift+1–8 the second and Ctrl+1–8 the third, on the current target. The digits are read from key events, not input actions, so a modifier can't fire two rows. Skills above our level show their level, greyed. The client refuses what it can see is wrong (controls, unlearned skills, cooldowns, mana, range, a dead target) without asking, by the same rules (`sim::combat`, ported to C#), and the server decides.
-- **Skillsets:** K opens a picker with a button per skillset, enabled while a pick is free; a line by the bars says "K: pick a skillset" or the level of the next pick, and with no skillset the hotbar says to press K.
+- **Skillsets:** K opens a picker with a button per player skillset (not Wildcraft, which is NPCs'), enabled while a pick is free; a line by the bars says "K: pick a skillset" or the level of the next pick, and with no skillset the hotbar says to press K.
 - **Facing:** when an enemy skill's target is behind us, the client turns us to face it and sends the turn as a movement event (a turn on the spot, which the move sender doesn't otherwise send) just before the skill, so the server judges the skill facing the new way. Reducer calls from one client arrive in order.
 - **Frames:** our HP and mana bars, cast bar, level and experience, and our buffs and debuffs (a chip each, name and seconds left, buffs edged green before debuffs edged red); the target's name and level, HP bar, statuses the same way, and cast bar; and the hotbar with each skill's cooldown, all from `vitals` and `my_fighter` settled to the present.
 - **Numbers:** each `combat_event` in view floats above the target: damage in orange (red on us), heals in green, "killed", a status's name (debuffs violet, buffs blue), "immune to …", "+40 xp" and "level 5!" in gold.
@@ -156,11 +156,9 @@ Enemy skills need the target in front; ally and caster skills don't. The two cro
 - **Diminishing returns are ours** (100/50/25%, then immune for 15 s past the last), since the original's are disputed.
 - **Statuses end on logging out**, so logging out clears a debuff. Saving them in `fighter` is a later fix if the playtest finds it abused.
 - **Ticks aren't scaled** by damage modifiers, and heals aren't scaled at all.
-- **No threat** until NPCs, which need it (BACKLOG M1).
 - **Flat numbers.** HP and mana grow by level; damage and heals are fixed until stats and gear.
 - **Death penalties:** experience only (durability waits for gear in M2), no resurrection by others or by scrolls, no corpse runs.
 - **Packs stay on the back** when their carrier dies on a ship or in water, until vehicles.
-- **Dummies, not NPCs**, until the NPC task.
 - Every character can attack every other: factions and the crime task decide the consequences later.
 
 ## 4. Test plan

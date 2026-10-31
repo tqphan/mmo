@@ -107,6 +107,9 @@ namespace Mmo
             AddChild(combat);
             player.Combat = combat;
             AddChild(new CombatHud(combat));
+            var looting = new Looting(session, player, entities);
+            AddChild(looting);
+            player.Looting = looting;
             var plots = new Plots(session, player, plotRegistry);
             AddChild(plots);
             player.Plots = plots;
@@ -118,6 +121,7 @@ namespace Mmo
             var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
+            hud.Prompts.Add(() => looting.Prompt);
             hud.Prompts.Add(() => trade.Status);
             hud.Prompts.Add(() => trade.Prompt);
             hud.Prompts.Add(() => placement.Active is null && farming.Active is null ? plots.Prompt : "");
@@ -149,6 +153,8 @@ namespace Mmo
                 AddChild(new TradeDemo(session, player, stations, crafting, craftWindow, tradeRegistry, trade));
             if (options.CombatDemo)
                 AddChild(new CombatDemo(session, player, entities, combat));
+            if (options.NpcDemo)
+                AddChild(new NpcDemo(session, player, entities, combat, looting));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))

@@ -17,6 +17,7 @@ mod items;
 mod labor;
 mod farm;
 mod land;
+mod npc;
 mod metrics;
 mod ship;
 mod swarm;
@@ -114,6 +115,7 @@ fn main() {
         "farm" => farm::scenario(&args),
         "trade" => trade::scenario(&args),
         "combat" => combat::scenario(&args),
+        "npc" => npc::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -135,7 +137,8 @@ fn main() {
                  land             two bots rush the same plot, pay tax ahead, and see it demolished by the dev clock\n  \
                  farm             a bot farms its plot and the open ground by the dev clock; refusals; another bot steals off the plot\n  \
                  trade            a bot crafts a pack, carries it slowly, has it stolen and back, and sells it far away; demand by the dev clock\n  \
-                 combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn"
+                 combat           two bots and a dummy: refusals, hits, casts, an interrupt, a projectile, a heal, a kill, a respawn\n  \
+                 npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death"
             );
             std::process::exit(2);
         }

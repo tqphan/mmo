@@ -10,6 +10,7 @@ mod items;
 mod labor;
 mod land;
 mod movement;
+mod npc;
 mod session;
 mod ship;
 mod terrain;

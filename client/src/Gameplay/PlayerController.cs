@@ -94,6 +94,9 @@ namespace Mmo.Gameplay
         /// <summary>Trade packs; set by <see cref="Main"/>. Carrying one slows us; F on land sells at a post or picks one up before gathering.</summary>
         public Trade? Trade { get; set; }
 
+        /// <summary>F loots a corpse in reach (docs/design/npcs.md).</summary>
+        public Looting? Looting { get; set; }
+
         /// <summary>Combat; set by <see cref="Main"/>. The dead lie still and send nothing.</summary>
         public Combat? Combat { get; set; }
 
@@ -183,7 +186,7 @@ namespace Mmo.Gameplay
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
             if (interact && Parent == 0
-                && (Placement?.Interact() == true || Farming?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true
+                && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true
                     || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // F climbs aboard from the water, and works the helm or a cannon once aboard; not both at once.

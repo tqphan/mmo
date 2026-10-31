@@ -14,6 +14,8 @@ mod farming;
 mod gathering;
 mod items;
 mod labor;
+#[cfg(feature = "dev")]
+mod npc;
 mod land;
 #[cfg(feature = "dev")]
 mod ships;

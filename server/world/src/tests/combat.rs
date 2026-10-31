@@ -10,17 +10,17 @@ use crate::combat::{
 use crate::dev::dev_teleport;
 use sim::combat::{COMBAT, respawn_share, shrine_by_id, skill_by_id};
 
-const ADMIN: u128 = 99;
+pub(super) const ADMIN: u128 = 99;
 
 fn wire(id: &str) -> u16 {
     skill_by_id(id).unwrap().wire
 }
 
-fn vitals_of(t: &TestContext, entity_id: u64) -> Vitals {
+pub(super) fn vitals_of(t: &TestContext, entity_id: u64) -> Vitals {
     read(t, |ctx| ctx.db.vitals().entity_id().find(entity_id).unwrap())
 }
 
-fn use_on(t: &TestContext, player: u128, skill: &str, target: u64) -> Result<(), String> {
+pub(super) fn use_on(t: &TestContext, player: u128, skill: &str, target: u64) -> Result<(), String> {
     call(t, player, |ctx| use_skill(ctx, wire(skill), target))
 }
 
@@ -33,7 +33,7 @@ fn use_seen(t: &TestContext, player: u128, skill: &str, target: u64) -> Vec<Comb
     .unwrap()
 }
 
-fn put(t: &TestContext, player: u128, x: f32, z: f32) {
+pub(super) fn put(t: &TestContext, player: u128, x: f32, z: f32) {
     call(t, player, |ctx| dev_teleport(ctx, x, z)).unwrap();
 }
 
@@ -71,14 +71,14 @@ fn land_all(t: &TestContext) -> Vec<CombatEvent> {
 }
 
 /// HP and mana settled to now.
-fn hp_mp(t: &TestContext, entity_id: u64) -> (i32, i32) {
+pub(super) fn hp_mp(t: &TestContext, entity_id: u64) -> (i32, i32) {
     let v = vitals_of(t, entity_id);
     let now = read(t, |ctx| crate::time::now(ctx).to_micros_since_unix_epoch());
     let (at, until, dead) = (v.at.to_micros_since_unix_epoch(), v.combat_until.to_micros_since_unix_epoch(), v.dead_at.is_some());
     (sim::combat::hp_now(v.hp, v.hp_max, at, until, now, dead), sim::combat::mp_now(v.mp, v.mp_max, at, until, now, dead))
 }
 
-fn shrines(t: &TestContext, at: &[(&str, f32, f32)]) {
+pub(super) fn shrines(t: &TestContext, at: &[(&str, f32, f32)]) {
     call(t, ADMIN, |ctx| {
         on_connect(ctx);
         crate::session::record_owner(ctx);
@@ -94,7 +94,7 @@ const HP: i32 = 1000 + 14 * 100;
 const MP: i32 = 800 + 14 * 40;
 
 /// Make `player` top level with every skillset picked.
-fn veteran(t: &TestContext, player: u128) {
+pub(super) fn veteran(t: &TestContext, player: u128) {
     call(t, player, |ctx| dev_set_level(ctx, sim::combat::level_max())).unwrap();
     for set in 0..3 {
         call(t, player, |ctx| pick_skillset(ctx, set)).unwrap();

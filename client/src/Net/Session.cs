@@ -18,8 +18,8 @@ namespace Mmo.Net
     /// </summary>
     public partial class Session : Node
     {
-        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP; <c>vitals</c> and <c>combat_event</c> are combat's (docs/design/combat.md).</summary>
-        public static readonly string[] NearTables = { "entity", "transform", "vehicle", "vitals", "combat_event" };
+        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP; <c>vitals</c> and <c>combat_event</c> are combat's (docs/design/combat.md), <c>loot</c> NPCs' (docs/design/npcs.md).</summary>
+        public static readonly string[] NearTables = { "entity", "transform", "vehicle", "vitals", "combat_event", "loot" };
         public const ushort NearRadius = 2;
         /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md), plots (docs/design/land.md), crops (docs/design/farming.md), trade posts and dropped packs (docs/design/trade.md), and Wayshrines (docs/design/combat.md).</summary>
         public static readonly string[] StaticTables = { "resource_node", "station", "plot", "crop", "trade_post", "dropped_pack", "shrine" };

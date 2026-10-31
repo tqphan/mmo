@@ -300,7 +300,7 @@ namespace Mmo.UI
                 box.AddThemeConstantOverride("separation", 8);
                 AddChild(box);
                 box.AddChild(title);
-                foreach (var set in GameContent.Skillsets)
+                foreach (var set in GameContent.Skillsets.Where(s => !s.Npc))
                 {
                     var skills = string.Join(", ", GameContent.Skills.Where(s => s.Skillset == set.Wire).Take(3).Select(s => s.Name));
                     var b = new Button { Text = $"{set.Name}: {skills}, …", CustomMinimumSize = new Vector2(460, 40) };

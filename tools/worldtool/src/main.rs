@@ -1,6 +1,6 @@
 //! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes,
-//! crafting stations, trade posts and Wayshrines included; `worldtool nodes`, `worldtool stations`,
-//! `worldtool posts` and `worldtool shrines` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
+//! crafting stations, trade posts, Wayshrines and NPC spawn points included; `worldtool nodes`,
+//! `worldtool stations`, `worldtool posts`, `worldtool shrines` and `worldtool spawns` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
 //! prints what's in it. Paths are relative to the repo root,
 //! which `cargo xtask` runs from (docs/design/world.md).
 
@@ -20,9 +20,10 @@ fn main() -> ExitCode {
         Some("stations") => World::load(&dir).and_then(|w| write_stations(&dir, &w)),
         Some("posts") => World::load(&dir).and_then(|w| write_posts(&dir, &w)),
         Some("shrines") => World::load(&dir).and_then(|w| write_shrines(&dir, &w)),
+        Some("spawns") => World::load(&dir).and_then(|w| write_spawns(&dir, &w)),
         Some("info") => info(&dir),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|spawns|info [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -44,7 +45,20 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     write_nodes(dir, &world)?;
     write_stations(dir, &world)?;
     write_posts(dir, &world)?;
-    write_shrines(dir, &world)
+    write_shrines(dir, &world)?;
+    write_spawns(dir, &world)
+}
+
+/// Place NPC spawn points on `world` and write them to `dir` (docs/design/npcs.md).
+fn write_spawns(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let spawns = worldtool::spawns::place(world);
+    worldtool::spawns::save(dir, &spawns)?;
+    println!("wrote {} spawn points to {}", spawns.len(), dir.join(worldtool::spawns::FILE).display());
+    for (id, x, z, _, want) in worldtool::spawns::CAMPS {
+        let got = spawns.iter().filter(|p| p.kind.id == id && (p.x - x).hypot(p.z - z) < 200.0).count();
+        println!("  {id} at ({x:.0}, {z:.0}): {got} of {want}");
+    }
+    Ok(())
 }
 
 /// Place Wayshrines on `world` and write them to `dir` (docs/design/combat.md).
@@ -103,6 +117,11 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     println!("{} trade posts", posts.len());
     for p in &posts {
         println!("  {:<16} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
+    }
+    let spawns = worldtool::spawns::load(dir)?;
+    println!("{} NPC spawn points", spawns.len());
+    for k in &sim::npc::NPC_KINDS {
+        println!("  {:<20} {}", k.id, spawns.iter().filter(|p| p.kind == k).count());
     }
     let shrines = worldtool::shrines::load(dir)?;
     println!("{} Wayshrines", shrines.len());

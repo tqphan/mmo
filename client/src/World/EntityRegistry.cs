@@ -97,6 +97,8 @@ namespace Mmo.World
                     view.SetLabel(session.Conn.Db.CharacterPublic.CharId.Find(view.RefId)?.Name ?? $"#{t.EntityId}");
                 else if (view.Kind == EntityKind.Dummy)
                     view.SetLabel("Straw Dummy");
+                else if (view.Kind == EntityKind.Npc && Gameplay.NpcModel.Kind(view.RefId) is { } npc)
+                    view.SetLabel(npc.Name, Gameplay.NpcModel.Aggressive(npc) ? new Color(1.0f, 0.45f, 0.4f) : new Color(1.0f, 0.95f, 0.75f));
                 view.SetPack(e?.Pack ?? 0);
                 view.SetDead(session.Conn.Db.Vitals.EntityId.Find(t.EntityId)?.DeadAt is not null);
                 session.Log($"sees entity {t.EntityId} ({view.Label}) at ({t.X:F1}, {t.Z:F1})");
@@ -164,6 +166,8 @@ namespace Mmo.World
         public const byte Ship = 2;
         /// <summary>A dev Straw Dummy (docs/design/combat.md).</summary>
         public const byte Dummy = 3;
+        /// <summary>An NPC; <c>ref_id</c> is its kind (docs/design/npcs.md).</summary>
+        public const byte Npc = 4;
     }
 
     /// <summary>Another player, drawn from its snapshot buffer, in its ship's frame when it's aboard one.</summary>
@@ -186,7 +190,12 @@ namespace Mmo.World
             EntityId = id;
             Kind = kind;
             RefId = refId;
-            body = kind == EntityKind.Dummy ? Views.Dummy() : Views.Capsule(Views.ColorFor(id));
+            body = kind switch
+            {
+                EntityKind.Dummy => Views.Dummy(),
+                EntityKind.Npc when Gameplay.NpcModel.Kind(refId) is { } npc => Views.Creature(NpcColor(npc), npc.SizeM),
+                _ => Views.Capsule(Views.ColorFor(id)),
+            };
             AddChild(body);
             label = new Label3D
             {
@@ -209,6 +218,38 @@ namespace Mmo.World
         public string Label => label.Text;
 
         public void SetLabel(string text) => label.Text = text;
+
+        public void SetLabel(string text, Color color)
+        {
+            label.Text = text;
+            label.Modulate = color;
+        }
+
+        private static Color NpcColor(NpcKindData k)
+        {
+            var (r, g, b) = Gameplay.NpcModel.Color(k);
+            return new Color(r, g, b);
+        }
+
+        private Node3D? sparkle;
+
+        /// <summary>Show the gold sparkle of a corpse we may loot, or hide it.</summary>
+        public void SetSparkle(bool on)
+        {
+            if (on && sparkle is null)
+            {
+                sparkle = Views.Sparkle();
+                AddChild(sparkle);
+            }
+            if (sparkle is not null)
+                sparkle.Visible = on;
+        }
+
+        public override void _Process(double delta)
+        {
+            if (sparkle is { Visible: true })
+                sparkle.RotateY((float)delta * 2.5f);
+        }
 
         /// <summary>Lying down while dead (docs/design/combat.md).</summary>
         public void SetDead(bool value)

@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x4cd490ff1fd62ab6;
+pub const CONTENT_HASH: u64 = 0x33fdd22e2b2f9d02;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -303,7 +303,7 @@ pub struct ItemData {
 }
 
 /// Every item, sorted by wire.
-pub static ITEMS: [ItemData; 49] = [
+pub static ITEMS: [ItemData; 60] = [
     ItemData { wire: 1, id: "saltreed", name: "Saltreed", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 2, id: "emberleaf", name: "Emberleaf", kind: ItemKind::Material, stack: 1000 },
     ItemData { wire: 3, id: "duskberry", name: "Duskberry", kind: ItemKind::Material, stack: 1000 },
@@ -353,6 +353,17 @@ pub static ITEMS: [ItemData; 49] = [
     ItemData { wire: 408, id: "woolback_lamb", name: "Woolback Lamb", kind: ItemKind::Seed, stack: 10 },
     ItemData { wire: 500, id: "grain_bale", name: "Grain Bale", kind: ItemKind::Pack, stack: 1 },
     ItemData { wire: 501, id: "preserves_crate", name: "Preserves Crate", kind: ItemKind::Pack, stack: 1 },
+    ItemData { wire: 600, id: "skitter_shell", name: "Skitter Shell", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 601, id: "coarse_hide", name: "Coarse Hide", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 602, id: "boar_tusk", name: "Boar Tusk", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 603, id: "fen_gland", name: "Fen Gland", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 604, id: "wolf_fang", name: "Wolf Fang", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 605, id: "brigands_token", name: "Brigand's Token", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 606, id: "brine_pearl", name: "Brine Pearl", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 607, id: "stalker_claw", name: "Stalker Claw", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 608, id: "mossback_scute", name: "Mossback Scute", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 609, id: "ashwing_venom", name: "Ashwing Venom", kind: ItemKind::Material, stack: 1000 },
+    ItemData { wire: 610, id: "captains_compass", name: "Captain's Compass", kind: ItemKind::Material, stack: 1 },
 ];
 
 /// Slots in every character's bag.
@@ -771,13 +782,16 @@ pub struct SkillsetData {
     pub id: &'static str,
     /// What players see.
     pub name: &'static str,
+    /// NPCs' skills: characters can't pick it, and its skills cost no mana.
+    pub npc: bool,
 }
 
 /// Every skillset, sorted by wire, which is the index.
-pub static SKILLSETS: [SkillsetData; 3] = [
-    SkillsetData { wire: 0, id: "emberlore", name: "Emberlore" },
-    SkillsetData { wire: 1, id: "ironvow", name: "Ironvow" },
-    SkillsetData { wire: 2, id: "wellspring", name: "Wellspring" },
+pub static SKILLSETS: [SkillsetData; 4] = [
+    SkillsetData { wire: 0, id: "emberlore", name: "Emberlore", npc: false },
+    SkillsetData { wire: 1, id: "ironvow", name: "Ironvow", npc: false },
+    SkillsetData { wire: 2, id: "wellspring", name: "Wellspring", npc: false },
+    SkillsetData { wire: 3, id: "wildcraft", name: "Wildcraft", npc: true },
 ];
 
 /// Skills (`content/combat.toml`, docs/design/combat.md).
@@ -806,7 +820,7 @@ pub struct SkillData {
 }
 
 /// Every skill, sorted by wire.
-pub static SKILLS: [SkillData; 24] = [
+pub static SKILLS: [SkillData; 40] = [
     SkillData { wire: 100, id: "cinder_dart", name: "Cinder Dart", skillset: 0, level: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 0, range_m: 25.0, cost_mp: 30, speed_mps: 30.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110, status: None, ms: 0, when: None }] },
     SkillData { wire: 101, id: "frostspike", name: "Frostspike", skillset: 0, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 8000, range_m: 20.0, cost_mp: 45, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 80, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 4000, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 2000, when: Some(3) }] },
     SkillData { wire: 102, id: "flare_burst", name: "Flare Burst", skillset: 0, level: 3, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 12000, range_m: 25.0, cost_mp: 80, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 240, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Damage, amount: 120, status: None, ms: 0, when: Some(1) }] },
@@ -831,6 +845,22 @@ pub static SKILLS: [SkillData; 24] = [
     SkillData { wire: 305, id: "cleansing_spring", name: "Cleansing Spring", skillset: 2, level: 7, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 20000, range_m: 25.0, cost_mp: 60, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Cleanse, amount: 0, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Heal, amount: 60, status: None, ms: 0, when: None }] },
     SkillData { wire: 306, id: "wavebreak", name: "Wavebreak", skillset: 2, level: 9, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 15000, range_m: 20.0, cost_mp: 70, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 160, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(6), ms: 6000, when: None }] },
     SkillData { wire: 307, id: "tidal_ward", name: "Tidal Ward", skillset: 2, level: 12, target: SkillTarget::Ally, cast_ms: 0, cooldown_ms: 30000, range_m: 25.0, cost_mp: 70, speed_mps: 0.0, facing: false, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(8), ms: 6000, when: None }] },
+    SkillData { wire: 400, id: "pinch", name: "Pinch", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2000, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 40, status: None, ms: 0, when: None }] },
+    SkillData { wire: 401, id: "gore", name: "Gore", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2500, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 60, status: None, ms: 0, when: None }] },
+    SkillData { wire: 402, id: "bog_spit", name: "Bog Spit", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 1000, cooldown_ms: 4000, range_m: 15.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 50, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(3), ms: 6000, when: None }] },
+    SkillData { wire: 403, id: "bite", name: "Bite", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2000, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 70, status: None, ms: 0, when: None }] },
+    SkillData { wire: 404, id: "hamstring_bite", name: "Hamstring Bite", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 12000, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 40, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(0), ms: 4000, when: None }] },
+    SkillData { wire: 405, id: "cutlass_slash", name: "Cutlass Slash", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2000, range_m: 4.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 90, status: None, ms: 0, when: None }] },
+    SkillData { wire: 406, id: "shield_knock", name: "Shield Knock", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 15000, range_m: 4.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 40, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 1500, when: None }] },
+    SkillData { wire: 407, id: "brine_bolt", name: "Brine Bolt", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 2500, range_m: 25.0, cost_mp: 0, speed_mps: 25.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 120, status: None, ms: 0, when: None }] },
+    SkillData { wire: 408, id: "sapping_hex", name: "Sapping Hex", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 15000, range_m: 20.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Status, amount: 0, status: Some(6), ms: 6000, when: None }] },
+    SkillData { wire: 409, id: "rake", name: "Rake", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2000, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 110, status: None, ms: 0, when: None }] },
+    SkillData { wire: 410, id: "pounce", name: "Pounce", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 18000, range_m: 8.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 60, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(2), ms: 1500, when: None }] },
+    SkillData { wire: 411, id: "snap", name: "Snap", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2500, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 90, status: None, ms: 0, when: None }] },
+    SkillData { wire: 412, id: "shell_slam", name: "Shell Slam", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 1500, cooldown_ms: 14000, range_m: 4.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 200, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(1), ms: 2000, when: None }] },
+    SkillData { wire: 413, id: "searing_sting", name: "Searing Sting", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 3000, range_m: 3.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 60, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 15, status: Some(4), ms: 6000, when: None }] },
+    SkillData { wire: 414, id: "captains_cleave", name: "Captain's Cleave", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 0, cooldown_ms: 2500, range_m: 5.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 180, status: None, ms: 0, when: None }, EffectData { kind: EffectKind::Status, amount: 0, status: Some(5), ms: 6000, when: None }] },
+    SkillData { wire: 415, id: "grapeshot", name: "Grapeshot", skillset: 3, level: 1, target: SkillTarget::Enemy, cast_ms: 2000, cooldown_ms: 12000, range_m: 20.0, cost_mp: 0, speed_mps: 0.0, facing: true, effects: &[EffectData { kind: EffectKind::Damage, amount: 260, status: None, ms: 0, when: None }] },
 ];
 
 /// The skill stored as `wire`.
@@ -944,3 +974,97 @@ pub struct ControlRules {
 }
 
 pub static CONTROL: ControlRules = ControlRules { window_s: 15, steps_pct: &[100, 50, 25] };
+
+/// NPC rules (`content/npcs.toml`, docs/design/npcs.md).
+#[derive(Debug, PartialEq)]
+pub struct NpcRules {
+    /// How often the brain thinks, ms: a multiple of the tick.
+    pub brain_ms: i32,
+    /// A spawn point with a living character this close has its NPC, m.
+    pub wake_m: f32,
+    /// An idle NPC with no character this close goes away, m.
+    pub sleep_m: f32,
+    /// This far from home an NPC gives up the fight, m.
+    pub leash_m: f32,
+    /// How often a moving NPC's position is published, ms.
+    pub heartbeat_ms: i32,
+    /// The shortest pause between strolls, s.
+    pub wander_min_s: i32,
+    /// The longest pause between strolls, s.
+    pub wander_max_s: i32,
+    /// A stroll's share of the kind's speed, in percent.
+    pub walk_pct: i32,
+    /// A return home's share of the kind's speed, in percent.
+    pub return_pct: i32,
+    /// How long a corpse lies, s.
+    pub corpse_s: i32,
+    /// When a corpse's loot is anyone's, s after the death.
+    pub free_s: i32,
+    /// The share of the damage the first hitter needs to own the loot, in percent.
+    pub tag_pct: i32,
+    /// Threat from healing someone an NPC fights, as a share of the HP healed, in percent.
+    pub heal_threat_pct: i32,
+    /// Threat from a debuff that deals no damage.
+    pub status_threat: i32,
+    /// How close a looter must stand, m.
+    pub loot_m: f32,
+}
+
+pub static NPC: NpcRules = NpcRules { brain_ms: 200, wake_m: 120.0, sleep_m: 160.0, leash_m: 40.0, heartbeat_ms: 500, wander_min_s: 8, wander_max_s: 20, walk_pct: 45, return_pct: 150, corpse_s: 90, free_s: 30, tag_pct: 50, heal_threat_pct: 50, status_threat: 20, loot_m: 4.0 };
+
+/// One line of a kind's loot: `min` to `max` of `item` with chance `pct`%.
+#[derive(Debug, PartialEq)]
+pub struct LootData {
+    /// The item's wire.
+    pub item: u16,
+    pub min: u32,
+    pub max: u32,
+    pub pct: u32,
+}
+
+/// NPC kinds (`content/npcs.toml`, docs/design/npcs.md).
+#[derive(Debug, PartialEq)]
+pub struct NpcKindData {
+    /// Stored in `entity.ref_id`.
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see.
+    pub name: &'static str,
+    pub level: u8,
+    pub hp: i32,
+    pub speed_mps: f32,
+    /// 0 attacks only when attacked.
+    pub aggro_m: f32,
+    pub wander_m: f32,
+    pub respawn_s: u32,
+    /// The placeholder body's height and colour (0xRRGGBB).
+    pub size_m: f32,
+    pub color: u32,
+    /// Skill wires, tried in order.
+    pub skills: &'static [u16],
+    pub loot: &'static [LootData],
+}
+
+/// Every NPC kind, sorted by wire, which is the index.
+pub static NPC_KINDS: [NpcKindData; 10] = [
+    NpcKindData { wire: 0, id: "shore_skitter", name: "Shore Skitter", level: 1, hp: 300, speed_mps: 4.0, aggro_m: 0.0, wander_m: 10.0, respawn_s: 120, size_m: 0.6, color: 0xd0603a, skills: &[400], loot: &[LootData { item: 600, min: 1, max: 1, pct: 70 }, LootData { item: 1, min: 1, max: 3, pct: 40 }] },
+    NpcKindData { wire: 1, id: "bristleback_boar", name: "Bristleback Boar", level: 2, hp: 500, speed_mps: 5.0, aggro_m: 0.0, wander_m: 14.0, respawn_s: 120, size_m: 1.0, color: 0x6b4a33, skills: &[401], loot: &[LootData { item: 601, min: 1, max: 1, pct: 60 }, LootData { item: 602, min: 1, max: 1, pct: 40 }] },
+    NpcKindData { wire: 2, id: "fen_croaker", name: "Fen Croaker", level: 3, hp: 600, speed_mps: 4.0, aggro_m: 12.0, wander_m: 8.0, respawn_s: 120, size_m: 0.8, color: 0x5f7f3a, skills: &[402], loot: &[LootData { item: 603, min: 1, max: 1, pct: 60 }] },
+    NpcKindData { wire: 3, id: "greymane_wolf", name: "Greymane Wolf", level: 4, hp: 800, speed_mps: 6.0, aggro_m: 15.0, wander_m: 16.0, respawn_s: 150, size_m: 1.1, color: 0x8a8f96, skills: &[404, 403], loot: &[LootData { item: 601, min: 1, max: 1, pct: 60 }, LootData { item: 604, min: 1, max: 1, pct: 50 }] },
+    NpcKindData { wire: 4, id: "wreck_brigand", name: "Wreck Brigand", level: 6, hp: 1100, speed_mps: 5.2, aggro_m: 15.0, wander_m: 10.0, respawn_s: 180, size_m: 1.8, color: 0x7a3b3b, skills: &[406, 405], loot: &[LootData { item: 605, min: 1, max: 1, pct: 80 }, LootData { item: 52, min: 2, max: 5, pct: 40 }] },
+    NpcKindData { wire: 5, id: "brine_hexer", name: "Brine Hexer", level: 7, hp: 1000, speed_mps: 5.0, aggro_m: 18.0, wander_m: 8.0, respawn_s: 180, size_m: 1.75, color: 0x2f6f7a, skills: &[408, 407], loot: &[LootData { item: 606, min: 1, max: 1, pct: 40 }, LootData { item: 2, min: 1, max: 3, pct: 50 }] },
+    NpcKindData { wire: 6, id: "cliff_stalker", name: "Cliff Stalker", level: 9, hp: 1600, speed_mps: 6.5, aggro_m: 18.0, wander_m: 18.0, respawn_s: 240, size_m: 1.3, color: 0xb88a4a, skills: &[410, 409], loot: &[LootData { item: 607, min: 1, max: 1, pct: 60 }, LootData { item: 601, min: 1, max: 2, pct: 60 }] },
+    NpcKindData { wire: 7, id: "mossback_tortoise", name: "Mossback Tortoise", level: 10, hp: 2600, speed_mps: 3.0, aggro_m: 0.0, wander_m: 6.0, respawn_s: 300, size_m: 1.4, color: 0x4f6b45, skills: &[412, 411], loot: &[LootData { item: 608, min: 1, max: 1, pct: 70 }] },
+    NpcKindData { wire: 8, id: "ashwing_drone", name: "Ashwing Drone", level: 11, hp: 1500, speed_mps: 6.0, aggro_m: 15.0, wander_m: 12.0, respawn_s: 240, size_m: 0.9, color: 0xc7a12a, skills: &[413], loot: &[LootData { item: 609, min: 1, max: 1, pct: 60 }] },
+    NpcKindData { wire: 9, id: "wreck_captain", name: "Wreck Captain", level: 15, hp: 6000, speed_mps: 5.4, aggro_m: 20.0, wander_m: 6.0, respawn_s: 600, size_m: 2.1, color: 0x3a2a4a, skills: &[415, 414], loot: &[LootData { item: 610, min: 1, max: 1, pct: 25 }, LootData { item: 53, min: 1, max: 2, pct: 60 }, LootData { item: 605, min: 2, max: 4, pct: 100 }] },
+];
+
+/// The NPC kind stored as `wire`.
+pub fn npc_kind(wire: u8) -> Option<&'static NpcKindData> {
+    NPC_KINDS.get(usize::from(wire))
+}
+
+/// The NPC kind with content id `id`.
+pub fn npc_kind_by_id(id: &str) -> Option<&'static NpcKindData> {
+    NPC_KINDS.iter().find(|d| d.id == id)
+}

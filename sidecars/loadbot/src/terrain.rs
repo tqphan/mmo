@@ -174,8 +174,9 @@ pub fn upload_file(args: &Args, ta: &TerrainArgs) -> Check {
 /// `loadbot world-upload [--world DIR]`: replace the server's terrain with the world's, then check
 /// that the server's terrain hash is the manifest's; then replace its resource nodes with the
 /// world's (docs/design/gathering.md), its crafting stations (docs/design/crafting.md), its trade
-/// posts (docs/design/trade.md) and its Wayshrines (docs/design/combat.md), and check they all
-/// arrived.
+/// posts (docs/design/trade.md), its Wayshrines (docs/design/combat.md) and its NPC spawn points
+/// (docs/design/npcs.md), and check they all arrived (spawn points are private, so only that the
+/// upload succeeded).
 pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     let started = Instant::now();
     let world = worldtool::World::load(std::path::Path::new(&ta.world))?;
@@ -194,6 +195,7 @@ pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     upload_stations(&admin, &worldtool::stations::load(std::path::Path::new(&ta.world))?)?;
     upload_posts(&admin, &worldtool::posts::load(std::path::Path::new(&ta.world))?)?;
     upload_shrines(&admin, &worldtool::shrines::load(std::path::Path::new(&ta.world))?)?;
+    upload_spawns(&admin, &worldtool::spawns::load(std::path::Path::new(&ta.world))?)?;
     admin.conn.disconnect().map_err(|e| e.to_string())
 }
 
@@ -326,6 +328,19 @@ fn upload_shrines(admin: &Bot, shrines: &[worldtool::shrines::Placement]) -> Che
         return Err(format!("the server has {got} Wayshrines, expected {}", shrines.len()));
     }
     println!("uploaded {got} Wayshrines");
+    Ok(())
+}
+
+/// Replace every NPC spawn point on the server with `spawns`. The table is private, so the count
+/// can't be read back; each call succeeding is the check.
+fn upload_spawns(admin: &Bot, spawns: &[worldtool::spawns::Placement]) -> Check {
+    outcome(|tx| admin.conn.reducers.admin_clear_spawns_then(move |_, r| drop(tx.send(flatten(r)))))?;
+    let rows: Vec<SpawnPlacement> = spawns
+        .iter()
+        .map(|s| SpawnPlacement { kind: s.kind.wire, x: s.x, y: s.y, z: s.z, yaw: sim::ship::yaw_to_u16(f32::from(s.yaw_deg).to_radians()) })
+        .collect();
+    outcome(|tx| admin.conn.reducers.admin_put_spawns_then(rows, move |_, r| drop(tx.send(flatten(r)))))?;
+    println!("uploaded {} NPC spawn points", spawns.len());
     Ok(())
 }
 

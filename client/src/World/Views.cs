@@ -49,6 +49,38 @@ namespace Mmo
             return root;
         }
 
+        /// <summary>
+        /// An NPC (docs/design/npcs.md) until NPCs get models: a capsule of the kind's height and
+        /// colour, wider and lower for small beasts, with a darker snout along its facing (-z).
+        /// </summary>
+        public static Node3D Creature(Color color, float size)
+        {
+            var root = new Node3D { Name = "Body" };
+            var hide = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f };
+            float radius = Mathf.Clamp(size * 0.3f, 0.2f, 0.7f);
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new CapsuleMesh { Radius = radius, Height = Mathf.Max(size, 2 * radius + 0.05f), Material = hide },
+                Position = new Vector3(0, Mathf.Max(size, 2 * radius) / 2, 0),
+            });
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(radius * 0.7f, radius * 0.5f, radius * 1.1f), Material = new StandardMaterial3D { AlbedoColor = color.Darkened(0.45f) } },
+                Position = new Vector3(0, size * 0.75f, -radius * 1.1f),
+            });
+            return root;
+        }
+
+        /// <summary>A gold sparkle over a corpse we may loot: a small spinning gem that glows.</summary>
+        public static Node3D Sparkle()
+        {
+            var root = new Node3D { Name = "Sparkle" };
+            var gold = new StandardMaterial3D { AlbedoColor = new Color(1.0f, 0.82f, 0.25f), EmissionEnabled = true, Emission = new Color(1.0f, 0.75f, 0.2f), EmissionEnergyMultiplier = 2.5f };
+            root.AddChild(new MeshInstance3D { Mesh = new PrismMesh { Size = new Vector3(0.3f, 0.35f, 0.3f), Material = gold }, Position = new Vector3(0, 1.3f, 0) });
+            root.AddChild(new MeshInstance3D { Mesh = new PrismMesh { Size = new Vector3(0.3f, 0.35f, 0.3f), Material = gold }, Position = new Vector3(0, 0.95f, 0), RotationDegrees = new Vector3(180, 0, 0) });
+            return root;
+        }
+
         /// <summary>A hull-sized box for a ship, deck at its origin.</summary>
         public static Node3D Ship(Vector3 size)
         {

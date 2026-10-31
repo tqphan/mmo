@@ -362,3 +362,82 @@ id = "preserves_crate"
 name = "Preserves Crate"
 kind = "pack"
 stack = 1
+
+# Trophies from NPCs (docs/design/npcs.md): materials with no recipes yet.
+
+[[item]]
+wire = 600
+id = "skitter_shell"
+name = "Skitter Shell"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 601
+id = "coarse_hide"
+name = "Coarse Hide"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 602
+id = "boar_tusk"
+name = "Boar Tusk"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 603
+id = "fen_gland"
+name = "Fen Gland"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 604
+id = "wolf_fang"
+name = "Wolf Fang"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 605
+id = "brigands_token"
+name = "Brigand's Token"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 606
+id = "brine_pearl"
+name = "Brine Pearl"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 607
+id = "stalker_claw"
+name = "Stalker Claw"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 608
+id = "mossback_scute"
+name = "Mossback Scute"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 609
+id = "ashwing_venom"
+name = "Ashwing Venom"
+kind = "material"
+stack = 1000
+
+[[item]]
+wire = 610
+id = "captains_compass"
+name = "Captain's Compass"
+kind = "material"
+stack = 1

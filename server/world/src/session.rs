@@ -21,6 +21,8 @@ pub mod entity_kind {
     /// A dev Straw Dummy (docs/design/combat.md).
     #[cfg_attr(not(feature = "dev"), allow(dead_code))] // only `dev_spawn_dummy` makes dummies until NPCs (M1)
     pub const DUMMY: u8 = 3;
+    /// `ref_id` is the NPC kind's wire (docs/design/npcs.md).
+    pub const NPC: u8 = 4;
 }
 
 /// `account.gm_level` values.

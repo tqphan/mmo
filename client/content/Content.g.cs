@@ -250,7 +250,36 @@ namespace Mmo.Content
     public sealed record ControlRules(uint WindowS, IReadOnlyList<uint> StepsPct);
 
     /// <summary>Skillsets (content/combat.toml, docs/design/combat.md).</summary>
-    public sealed record SkillsetData(byte Wire, string Id, string Name);
+    /// <param name="Npc">NPCs' skills: characters can't pick it, and its skills cost no mana.</param>
+    public sealed record SkillsetData(byte Wire, string Id, string Name, bool Npc);
+
+    /// <summary>NPC rules (content/npcs.toml, docs/design/npcs.md).</summary>
+    /// <param name="BrainMs">How often the brain thinks, ms: a multiple of the tick.</param>
+    /// <param name="WakeM">A spawn point with a living character this close has its NPC, m.</param>
+    /// <param name="SleepM">An idle NPC with no character this close goes away, m.</param>
+    /// <param name="LeashM">This far from home an NPC gives up the fight, m.</param>
+    /// <param name="HeartbeatMs">How often a moving NPC's position is published, ms.</param>
+    /// <param name="WanderMinS">The shortest pause between strolls, s.</param>
+    /// <param name="WanderMaxS">The longest pause between strolls, s.</param>
+    /// <param name="WalkPct">A stroll's share of the kind's speed, in percent.</param>
+    /// <param name="ReturnPct">A return home's share of the kind's speed, in percent.</param>
+    /// <param name="CorpseS">How long a corpse lies, s.</param>
+    /// <param name="FreeS">When a corpse's loot is anyone's, s after the death.</param>
+    /// <param name="TagPct">The share of the damage the first hitter needs to own the loot, in percent.</param>
+    /// <param name="HealThreatPct">Threat from healing someone an NPC fights, as a share of the HP healed, in percent.</param>
+    /// <param name="StatusThreat">Threat from a debuff that deals no damage.</param>
+    /// <param name="LootM">How close a looter must stand, m.</param>
+    public sealed record NpcRules(int BrainMs, float WakeM, float SleepM, float LeashM, int HeartbeatMs, int WanderMinS, int WanderMaxS, int WalkPct, int ReturnPct, int CorpseS, int FreeS, int TagPct, int HealThreatPct, int StatusThreat, float LootM);
+
+    /// <summary>One line of an NPC kind's loot: <paramref name="Min"/> to <paramref name="Max"/> of the item with chance <paramref name="Pct"/>%.</summary>
+    public sealed record LootData(ushort Item, uint Min, uint Max, uint Pct);
+
+    /// <summary>NPC kinds (content/npcs.toml, docs/design/npcs.md).</summary>
+    /// <param name="Wire">Stored in <c>entity.ref_id</c>.</param>
+    /// <param name="AggroM">0 attacks only when attacked.</param>
+    /// <param name="Color">The placeholder body's colour, 0xRRGGBB; <paramref name="SizeM"/> its height.</param>
+    /// <param name="Skills">Skill wires, tried in order.</param>
+    public sealed record NpcKindData(byte Wire, string Id, string Name, byte Level, int Hp, float SpeedMps, float AggroM, float WanderM, uint RespawnS, float SizeM, uint Color, IReadOnlyList<ushort> Skills, IReadOnlyList<LootData> Loot);
 
     /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>
     /// <param name="Wire">Stored in casts and combat events.</param>
@@ -282,7 +311,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x4cd490ff1fd62ab6UL;
+        public const ulong Hash = 0x33fdd22e2b2f9d02UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -386,6 +415,17 @@ namespace Mmo.Content
             new(408, "woolback_lamb", "Woolback Lamb", ItemKind.Seed, 10),
             new(500, "grain_bale", "Grain Bale", ItemKind.Pack, 1),
             new(501, "preserves_crate", "Preserves Crate", ItemKind.Pack, 1),
+            new(600, "skitter_shell", "Skitter Shell", ItemKind.Material, 1000),
+            new(601, "coarse_hide", "Coarse Hide", ItemKind.Material, 1000),
+            new(602, "boar_tusk", "Boar Tusk", ItemKind.Material, 1000),
+            new(603, "fen_gland", "Fen Gland", ItemKind.Material, 1000),
+            new(604, "wolf_fang", "Wolf Fang", ItemKind.Material, 1000),
+            new(605, "brigands_token", "Brigand's Token", ItemKind.Material, 1000),
+            new(606, "brine_pearl", "Brine Pearl", ItemKind.Material, 1000),
+            new(607, "stalker_claw", "Stalker Claw", ItemKind.Material, 1000),
+            new(608, "mossback_scute", "Mossback Scute", ItemKind.Material, 1000),
+            new(609, "ashwing_venom", "Ashwing Venom", ItemKind.Material, 1000),
+            new(610, "captains_compass", "Captain's Compass", ItemKind.Material, 1),
         };
 
         private static readonly Dictionary<ushort, ItemData> ItemsByWire = Items.ToDictionary(i => i.Wire);
@@ -524,9 +564,10 @@ namespace Mmo.Content
         /// <summary>Every skillset, sorted by wire, which is the index.</summary>
         public static readonly IReadOnlyList<SkillsetData> Skillsets = new SkillsetData[]
         {
-            new(0, "emberlore", "Emberlore"),
-            new(1, "ironvow", "Ironvow"),
-            new(2, "wellspring", "Wellspring"),
+            new(0, "emberlore", "Emberlore", false),
+            new(1, "ironvow", "Ironvow", false),
+            new(2, "wellspring", "Wellspring", false),
+            new(3, "wildcraft", "Wildcraft", true),
         };
 
         /// <summary>Every skill, sorted by wire.</summary>
@@ -556,6 +597,22 @@ namespace Mmo.Content
             new(305, "cleansing_spring", "Cleansing Spring", 2, 7, SkillTarget.Ally, 0, 20000, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Cleanse, 0, null, 0, null), new(EffectKind.Heal, 60, null, 0, null) }),
             new(306, "wavebreak", "Wavebreak", 2, 9, SkillTarget.Enemy, 2000, 15000, 20.0f, 70, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 160, null, 0, null), new(EffectKind.Status, 0, 6, 6000, null) }),
             new(307, "tidal_ward", "Tidal Ward", 2, 12, SkillTarget.Ally, 0, 30000, 25.0f, 70, 0.0f, false, new EffectData[] { new(EffectKind.Status, 0, 8, 6000, null) }),
+            new(400, "pinch", "Pinch", 3, 1, SkillTarget.Enemy, 0, 2000, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 40, null, 0, null) }),
+            new(401, "gore", "Gore", 3, 1, SkillTarget.Enemy, 0, 2500, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 60, null, 0, null) }),
+            new(402, "bog_spit", "Bog Spit", 3, 1, SkillTarget.Enemy, 1000, 4000, 15.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 50, null, 0, null), new(EffectKind.Status, 0, 3, 6000, null) }),
+            new(403, "bite", "Bite", 3, 1, SkillTarget.Enemy, 0, 2000, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 70, null, 0, null) }),
+            new(404, "hamstring_bite", "Hamstring Bite", 3, 1, SkillTarget.Enemy, 0, 12000, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 40, null, 0, null), new(EffectKind.Status, 0, 0, 4000, null) }),
+            new(405, "cutlass_slash", "Cutlass Slash", 3, 1, SkillTarget.Enemy, 0, 2000, 4.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 90, null, 0, null) }),
+            new(406, "shield_knock", "Shield Knock", 3, 1, SkillTarget.Enemy, 0, 15000, 4.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 40, null, 0, null), new(EffectKind.Status, 0, 1, 1500, null) }),
+            new(407, "brine_bolt", "Brine Bolt", 3, 1, SkillTarget.Enemy, 1500, 2500, 25.0f, 0, 25.0f, true, new EffectData[] { new(EffectKind.Damage, 120, null, 0, null) }),
+            new(408, "sapping_hex", "Sapping Hex", 3, 1, SkillTarget.Enemy, 0, 15000, 20.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Status, 0, 6, 6000, null) }),
+            new(409, "rake", "Rake", 3, 1, SkillTarget.Enemy, 0, 2000, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 110, null, 0, null) }),
+            new(410, "pounce", "Pounce", 3, 1, SkillTarget.Enemy, 0, 18000, 8.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 60, null, 0, null), new(EffectKind.Status, 0, 2, 1500, null) }),
+            new(411, "snap", "Snap", 3, 1, SkillTarget.Enemy, 0, 2500, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 90, null, 0, null) }),
+            new(412, "shell_slam", "Shell Slam", 3, 1, SkillTarget.Enemy, 1500, 14000, 4.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 200, null, 0, null), new(EffectKind.Status, 0, 1, 2000, null) }),
+            new(413, "searing_sting", "Searing Sting", 3, 1, SkillTarget.Enemy, 0, 3000, 3.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 60, null, 0, null), new(EffectKind.Status, 15, 4, 6000, null) }),
+            new(414, "captains_cleave", "Captain's Cleave", 3, 1, SkillTarget.Enemy, 0, 2500, 5.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 180, null, 0, null), new(EffectKind.Status, 0, 5, 6000, null) }),
+            new(415, "grapeshot", "Grapeshot", 3, 1, SkillTarget.Enemy, 2000, 12000, 20.0f, 0, 0.0f, true, new EffectData[] { new(EffectKind.Damage, 260, null, 0, null) }),
         };
 
         /// <summary>The skill stored as <paramref name="wire"/>, if it exists.</summary>
@@ -594,5 +651,25 @@ namespace Mmo.Content
         public static readonly ProgressRules Progress = new(new uint[] { 100u, 150u, 220u, 300u, 400u, 520u, 660u, 820u, 1000u, 1200u, 1450u, 1750u, 2100u, 2500u }, new byte[] { 1, 5, 10 }, 100, 40, 40u, 20u, 25u, 5u);
 
         public static readonly ControlRules Diminishing = new(15u, new uint[] { 100u, 50u, 25u });
+
+        public static readonly NpcRules Npc = new(200, 120.0f, 160.0f, 40.0f, 500, 8, 20, 45, 150, 90, 30, 50, 50, 20, 4.0f);
+
+        /// <summary>Every NPC kind, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<NpcKindData> NpcKinds = new NpcKindData[]
+        {
+            new(0, "shore_skitter", "Shore Skitter", 1, 300, 4.0f, 0.0f, 10.0f, 120u, 0.6f, 0xd0603au, new ushort[] { 400 }, new LootData[] { new(600, 1u, 1u, 70u), new(1, 1u, 3u, 40u) }),
+            new(1, "bristleback_boar", "Bristleback Boar", 2, 500, 5.0f, 0.0f, 14.0f, 120u, 1.0f, 0x6b4a33u, new ushort[] { 401 }, new LootData[] { new(601, 1u, 1u, 60u), new(602, 1u, 1u, 40u) }),
+            new(2, "fen_croaker", "Fen Croaker", 3, 600, 4.0f, 12.0f, 8.0f, 120u, 0.8f, 0x5f7f3au, new ushort[] { 402 }, new LootData[] { new(603, 1u, 1u, 60u) }),
+            new(3, "greymane_wolf", "Greymane Wolf", 4, 800, 6.0f, 15.0f, 16.0f, 150u, 1.1f, 0x8a8f96u, new ushort[] { 404, 403 }, new LootData[] { new(601, 1u, 1u, 60u), new(604, 1u, 1u, 50u) }),
+            new(4, "wreck_brigand", "Wreck Brigand", 6, 1100, 5.2f, 15.0f, 10.0f, 180u, 1.8f, 0x7a3b3bu, new ushort[] { 406, 405 }, new LootData[] { new(605, 1u, 1u, 80u), new(52, 2u, 5u, 40u) }),
+            new(5, "brine_hexer", "Brine Hexer", 7, 1000, 5.0f, 18.0f, 8.0f, 180u, 1.75f, 0x2f6f7au, new ushort[] { 408, 407 }, new LootData[] { new(606, 1u, 1u, 40u), new(2, 1u, 3u, 50u) }),
+            new(6, "cliff_stalker", "Cliff Stalker", 9, 1600, 6.5f, 18.0f, 18.0f, 240u, 1.3f, 0xb88a4au, new ushort[] { 410, 409 }, new LootData[] { new(607, 1u, 1u, 60u), new(601, 1u, 2u, 60u) }),
+            new(7, "mossback_tortoise", "Mossback Tortoise", 10, 2600, 3.0f, 0.0f, 6.0f, 300u, 1.4f, 0x4f6b45u, new ushort[] { 412, 411 }, new LootData[] { new(608, 1u, 1u, 70u) }),
+            new(8, "ashwing_drone", "Ashwing Drone", 11, 1500, 6.0f, 15.0f, 12.0f, 240u, 0.9f, 0xc7a12au, new ushort[] { 413 }, new LootData[] { new(609, 1u, 1u, 60u) }),
+            new(9, "wreck_captain", "Wreck Captain", 15, 6000, 5.4f, 20.0f, 6.0f, 600u, 2.1f, 0x3a2a4au, new ushort[] { 415, 414 }, new LootData[] { new(610, 1u, 1u, 25u), new(53, 1u, 2u, 60u), new(605, 2u, 4u, 100u) }),
+        };
+
+        /// <summary>The NPC kind stored as <paramref name="wire"/>, if it exists.</summary>
+        public static NpcKindData? NpcKind(byte wire) => wire < NpcKinds.Count ? NpcKinds[wire] : null;
     }
 }
