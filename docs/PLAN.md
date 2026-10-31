@@ -739,7 +739,7 @@ Relative sizes: M0 medium · M1 large · M2 very large · M3 large · M4 very la
 - **Exit:** a user playtest where the whole loop (gather, farm, craft a pack, carry it, sail it, sell it) fits in one evening, and being robbed at sea feels tense, not tedious.
 
 ### M2: "Two Continents"
-**World:** built in Terrain3D v1.1.0 (ADR 0032). The first task is a spike: the whole map loaded at once, measured on both GPUs, with an import and export round trip to `world/`.
+**World:** built in Terrain3D v1.1.0 (ADR 0032). Both continents and the sea between them fit in the 16 × 16 km world. The first task is a spike: the whole map loaded at once, measured on both GPUs, with an import and export round trip to `world/`.
 
 **Players and combat:**
 - 2 factions and 4 races
