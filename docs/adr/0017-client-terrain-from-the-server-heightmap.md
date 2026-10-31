@@ -1,6 +1,6 @@
 # 0017: The client draws terrain from the server's heightmap file, not Terrain3D
 
-- **Status:** Accepted, 2026-10-26 (user chose this over Terrain3D's prebuilt binaries or building it from source).
+- **Status:** Superseded from M2 by ADR 0032 (2026-10-31). Accepted, 2026-10-26 (user chose this over Terrain3D's prebuilt binaries or building it from source).
 - **Context:** PLAN §3 picked Terrain3D for client terrain. In spike 4 two problems showed up. First, Terrain3D is a native GDExtension, so we would ship and run a third party's compiled code, and the user would rather not. Second, its 1.0.2 source showed that adding or removing any region rebuilds the texture arrays of every loaded region, and removed regions stay in memory until a save. That makes streaming slower the more is loaded. The art is placeholder until the game systems are built (ADR 0004), so Terrain3D's material and foliage tools aren't needed yet.
 - **Decision:**
   - The client draws terrain itself, in C#, from the same `.mmoh` heightmap the server checks movement against (ADR 0013, docs/design/terrain.md). One file is the source for both.

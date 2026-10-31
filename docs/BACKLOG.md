@@ -14,6 +14,10 @@ Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<syst
 4. **The coast**: the One Coast zone and its island outpost laid out in `world/`, with nodes, stations, outposts and spawns placed, and about ten quests, with NPC camps placed by hand in place of `worldtool spawns`' placeholder camps. A starting bundle of seeds (until seed merchants and gold exist, docs/design/farming.md §3).
 5. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit).
 
+## M2: "Two Continents" (PLAN §11)
+Broken down when M1 closes. Fixed so far:
+- **First task: a Terrain3D spike** (ADR 0032). Add Terrain3D v1.1.0-stable to the client (**[needs OK]**: prebuilt binaries or built from source) and record it in the ledger. Write `worldtool` import and export steps between `world/` and Terrain3D regions at 2 m spacing, with land use as a control-map layer. Load the whole 16 km map at once and rerun spike 4's routes. Acceptance: the round trip leaves `world/` byte-identical when nothing was edited; VRAM, RAM and GPU p99 are recorded on the RTX 5070 Ti and the Radeon 610M; a 10-minute walk with zero corrections; captures. If it passes, remove the client's own terrain tiles and `TerrainCollision`.
+
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.
 - Walk speed and the pack-carrying slowdown as a percentage (run 5.4 m/s and sprint 8 m/s are known; docs/design/movement.md §1).

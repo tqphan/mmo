@@ -127,7 +127,7 @@
   - Captures: `docs/captures/2026-10-26-style-*.png`.
   - Assets live in `client/assets/`, listed in `assets/LEDGER.md`. The xtask now runs Godot's import before every client run (about 2 s).
 - **World-scale test, offline** (docs/design/worldstream.md, ADR 0017):
-  - The client draws terrain itself from the server's `.mmoh` heightmap: 256 m tiles at six levels of detail, built on worker threads, deep-water tiles skipped. Terrain3D was dropped (native code, and streaming that slows as more is loaded).
+  - The client draws terrain itself from the server's `.mmoh` heightmap: 256 m tiles at six levels of detail, built on worker threads, deep-water tiles skipped. Terrain3D was dropped (native code, and streaming that slows as more is loaded); it returns in M2 for building the world, loaded whole (ADR 0032).
   - The placeholder 16 km map follows PLAN §9's layout (now `world/`, above). `cargo xtask client --world-test world --route sail|walk|cross|high` flies a camera over it and logs frame times, memory and streaming.
   - The sea follows the camera. Captures: `docs/captures/2026-10-26-world-*.png`.
 - **Spikes 1–5 done** (docs/spikes/throughput.md, mass-fight.md, world-scale.md):

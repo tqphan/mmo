@@ -20,7 +20,7 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0014](0014-ships-and-moving-decks.md) | Ships are stepped by the server; passengers move in the ship's frame | Accepted |
 | [0015](0015-remote-entities-interpolate-then-dead-reckon.md) | Other entities are drawn 200 ms back, interpolated, then dead-reckoned | Accepted |
 | [0016](0016-assets-inside-the-godot-project.md) | Third-party and generated assets live in `client/assets/`; the ledger stays in `assets/` | Accepted |
-| [0017](0017-client-terrain-from-the-server-heightmap.md) | The client draws terrain from the server's `.mmoh` heightmap in LOD tiles; no Terrain3D | Accepted |
+| [0017](0017-client-terrain-from-the-server-heightmap.md) | The client draws terrain from the server's `.mmoh` heightmap in LOD tiles; no Terrain3D | Superseded from M2 by 0032 |
 | [0018](0018-world-files-in-the-repo-and-a-terrain-hash.md) | The world's files live in the repo as compressed regions; clients send a terrain hash | Accepted |
 | [0019](0019-client-ships-at-the-present-player-in-the-ships-frame.md) | The client draws ships at the present, and keeps a passenger in the ship's frame | Accepted |
 | [0020](0020-reconnect-and-connection-keyed-despawn.md) | The client reconnects through the SDK and enters again; only the entering connection despawns a character | Accepted |
@@ -35,3 +35,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0029](0029-statuses-in-vitals-ticks-by-due-index.md) | Statuses live in `vitals`; damage over time ticks from a due-time index; controls diminish per group; levels and skillsets live in `fighter` | Accepted |
 | [0030](0030-npcs-wake-near-players-move-by-segments.md) | NPCs exist only near players, move by timed segments published as moves, and think every 200 ms in the tick | Accepted |
 | [0031](0031-owned-vehicles-are-bag-items-carts-share-the-ship-step.md) | Owned vehicles are bag items that leave the bag while out; carts share the ships' step with a stored deck height; cargo is public by item and private in detail | Accepted |
+| [0032](0032-terrain3d-from-m2.md) | From M2 the world is built and drawn with Terrain3D v1.1.0, loaded whole; `world/` stays the server's source | Accepted |
