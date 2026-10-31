@@ -10,7 +10,6 @@ namespace Mmo.Gameplay
     /// </summary>
     public partial class FollowCamera : Camera3D
     {
-        private const float Pitch = -0.35f;
         private const float TurnSpeed = 2.0f;
         private const float MouseTurn = 0.005f;
         /// <summary>The least height above the ground at the camera, so it doesn't look out from inside a hill.</summary>
@@ -22,12 +21,14 @@ namespace Mmo.Gameplay
         private readonly PlayerController player;
         private readonly HeightMap map;
         private float yaw;
+        private readonly float pitch;
         private float distance = 8.0f;
         private ulong lastFrame;
         private float lastFrameYaw;
 
-        public FollowCamera(PlayerController player, float yawDeg, HeightMap map, float distance = 8.0f)
+        public FollowCamera(PlayerController player, float yawDeg, HeightMap map, float distance = 8.0f, float pitchDeg = -20.0f)
         {
+            pitch = Mathf.DegToRad(pitchDeg);
             this.player = player;
             this.distance = distance;
             this.map = map;
@@ -63,7 +64,7 @@ namespace Mmo.Gameplay
                 yaw += Sim.Yaw.Delta(yaw, aim) * (1 - Mathf.Exp(-AimFollowRate * (float)delta));
             player.CameraYaw = yaw;
             var target = player.GlobalPosition + new Vector3(0, 1.6f, 0);
-            var offset = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, Pitch) * new Vector3(0, 0, distance);
+            var offset = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, pitch) * new Vector3(0, 0, distance);
             var eye = target + offset;
             eye.Y = Mathf.Max(eye.Y, map.Height(eye.X, eye.Z) + Clearance);
             LookAtFromPosition(eye, target, Vector3.Up);

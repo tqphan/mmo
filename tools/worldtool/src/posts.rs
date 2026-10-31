@@ -1,7 +1,7 @@
 //! Trade post placements (`world/posts.tsv`, docs/design/trade.md), in the same format as
-//! `stations.tsv`: `kind x y z yaw-degrees`, kinds by content id. For now there is one of each post
-//! kind at fixed spots in the placeholder towns, set on the ground; the coast zone will be placed by
-//! hand (M1, the coast task).
+//! `stations.tsv`: `kind x y z yaw-degrees`, kinds by content id. They stand where the coast layout
+//! puts them (`coast::POSTS`), set on the ground: Cairnwick and Redfen in Hearthshore, Gullhaven
+//! across the sea.
 
 use std::path::Path;
 
@@ -13,11 +13,8 @@ use crate::nodes::{parse_lines, round2};
 
 pub const FILE: &str = "posts.tsv";
 
-/// Where the posts stand: (kind, x, z, yaw in degrees). Cairnwick and Redfen are hamlets on the
-/// west continent near Furrowdale's Packwright's Bench; Gullhaven is the trade island's town round
-/// spawn, across the sea (`placeholder::TOWNS`).
-pub const POSTS: [(&str, f32, f32, u16); 3] =
-    [("cairnwick_post", -4500.0, -1400.0, 90), ("redfen_post", -3900.0, 1800.0, 0), ("gullhaven_post", -10.0, 4.0, 90)];
+/// Where they stand (`coast::POSTS`).
+pub use crate::coast::POSTS;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placement {
@@ -28,7 +25,7 @@ pub struct Placement {
     pub yaw_deg: u16,
 }
 
-/// The placeholder placement: each post set on the ground where it stands.
+/// The placement: each post set on the ground where it stands.
 pub fn place(world: &World) -> Vec<Placement> {
     let mut chunks = FileChunks::new(&world.heights);
     POSTS

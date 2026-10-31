@@ -10,7 +10,7 @@ pub const MAX_CHARACTERS_PER_ACCOUNT: usize = 4;
 pub const NAME_MIN: usize = 3;
 pub const NAME_MAX: usize = 16;
 
-/// Where new arrivals appear until the world has real spawn points.
+/// Where new arrivals appear on a world without a start Wayshrine (`combat::start_point`).
 pub const SPAWN: [f32; 3] = [0.0, 0.0, 0.0];
 
 pub mod entity_kind {
@@ -225,7 +225,7 @@ pub fn create_character(ctx: &ReducerContext, name: String) -> Result<(), String
     if ctx.db.character_public().name().find(&name).is_some() {
         return Err("that name is taken".into());
     }
-    let [x, y, z] = SPAWN;
+    let [x, y, z] = crate::combat::start_point(ctx);
     let c = ctx.db.character_private().insert(CharacterPrivate {
         char_id: 0,
         owner: ctx.sender(),
@@ -235,6 +235,9 @@ pub fn create_character(ctx: &ReducerContext, name: String) -> Result<(), String
         z,
     });
     ctx.db.character_public().insert(CharacterPublic { char_id: c.char_id, name });
+    for i in &sim::content::BAG_START {
+        crate::items::grant(ctx, c.char_id, i.item, i.count)?;
+    }
     Ok(())
 }
 

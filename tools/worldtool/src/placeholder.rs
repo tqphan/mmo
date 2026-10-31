@@ -54,7 +54,7 @@ fn noise(x: f32, z: f32, scale: f32, seed: u32) -> f32 {
 }
 
 /// Fractal noise in about -0.5..0.5.
-fn fbm(x: f32, z: f32, scale: f32, octaves: u32, seed: u32) -> f32 {
+pub(crate) fn fbm(x: f32, z: f32, scale: f32, octaves: u32, seed: u32) -> f32 {
     let (mut sum, mut amp, mut s) = (0.0, 0.5, scale);
     for o in 0..octaves {
         sum += (noise(x, z, s, seed + o) - 0.5) * amp;
@@ -77,7 +77,7 @@ fn ridged(x: f32, z: f32, scale: f32, octaves: u32, seed: u32) -> f32 {
     sum / norm
 }
 
-fn smoothstep(edge0: f32, edge1: f32, v: f32) -> f32 {
+pub(crate) fn smoothstep(edge0: f32, edge1: f32, v: f32) -> f32 {
     let t = ((v - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
@@ -111,7 +111,7 @@ pub fn world_height(x: f32, z: f32) -> f32 {
         let h = if d >= 0.0 { land } else { sea };
         height = height.max(h);
     }
-    height
+    crate::coast::shape(x, z, height)
 }
 
 /// Housing areas, three on each continent's lowlands: centre and radius in metres.
@@ -123,10 +123,9 @@ const HOUSING: [(f32, f32, f32); 6] = [
     (4300.0, 900.0, 500.0),
     (5300.0, 4300.0, 500.0),
 ];
-/// Towns: centre and radius in metres. Gullhaven, the trade island's town round spawn; Furrowdale,
-/// with the Packwright's Bench, on the west continent's coast by its housing land; and the hamlets
-/// of Cairnwick and Redfen, with trade posts (docs/design/trade.md, `posts::POSTS`).
-pub const TOWNS: [(f32, f32, f32); 4] = [(0.0, 0.0, 250.0), (-3800.0, 600.0, 60.0), (-4500.0, -1400.0, 50.0), (-3900.0, 1800.0, 50.0)];
+/// Towns: centre and radius in metres. Gullhaven, the trade island's town round spawn, and the
+/// coast zone's three (`coast::TOWNS`).
+pub use crate::coast::TOWNS;
 
 /// The placeholder climate at a position.
 pub fn climate(x: f32, z: f32) -> Climate {
@@ -145,6 +144,8 @@ pub fn climate(x: f32, z: f32) -> Climate {
 fn land_use(x: f32, z: f32, height: f32, slope: f32) -> LandUse {
     if height > 0.0 && TOWNS.iter().any(|&(tx, tz, r)| (x - tx).hypot(z - tz) < r) {
         LandUse::Town
+    } else if height > 0.0 && crate::coast::on_road(x, z) {
+        LandUse::Road
     } else if (2.0..60.0).contains(&height) && slope < 0.25 && HOUSING.iter().any(|&(hx, hz, r)| (x - hx).hypot(z - hz) < r) {
         LandUse::Housing
     } else {

@@ -36,13 +36,13 @@ Status: v0.1, 2026-10-26. M1 task 7 (BACKLOG M1 #1). Code: `content/trade.toml`,
 | Grain Bale | Hearthgrain 20, Reedcloth 2 | 40 | 6 s | 1g 50s |
 | Preserves Crate | Duskberry Preserve 6, Driftpine Plank 4, Rustiron Nails 10 | 40 | 6 s | 1g 80s |
 
-| Post | Where (placeholder) | Bonus |
+| Post | Where (docs/design/coast.md) | Bonus |
 |---|---|---|
-| Cairnwick Post | inland, 2.1 km north-west of Furrowdale | 0 |
-| Redfen Post | 1.2 km south of Furrowdale | 0 |
-| Gullhaven Post | on the trade island at spawn, 3.8 km across the sea | +20% |
+| Cairnwick Post | under the Cairn Crags, 1.9 km north-west of the bench by road | 0 |
+| Redfen Post | on Croaker Fen's edge, 1.0 km south-west by road | 0 |
+| Gullhaven Post | on Gullhaven Isle, 3.3 km across the sea | +20% |
 
-The Packwright's Bench stands in Furrowdale, a hamlet on the west continent's coast near its housing land, where Hearthgrain grows. Every number is ours, for the playtest to tune.
+The Packwright's Bench stands in Furrowdale, the starting village on Hearthshore's shore, by Furrowdale Commons' housing land, where Hearthgrain grows. Every number is ours, for the playtest to tune.
 
 ### Money
 - Coins are copper, shown as gold, silver and copper (100 copper to a silver, 100 silver to a gold). The private **`purse`** table holds each character's copper (`char_id`, `copper`); **`my_purse`** shows the owner theirs. A character without a row has none.
@@ -87,7 +87,7 @@ The Packwright's Bench stands in Furrowdale, a hamlet on the west continent's co
 - **Theft isn't refused**; it leaves evidence for others to report (docs/design/crime.md).
 - **No seller's cut, taxes or proficiency bonuses.**
 - Spoiled packs on the ground stay as rows until someone tries to pick them up; a sweep can come if they pile up.
-- Posts and the bench are placeholder placements until the coast task lays out the zone.
+- Posts and the bench are placed by the coast layout (docs/design/coast.md); there are no roads to them beyond Hearthshore's two.
 
 ## 4. Test plan
 

@@ -129,12 +129,12 @@ Enemy skills need the target in front; ally and caster skills don't. The two cro
 - HP reaching 0 kills. A dead character: `dead_at` set, HP 0, mana kept, cast cleared; gathering and crafting stopped; the helm let go; a carried pack dropped at its feet if it's on land, where anyone may pick it up (taking another's is theft, docs/design/trade.md). On a ship or in water the pack stays on the back until vehicles give packs somewhere to fall.
 - It counts a death: if the last one was within `death_stack_s`, `deaths` goes up by one; otherwise it starts again at 1.
 - The dead can't move (`move_event` refuses with "you are dead" and changes nothing), use skills, gather, craft, pick up, drop or sell packs, take the helm or fire.
-- **`respawn()`** is allowed once `respawn_first_s + respawn_step_s × (deaths − 1)` seconds have passed since `dead_at`, capped at `respawn_max_s`. It puts the character 3 m in front of the nearest Wayshrine (clear of its stone; or at the world spawn if there is none), off any ship, on the ground, running, with `respawn_pct` of its HP and mana, out of combat, and tells its client to snap there.
+- **`respawn()`** is allowed once `respawn_first_s + respawn_step_s × (deaths − 1)` seconds have passed since `dead_at`, capped at `respawn_max_s`. It puts the character 3 m in front of the nearest Wayshrine (clear of its stone; or where new characters start if there is none), off any ship, on the ground, running, with `respawn_pct` of its HP and mana, out of combat, and tells its client to snap there.
 - No experience or durability is lost yet: neither exists (combat B and M2).
 
 ### Wayshrines
 - The public **`shrine`** table (Static tier): `id`, `cell`, `kind`, `x`, `y`, `z`, `yaw`, placed from **`world/shrines.tsv`** by `worldtool shrines` and `cargo xtask world`, like posts. Admins have `admin_put_shrines`, `admin_remove_shrines` and `admin_clear_shrines`.
-- Four for now, one in each town: Gullhaven, Furrowdale, Cairnwick and Redfen.
+- Four for now, one in each town: Gullhaven, Furrowdale, Cairnwick and Redfen. The one marked `start = true` (Furrowdale's) is where new characters appear (docs/design/coast.md).
 
 ### Straw Dummies (dev builds)
 - **`dev_spawn_dummy(x, z)`** puts a Straw Dummy (entity kind 3) on the ground with `dummy_hp` HP; `dev_remove_dummy(id)` removes it. A dummy is an `enemy` target that never fights back. At 0 HP it is "killed" (a `KILL` event) and back to full at once. NPCs (docs/design/npcs.md) are the real foes; dummies stay for practice and tests.

@@ -5,6 +5,13 @@
 [bag]
 # Slots in every character's bag: the original's starting size (B). Expansion comes in M2.
 slots = 50
+# Every new character's bag starts with a few seeds and saplings, until seed merchants and gold
+# exist (docs/design/farming.md §3, docs/design/coast.md). Ours.
+start = [
+    { item = "hearthgrain_seed", count = 10 },
+    { item = "whiteflax_seed", count = 6 },
+    { item = "amberpear_sapling", count = 1 },
+]
 
 # Plants
 [[item]]

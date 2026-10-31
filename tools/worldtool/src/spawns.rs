@@ -1,7 +1,7 @@
 //! NPC spawn points (`world/spawns.tsv`, docs/design/npcs.md), in the same format as `nodes.tsv`:
-//! `kind x y z yaw-degrees`, kinds by content id. The placeholder placement puts a camp of each kind
-//! on dry wild land, rising in level with the distance from Gullhaven; the coast task lays them out
-//! by hand.
+//! `kind x y z yaw-degrees`, kinds by content id. The placement puts a camp of each kind
+//! on dry wild land round the centres of the camps laid out by hand in `coast::CAMPS`, rising in
+//! level away from Furrowdale.
 
 use std::path::Path;
 
@@ -22,22 +22,8 @@ const SPACING_M: f32 = 8.0;
 /// Candidates tried per camp.
 const TRIES: u64 = 400;
 
-/// The camps: (kind, centre x, z, radius, spawn points). Skitters on Gullhaven's beaches, Boars and
-/// Croakers on its hills, the rest round Furrowdale across the sea, further out as they get stronger.
-pub const CAMPS: [(&str, f32, f32, f32, usize); 12] = [
-    ("shore_skitter", 330.0, 0.0, 90.0, 6),
-    ("shore_skitter", -320.0, 80.0, 90.0, 4),
-    ("bristleback_boar", 380.0, 220.0, 120.0, 5),
-    ("fen_croaker", 360.0, -260.0, 120.0, 5),
-    ("greymane_wolf", -3560.0, 820.0, 140.0, 5),
-    ("wreck_brigand", -3620.0, 260.0, 120.0, 5),
-    ("brine_hexer", -4400.0, 1300.0, 140.0, 4),
-    ("cliff_stalker", -4300.0, -900.0, 160.0, 4),
-    ("mossback_tortoise", -3450.0, 1400.0, 140.0, 4),
-    ("ashwing_drone", -4750.0, -500.0, 160.0, 5),
-    ("wreck_captain", -4050.0, 2150.0, 160.0, 1),
-    ("wreck_brigand", -4050.0, 2150.0, 160.0, 4),
-];
+/// The camps (`coast::CAMPS`).
+pub use crate::coast::CAMPS;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placement {
@@ -49,7 +35,7 @@ pub struct Placement {
 }
 
 /// A deterministic number from 0 to 1 (splitmix64).
-fn unit(seed: u64) -> f32 {
+pub(crate) fn unit(seed: u64) -> f32 {
     let mut v = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15);
     v = (v ^ (v >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     v = (v ^ (v >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
@@ -57,7 +43,7 @@ fn unit(seed: u64) -> f32 {
     (v >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// The placeholder placement: for each camp, deterministic candidates round its centre, kept on
+/// The placement: for each camp, deterministic candidates round its centre, kept on
 /// dry, gentle wild land and apart from each other, until the camp has its count.
 pub fn place(world: &World) -> Vec<Placement> {
     let mut chunks = FileChunks::new(&world.heights);

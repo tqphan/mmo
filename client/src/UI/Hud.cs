@@ -7,13 +7,14 @@ using Mmo.World;
 
 namespace Mmo.UI
 {
-    /// <summary>A debug readout: connection, position, labor, land use, cell windows, entities in view, corrections, the ship we're on or next to, and resource nodes and stations in reach.</summary>
+    /// <summary>A debug readout: connection, position, labor, land use, the named area, cell windows, entities in view, corrections, the ship we're on or next to, and resource nodes and stations in reach.</summary>
     public partial class Hud : CanvasLayer
     {
         private readonly Session session;
         private readonly PlayerController player;
         private readonly EntityRegistry entities;
         private readonly LandRaster? land;
+        private readonly System.Collections.Generic.IReadOnlyList<Area> areas;
         private readonly ShipControls controls;
         private readonly Gathering gathering;
         private readonly Crafting crafting;
@@ -22,8 +23,9 @@ namespace Mmo.UI
         /// <summary>More prompts, each shown on its own line when not empty (land: docs/design/land.md).</summary>
         public System.Collections.Generic.List<Func<string>> Prompts { get; } = new();
 
-        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, ShipControls controls, Gathering gathering, Crafting crafting)
+        public Hud(Session session, PlayerController player, EntityRegistry entities, LandRaster? land, System.Collections.Generic.IReadOnlyList<Area> areas, ShipControls controls, Gathering gathering, Crafting crafting)
         {
+            this.areas = areas;
             this.gathering = gathering;
             this.crafting = crafting;
             this.controls = controls;
@@ -58,6 +60,8 @@ namespace Mmo.UI
                     var use = LandRaster.Use(t).Data();
                     text += $"\nland {use.Id}{(use.Buildable ? " (buildable)" : "")}  climate {LandRaster.ClimateOf(t).Id()}";
                 }
+                if (Areas.Describe(areas, p.X, p.Z) is { Length: > 0 } where)
+                    text += $"\narea {where}";
             }
             if (session.Near is { } near && near.Center is ulong c)
             {

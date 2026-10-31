@@ -1,8 +1,10 @@
 //! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes,
-//! crafting stations, trade posts, Wayshrines and NPC spawn points included; `worldtool nodes`,
-//! `worldtool stations`, `worldtool posts`, `worldtool shrines` and `worldtool spawns` (each `[--dir D]`) rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
-//! prints what's in it. Paths are relative to the repo root,
-//! which `cargo xtask` runs from (docs/design/world.md).
+//! crafting stations, trade posts, Wayshrines, NPC spawn points and named areas included;
+//! `worldtool nodes`, `stations`, `posts`, `shrines`, `spawns` and `areas` (each `[--dir D]`)
+//! rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
+//! prints what's in it. `worldtool probe X,Z...` prints the ground at points, and `worldtool map
+//! --area X0,Z0,X1,Z1 [--px N] [--out F]` draws part of the world as a PNG (docs/design/coast.md).
+//! Paths are relative to the repo root, which `cargo xtask` runs from (docs/design/world.md).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -21,9 +23,12 @@ fn main() -> ExitCode {
         Some("posts") => World::load(&dir).and_then(|w| write_posts(&dir, &w)),
         Some("shrines") => World::load(&dir).and_then(|w| write_shrines(&dir, &w)),
         Some("spawns") => World::load(&dir).and_then(|w| write_spawns(&dir, &w)),
+        Some("areas") => write_areas(&dir),
         Some("info") => info(&dir),
+        Some("map") => map(&dir, &args),
+        Some("probe") => probe(&dir, &args[1..]),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|spawns|info [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|spawns|areas|info [--dir DIR]\n       worldtool probe X,Z...\n       worldtool map --area X0,Z0,X1,Z1 [--px N] [--out FILE] [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -46,7 +51,16 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     write_stations(dir, &world)?;
     write_posts(dir, &world)?;
     write_shrines(dir, &world)?;
-    write_spawns(dir, &world)
+    write_spawns(dir, &world)?;
+    write_areas(dir)
+}
+
+/// Write the named areas to `dir` (docs/design/coast.md).
+fn write_areas(dir: &std::path::Path) -> Result<(), String> {
+    let areas = worldtool::areas::place();
+    worldtool::areas::save(dir, &areas)?;
+    println!("wrote {} named areas to {}", areas.len(), dir.join(worldtool::areas::FILE).display());
+    Ok(())
 }
 
 /// Place NPC spawn points on `world` and write them to `dir` (docs/design/npcs.md).
@@ -54,8 +68,8 @@ fn write_spawns(dir: &std::path::Path, world: &World) -> Result<(), String> {
     let spawns = worldtool::spawns::place(world);
     worldtool::spawns::save(dir, &spawns)?;
     println!("wrote {} spawn points to {}", spawns.len(), dir.join(worldtool::spawns::FILE).display());
-    for (id, x, z, _, want) in worldtool::spawns::CAMPS {
-        let got = spawns.iter().filter(|p| p.kind.id == id && (p.x - x).hypot(p.z - z) < 200.0).count();
+    for (id, x, z, r, want) in worldtool::spawns::CAMPS {
+        let got = spawns.iter().filter(|p| p.kind.id == id && (p.x - x).hypot(p.z - z) <= r).count();
         println!("  {id} at ({x:.0}, {z:.0}): {got} of {want}");
     }
     Ok(())
@@ -100,6 +114,48 @@ fn node_summary(nodes: &[worldtool::nodes::Placement]) {
     }
 }
 
+/// Print the ground and land use at each `X,Z` given.
+fn probe(dir: &std::path::Path, points: &[String]) -> Result<(), String> {
+    let world = World::load(dir)?;
+    let mut chunks = sim::terrain::FileChunks::new(&world.heights);
+    for p in points.iter().filter(|p| p.contains(',')) {
+        let v: Vec<f32> = p.split(',').map(|v| v.parse::<f32>().map_err(|e| format!("{p}: {e}"))).collect::<Result<_, _>>()?;
+        let [x, z] = v[..] else { return Err(format!("{p}: want X,Z")) };
+        let g = sim::terrain::ground(&mut chunks, x, z).ok_or(format!("{p}: off the map"))?;
+        let t = world.land_at(x, z).unwrap_or(0);
+        println!("({x:.0}, {z:.0}): {:.1} m, gradient {:.2}, {:?}, {:?}", g.lo, g.gradient, texel_use(t), texel_climate(t));
+    }
+    Ok(())
+}
+
+/// Draw part of the world with everything placed on it (`worldtool::map`).
+fn map(dir: &std::path::Path, args: &[String]) -> Result<(), String> {
+    use worldtool::map::{Area, Mark};
+    let arg = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).map(String::as_str);
+    let area = Area::parse(arg("--area").ok_or("map needs --area X0,Z0,X1,Z1")?)?;
+    let px: usize = arg("--px").map_or(Ok(1200), str::parse).map_err(|e| format!("--px: {e}"))?;
+    let out = std::path::PathBuf::from(arg("--out").unwrap_or("target/maps/map.png"));
+    let world = World::load(dir)?;
+    let mark = |x: f32, z: f32, rgb: [u8; 3], r: i32| Mark { x, z, rgb, r };
+    let mut marks = Vec::new();
+    for n in worldtool::nodes::load(dir)? {
+        let rgb = match n.kind.id {
+            id if id.ends_with("_vein") || id.ends_with("_outcrop") => [90, 90, 110],
+            "driftpine" | "hollowoak" => [20, 70, 30],
+            _ => [60, 220, 60],
+        };
+        marks.push(mark(n.x, n.z, rgb, 1));
+    }
+    marks.extend(worldtool::spawns::load(dir)?.iter().map(|p| mark(p.x, p.z, [230, 30, 30], 2)));
+    marks.extend(worldtool::stations::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 140, 0], 3)));
+    marks.extend(worldtool::posts::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 230, 0], 4)));
+    marks.extend(worldtool::shrines::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 255, 255], 3)));
+    let pic = worldtool::map::render(&world, area, px, &marks);
+    worldtool::map::save(&out, &pic)?;
+    println!("wrote {} ({} × {} px, {:.1} m a pixel)", out.display(), pic.w, pic.h, (area.x1 - area.x0) / px as f32);
+    Ok(())
+}
+
 fn info(dir: &std::path::Path) -> Result<(), String> {
     let started = Instant::now();
     let world = World::load(dir)?;
@@ -128,6 +184,8 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     for p in &shrines {
         println!("  {:<20} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
     }
+    let areas = worldtool::areas::load(dir)?;
+    println!("{} named areas", areas.len());
     Ok(())
 }
 

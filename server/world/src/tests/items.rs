@@ -198,8 +198,7 @@ fn bag_work_needs_a_character_in_the_world() {
 fn the_view_shows_your_own_characters_bags_only() {
     let t = world();
     let mira = arrive(&t, 1, "Mira").char_id;
-    call(&t, 1, |ctx| create_character(ctx, "Tobin".into())).unwrap();
-    let tobin = read(&t, |ctx| ctx.db.character_private().owner().filter(identity(1)).last().unwrap().char_id);
+    let tobin = create(&t, 1, "Tobin");
     let ash = arrive(&t, 2, "Ash").char_id;
     give(&t, mira, REED, 5).unwrap();
     give(&t, tobin, TART, 2).unwrap();
@@ -210,6 +209,21 @@ fn the_view_shows_your_own_characters_bags_only() {
     let theirs: Vec<_> = my_inventory(&t.view_context(auth(2))).into_iter().map(|i| i.holder).collect();
     assert_eq!(theirs, [ash]);
     assert!(my_inventory(&t.view_context(auth(3))).is_empty());
+}
+
+#[test]
+fn a_new_character_starts_with_the_start_bag() {
+    let t = world();
+    call(&t, 1, |ctx| {
+        crate::session::on_connect(ctx);
+        Ok(())
+    })
+    .unwrap();
+    call(&t, 1, |ctx| create_character(ctx, "Mira".into())).unwrap();
+    let me = read(&t, |ctx| ctx.db.character_private().owner().filter(identity(1)).last().unwrap().char_id);
+    let want: Vec<_> = sim::content::BAG_START.iter().enumerate().map(|(s, i)| (s as u16, sim::content::item(i.item).unwrap().id, i.count)).collect();
+    assert!(!want.is_empty());
+    assert_eq!(bag(&t, me), want);
 }
 
 #[cfg(feature = "dev")]

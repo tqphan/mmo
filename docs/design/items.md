@@ -20,7 +20,7 @@ Status: v0.1, 2026-10-26. M1 task 2. Code: `content/items.toml`, `server/world/s
 - Kinds are `material`, `consumable` and `gear`, then `deed` (docs/design/land.md), `seed` (docs/design/farming.md) and `pack` (docs/design/trade.md). Gear and packs have a stack of 1. Stacks run from 1 to 10,000. Packs are never in a bag: they're carried in their own table with their origin and age (ADR 0027).
 - Names are original and come from `docs/world/` (CLAUDE.md).
 - Contentgen checks the ids, unique names and wires, the kinds and the stack limits. The definitions are part of the content hash.
-- The bag's size is content too (`[bag] slots`, 50, the original's starting size).
+- The bag's size is content too (`[bag] slots`, 50, the original's starting size), and so is what a new character's bag starts with (`[bag] start`, a list of items and counts, one stack each from slot 0; docs/design/coast.md). contentgen checks each exists, fits a stack, is listed once and that they fit the bag.
 
 ### Storage
 - The private `item` table has one row per stack: `id`, `holder`, `place`, `slot`, `def` (the wire value) and `count`.

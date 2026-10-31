@@ -66,7 +66,7 @@ The chains are deliberate. Charcoal from the hearth feeds the bloomery, and bars
 ### Stations in the world
 - The public **`station`** table has one row per station: `id`, `cell` (indexed), `kind` (the wire), `x`, `y`, `z` and `yaw`. Nothing else changes on it, and any number of players may use one station at once.
 - Stations are in the **Static tier**, next to resource nodes.
-- Placements are part of the world's files, in **`world/stations.tsv`**: one per line (`kind-id x y z yaw-degrees`), the same format as `nodes.tsv`. For now it's written by hand: one of each station in the town round spawn. A worldtool test checks that each stands on the ground there. `cargo xtask world` uploads them after the nodes, replacing every station.
+- Placements are part of the world's files, in **`world/stations.tsv`**: one per line (`kind-id x y z yaw-degrees`), the same format as `nodes.tsv`. The coast layout puts one of each in Furrowdale and three in Gullhaven (docs/design/coast.md). A worldtool test checks that each stands on gentle town ground. `cargo xtask world` uploads them after the nodes, replacing every station.
 - Admins have `admin_put_stations(Vec<StationPlacement>)`, `admin_remove_stations(ids)` and `admin_clear_stations()`. Removing a station stops any craft at it.
 
 ### Crafting

@@ -70,7 +70,7 @@ Status: v0.1, 2026-10-26. M1 task 5 (BACKLOG M1 #1). Code: `content/land.toml` (
 - **Placing:** right-click a deed in the bag to start. A square follows a point 6 m in front of the player, snapped like the server's, green where `check_site` passes and red with the reason in the HUD. R turns the marker, F or a left click places, Esc or a right click cancels.
 - Right-clicking any stack in the bag now uses it; only deeds have a use so far.
 - **The plot window:** F within reach of a plot opens it: kind, owner, standing and its times, the weekly tax at the current rate with the seals held, and buttons for Pay tax, Access and Abandon (owner only, Abandon confirmed).
-- `--land-demo` (dev builds) finds the nearest housing site (3.8 km west of spawn on the placeholder world), teleports beside it, grants a Garden Deed and seals, places a garden through the placement mode, pays a week, sets it public, and then moves the dev clock past the demolition time so the plot disappears and the deed comes back.
+- `--land-demo` (dev builds) finds the nearest housing site (Furrowdale Commons, about 500 m west of Furrowdale), teleports beside it, grants a Garden Deed and seals, places a garden through the placement mode, pays a week, sets it public, and then moves the dev clock past the demolition time so the plot disappears and the deed comes back.
 
 ## 3. Deviations and not yet done
 - **No deposit.** Placing pays the first week instead of a deposit plus tax.

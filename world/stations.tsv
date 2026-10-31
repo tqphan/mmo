@@ -2,4 +2,7 @@
 joiners_bench	9.00	12.47	-5.00	270
 bloomery	12.00	12.91	2.00	270
 cookhearth	8.00	13.28	8.00	0
-packwright_bench	-3800.00	23.84	600.00	90
+joiners_bench	-3345.00	5.09	352.00	0
+bloomery	-3360.00	5.16	360.00	90
+cookhearth	-3358.00	5.00	400.00	90
+packwright_bench	-3305.00	5.00	410.00	270

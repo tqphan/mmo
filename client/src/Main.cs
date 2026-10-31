@@ -134,9 +134,9 @@ namespace Mmo
             var plotWindow = new PlotWindow(session, plots);
             AddChild(plotWindow);
             plots.Window = plotWindow;
-            var camera = new FollowCamera(player, options.CamYawDeg, map, options.CamDistance);
+            var camera = new FollowCamera(player, options.CamYawDeg, map, options.CamDistance, options.CamPitchDeg);
             AddChild(camera);
-            var hud = new Hud(session, player, entities, world.Land, controls, gathering, crafting);
+            var hud = new Hud(session, player, entities, world.Land, world.Areas, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
             hud.Prompts.Add(() => looting.Prompt);

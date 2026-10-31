@@ -67,10 +67,23 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Item: pack | Grain Bale | Hearthgrain bound in reedcloth, carried on the back (`grain_bale`) |
 | Item: pack | Preserves Crate | A nailed crate of Duskberry Preserve jars (`preserves_crate`) |
 | Currency | gold, silver and copper | Coins: 100 copper to a silver, 100 silver to a gold; stored as copper |
-| Place | Gullhaven | The town on the trade island round spawn, with Gullhaven Post |
-| Place | Furrowdale | A farming hamlet on the west continent's coast, with the Packwright's Bench |
-| Place | Cairnwick | An inland hamlet north-west of Furrowdale, with Cairnwick Post |
-| Place | Redfen | A hamlet south of Furrowdale, with Redfen Post |
+| Zone | Hearthshore | The M1 coast zone: about 3 × 3 km of the west continent's east coast, where characters start (docs/design/coast.md) |
+| Place | Gullhaven Isle | The trade island in the central sea, Hearthshore's outpost across the water |
+| Place | Gullhaven | The town on Gullhaven Isle, with Gullhaven Post, a Wayshrine and three stations |
+| Place | Furrowdale | A farming village on Hearthshore's shore, where characters start, with all four stations and the start Wayshrine |
+| Place | Cairnwick | A hamlet under the Cairn Crags, north-west of Furrowdale, with Cairnwick Post |
+| Place | Redfen | A hamlet on the edge of Croaker Fen, south-west of Furrowdale, with Redfen Post |
+| Area | Saltreed Strand | The beach north of Furrowdale, thick with Saltreed; Shore Skitters |
+| Area | Bristle Downs | Rolling hills north-west of Furrowdale; Bristleback Boars, herbs and Tinstone |
+| Area | Croaker Fen | Wet flats and pools between Furrowdale and Redfen; Fen Croakers and Saltreed |
+| Area | Greymane Wood | A Hollowoak wood on a low rise along the Cairnwick road; Greymane Wolves |
+| Area | Wrackline Point | A low headland on the north shore; a Wreck Brigand camp and Driftpines |
+| Area | Hexer's Tarn | A small dark lake in the south-west; Brine Hexers |
+| Area | Cairn Crags | Craggy hills in the north-west; Cliff Stalkers, Tinstone and Rustvein |
+| Area | Mossback Meadow | Open grass under the scarp; Mossback Tortoises and Hollowoaks |
+| Area | Ashwing Scarp | The long ridge on Hearthshore's west side; Ashwing Drones and Rustvein |
+| Area | Wreckers' Cove | A bay on the south shore; the Wreck Captain's camp |
+| Area | Furrowdale Commons | The housing land between Furrowdale and the scarp, where gardens and farms go |
 | Trade post | Cairnwick Post, Redfen Post, Gullhaven Post | Where packs are sold (`content/trade.toml`) |
 | Skillset | Emberlore | Fire and frost at range (`emberlore`, `content/combat.toml`) |
 | Skillset | Ironvow | Weapons and fury up close (`ironvow`) |

@@ -222,6 +222,7 @@ impl Bot {
                 "SELECT * FROM my_presence",
                 "SELECT * FROM character_public",
                 "SELECT * FROM terrain_info",
+                "SELECT * FROM my_inventory",
             ]);
         wait_for("subscription", || applied.load(std::sync::atomic::Ordering::SeqCst))
     }
@@ -254,7 +255,26 @@ impl Bot {
         self.conn.reducers.enter_world(char_id, sim::content::CONTENT_HASH, terrain).map_err(|e| e.to_string())?;
         wait_for("presence", || self.presence().is_some())?;
         println!("{}: entered as {name} (char {char_id})", self.label);
+        self.empty_start_bag(char_id)?;
         Ok(self.presence().unwrap())
+    }
+
+    /// Check that a new character's bag holds `BAG_START` (docs/design/coast.md), then destroy it,
+    /// so every scenario starts with an empty bag.
+    fn empty_start_bag(&self, char_id: u64) -> Check {
+        let bag = || {
+            let mut b: Vec<(u16, u16, u32)> = self.conn.db.my_inventory().iter().filter(|i| i.holder == char_id).map(|i| (i.slot, i.def, i.count)).collect();
+            b.sort();
+            b
+        };
+        let want: Vec<(u16, u16, u32)> = sim::content::BAG_START.iter().enumerate().map(|(s, i)| (s as u16, i.item, i.count)).collect();
+        if wait_for("the start bag", || bag() == want).is_err() {
+            return Err(format!("the start bag is {:?}, not {want:?}", bag()));
+        }
+        for i in self.conn.db.my_inventory().iter().filter(|i| i.holder == char_id) {
+            self.conn.reducers.destroy_item(i.id, i.count).map_err(|e| e.to_string())?;
+        }
+        wait_for("an emptied bag", || bag().is_empty())
     }
 
     fn presence(&self) -> Option<Presence> {

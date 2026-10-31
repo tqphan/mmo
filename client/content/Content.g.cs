@@ -369,7 +369,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0xf62cdb7136b10de0UL;
+        public const ulong Hash = 0x315e3c88921e5c5bUL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {

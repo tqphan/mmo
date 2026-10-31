@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0xf62cdb7136b10de0;
+pub const CONTENT_HASH: u64 = 0x315e3c88921e5c5b;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -577,6 +577,9 @@ pub static ITEMS: [ItemData; 68] = [
 /// Slots in every character's bag.
 pub const BAG_SLOTS: u16 = 50;
 
+/// What every new character's bag starts with, one stack each.
+pub static BAG_START: [Ingredient; 3] = [Ingredient { item: 400, count: 10 }, Ingredient { item: 401, count: 6 }, Ingredient { item: 406, count: 1 }];
+
 /// The item stored as `wire`, if it still exists.
 pub fn item(wire: u16) -> Option<&'static ItemData> {
     ITEMS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &ITEMS[i])
@@ -1108,6 +1111,9 @@ pub static SHRINES: [ShrineData; 4] = [
     ShrineData { wire: 2, id: "cairnwick_wayshrine", name: "Cairnwick Wayshrine" },
     ShrineData { wire: 3, id: "redfen_wayshrine", name: "Redfen Wayshrine" },
 ];
+
+/// The Wayshrine new characters start in front of.
+pub const START_SHRINE: u8 = 1;
 
 /// The Wayshrine kind stored as `wire`.
 pub fn shrine(wire: u8) -> Option<&'static ShrineData> {

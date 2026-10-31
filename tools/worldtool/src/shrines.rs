@@ -1,7 +1,6 @@
 //! Wayshrine placements (`world/shrines.tsv`, docs/design/combat.md), in the same format as
-//! `posts.tsv`: `kind x y z yaw-degrees`, kinds by content id. For now there is one of each kind in
-//! each placeholder town, set on the ground; the coast zone will be placed by hand (M1, the coast
-//! task).
+//! `posts.tsv`: `kind x y z yaw-degrees`, kinds by content id. One stands in each town, where the
+//! coast layout puts it (`coast::SHRINES`), set on the ground.
 
 use std::path::Path;
 
@@ -13,14 +12,8 @@ use crate::nodes::{parse_lines, round2};
 
 pub const FILE: &str = "shrines.tsv";
 
-/// Where the Wayshrines stand: (kind, x, z, yaw in degrees), a short walk from each town's post or
-/// bench (`placeholder::TOWNS`).
-pub const SHRINES: [(&str, f32, f32, u16); 4] = [
-    ("gullhaven_wayshrine", 0.0, -15.0, 0),
-    ("furrowdale_wayshrine", -3812.0, 588.0, 90),
-    ("cairnwick_wayshrine", -4488.0, -1412.0, 90),
-    ("redfen_wayshrine", -3888.0, 1788.0, 0),
-];
+/// Where they stand (`coast::SHRINES`).
+pub use crate::coast::SHRINES;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placement {
@@ -31,7 +24,7 @@ pub struct Placement {
     pub yaw_deg: u16,
 }
 
-/// The placeholder placement: each Wayshrine set on the ground where it stands.
+/// The placement: each Wayshrine set on the ground where it stands.
 pub fn place(world: &World) -> Vec<Placement> {
     let mut chunks = FileChunks::new(&world.heights);
     SHRINES

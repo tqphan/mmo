@@ -4,6 +4,7 @@ use spacetimedb::test_utils::{TestAuth, TestContext};
 use spacetimedb::{ConnectionId, Identity, ReducerContext, Table, TimeDuration, Timestamp};
 
 use crate::movement::{move_event, moved, suspicion};
+use crate::items::item;
 use crate::session::*;
 use sim::content::CONTENT_HASH;
 
@@ -60,6 +61,19 @@ fn read<T>(t: &TestContext, f: impl FnOnce(&ReducerContext) -> T) -> T {
     t.with_reducer_tx::<_, ()>(TestAuth::internal(), |ctx| Ok(f(ctx))).unwrap()
 }
 
+/// Create a character called `name` for `player`, already connected, and empty its starting bag so
+/// tests count only what they give it. Returns its id.
+fn create(t: &TestContext, player: u128, name: &str) -> u64 {
+    call(t, player, |ctx| create_character(ctx, name.into())).unwrap();
+    let char_id = read(t, |ctx| ctx.db.character_private().owner().filter(identity(player)).last().unwrap().char_id);
+    read(t, |ctx| {
+        for i in ctx.db.item().by_slot().filter((char_id, crate::items::place::BAG)).collect::<Vec<_>>() {
+            ctx.db.item().id().delete(i.id);
+        }
+    });
+    char_id
+}
+
 /// Connect `player`, create a character called `name` and enter the world with it.
 fn arrive(t: &TestContext, player: u128, name: &str) -> Presence {
     call(t, player, |ctx| {
@@ -67,8 +81,7 @@ fn arrive(t: &TestContext, player: u128, name: &str) -> Presence {
         Ok(())
     })
     .unwrap();
-    call(t, player, |ctx| create_character(ctx, name.into())).unwrap();
-    let char_id = read(t, |ctx| ctx.db.character_private().owner().filter(identity(player)).last().unwrap().char_id);
+    let char_id = create(t, player, name);
     call(t, player, |ctx| enter_world(ctx, char_id, CONTENT_HASH, server_terrain(ctx))).unwrap();
     read(t, |ctx| ctx.db.presence().identity().find(identity(player)).unwrap())
 }

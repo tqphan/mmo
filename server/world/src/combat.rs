@@ -889,13 +889,29 @@ pub fn respawn(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 /// Where to get up (x, z): `SHRINE_STEP_M` in front of the Wayshrine nearest `at`, or the world's
-/// spawn if there's none.
+/// start if there's none.
 fn nearest_shrine(ctx: &ReducerContext, at: [f32; 3]) -> [f32; 2] {
     let d2 = |s: &Shrine| (s.x - at[0]).powi(2) + (s.z - at[2]).powi(2);
-    let spawn = crate::session::SPAWN;
-    ctx.db.shrine().iter().min_by(|a, b| d2(a).total_cmp(&d2(b))).map_or([spawn[0], spawn[2]], |s| {
-        let [fx, fz] = sim::ship::facing(sim::ship::yaw_from_u16(s.yaw));
-        [s.x + fx * SHRINE_STEP_M, s.z + fz * SHRINE_STEP_M]
+    ctx.db.shrine().iter().min_by(|a, b| d2(a).total_cmp(&d2(b))).map_or_else(
+        || {
+            let [x, _, z] = start_point(ctx);
+            [x, z]
+        },
+        |s| in_front(&s),
+    )
+}
+
+fn in_front(s: &Shrine) -> [f32; 2] {
+    let [fx, fz] = sim::ship::facing(sim::ship::yaw_from_u16(s.yaw));
+    [s.x + fx * SHRINE_STEP_M, s.z + fz * SHRINE_STEP_M]
+}
+
+/// Where new characters appear: in front of the start Wayshrine (`START_SHRINE`), or at the old
+/// spawn on a world without one (docs/design/coast.md).
+pub fn start_point(ctx: &ReducerContext) -> [f32; 3] {
+    ctx.db.shrine().iter().find(|s| s.kind == sim::content::START_SHRINE).map_or(crate::session::SPAWN, |s| {
+        let [x, z] = in_front(&s);
+        [x, s.y, z]
     })
 }
 

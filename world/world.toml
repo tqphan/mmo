@@ -2,4 +2,4 @@
 format = 1
 region_cells = 10
 # sim::terrain::terrain_hash of the heights; enter_world compares the client's with the server's.
-terrain_hash = "fce1fedef6afc647"
+terrain_hash = "690339fb43366241"

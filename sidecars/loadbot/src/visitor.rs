@@ -1,6 +1,7 @@
 //! `loadbot visitor`: company for client playtests and captures (docs/design/client.md).
 //!
-//! One bot enters, teleports onto a circle near spawn and runs round it for `--secs`, sending a
+//! One bot enters, teleports onto a circle near where it arrived (the start Wayshrine, on the
+//! world; docs/design/coast.md) and runs round it for `--secs`, sending a
 //! move with its heading every 150 ms, about as often as a client running that circle sends turns. Every step it lists the characters in
 //! its Near tier and prints each one the first time it sees it. With `--expect N` it fails unless
 //! it saw at least N other characters; it always fails if it's corrected.
@@ -38,8 +39,9 @@ impl Default for VisitorArgs {
     }
 }
 
-/// North-east of spawn, in view of a client standing there and looking north.
-const CENTER: [f32; 2] = [6.0, -14.0];
+/// The circle's centre from where the bot arrives: north-east of it, in view of a new character
+/// standing there and looking north.
+const OFFSET: [f32; 2] = [6.0, -14.0];
 const RADIUS: f32 = 4.0;
 const STEP: Duration = Duration::from_millis(150);
 
@@ -77,7 +79,8 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
     let me = bot.arrive()?;
     // Whatever was in our inbox from before isn't answered.
     let mut answered: HashSet<u64> = bot.conn.db.my_chat().iter().map(|m| m.id).collect();
-    let start = [CENTER[0] + RADIUS, CENTER[1]];
+    let center = [me.x + OFFSET[0], me.z + OFFSET[1]];
+    let start = [center[0] + RADIUS, center[1]];
     bot.teleport(start[0], start[1])?;
     bot.watch_near(start[0], start[1])?;
 
@@ -89,7 +92,7 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
         std::thread::sleep(STEP);
         let step = RUN_SPEED * 0.9 * STEP.as_secs_f32();
         angle -= step / RADIUS;
-        let (x, z) = (CENTER[0] + RADIUS * angle.cos(), CENTER[1] + RADIUS * angle.sin());
+        let (x, z) = (center[0] + RADIUS * angle.cos(), center[1] + RADIUS * angle.sin());
         // Facing along the circle: the tangent of a falling angle is (sin, -cos).
         let heading = (angle.sin(), -(angle.cos()));
         let yaw = sim::ship::yaw_to_u16((-heading.0).atan2(-heading.1));

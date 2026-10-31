@@ -26,7 +26,9 @@ namespace Mmo
     /// <item><c>--craft-demo</c>: dev builds; on entering, teleport to the Cookhearth, grant logs and ore, craft Charcoal, then a Rustiron Bar at the Bloomery (docs/design/crafting.md).</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
     /// <item><c>--cam-yaw DEG</c>: where the camera starts, 0 looking north (-z).</item>
-    /// <item><c>--cam-distance M</c>: how far behind the player the camera starts, 3 to 30 m (8; the mouse wheel changes it).</item>
+    /// <item><c>--cam-distance M</c>: how far behind the player the camera starts, 3 to 400 m (8; the mouse wheel changes it, up to 30).</item>
+    /// <item><c>--cam-pitch DEG</c>: the camera's pitch, −89 (straight down) to 30 (−20).</item>
+    /// <item><c>--teleport X,Z</c>: dev builds; a second after entering, go to (X, Z) by dev teleport.</item>
     /// <item><c>--trace</c>: log where each other entity is drawn every frame, to measure smoothness.</item>
     /// <item><c>--test-cheat</c>: 3 s after entering, jump 30 m in one frame, to check that the server's correction snaps us back.</item>
     /// <item><c>--world DIR</c>: the world's files (default <c>world</c>), the same ones uploaded to the server (docs/design/world.md); or a bare <c>.mmoh</c> height file.</item>
@@ -47,6 +49,8 @@ namespace Mmo
         public Gameplay.Autopilot? Autopilot;
         public (float X, float Z, float YawDeg)? SpawnShip;
         public int? Labor;
+        /// <summary><c>--teleport X,Z</c> (dev builds): a second after entering, go there by dev teleport.</summary>
+        public (float X, float Z)? Teleport;
         public bool BagDemo;
         public bool GatherDemo;
         public bool CraftDemo;
@@ -62,6 +66,7 @@ namespace Mmo
         public bool Walk;
         public float CamYawDeg;
         public float CamDistance = 8.0f;
+        public float CamPitchDeg = -20.0f;
         public bool Trace;
         public bool TestCheat;
         public string World = "world";
@@ -124,7 +129,9 @@ namespace Mmo
                     case "--no-vsync": o.NoVsync = true; break;
                     case "--secs": o.Secs = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--cam-yaw": o.CamYawDeg = float.Parse(Next(), CultureInfo.InvariantCulture); break;
-                    case "--cam-distance": o.CamDistance = Math.Clamp(float.Parse(Next(), CultureInfo.InvariantCulture), 3.0f, 30.0f); break;
+                    case "--cam-distance": o.CamDistance = Math.Clamp(float.Parse(Next(), CultureInfo.InvariantCulture), 3.0f, 400.0f); break;
+                    case "--cam-pitch": o.CamPitchDeg = Math.Clamp(float.Parse(Next(), CultureInfo.InvariantCulture), -89.0f, 30.0f); break;
+                    case "--teleport": o.Teleport = Pair(Next()); break;
                     default: throw new ArgumentException($"unknown option {args[i]}");
                 }
             }
@@ -136,6 +143,14 @@ namespace Mmo
             System.IO.Path.IsPathRooted(path)
                 ? path
                 : System.IO.Path.GetFullPath(System.IO.Path.Combine(Godot.ProjectSettings.GlobalizePath("res://"), "..", path));
+
+        private static (float, float) Pair(string value)
+        {
+            var nums = value.Split(',');
+            if (nums.Length != 2 || !nums.All(n => float.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out _)))
+                throw new ArgumentException($"{value}: expected X,Z");
+            return (float.Parse(nums[0], CultureInfo.InvariantCulture), float.Parse(nums[1], CultureInfo.InvariantCulture));
+        }
 
         private static (float, float, float) Triple(string value)
         {

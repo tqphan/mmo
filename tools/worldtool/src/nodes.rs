@@ -1,6 +1,7 @@
 //! Resource node placements (`world/nodes.tsv`, docs/design/gathering.md): where nodes stand, one
 //! per line as `kind x y z yaw-degrees`, kinds by content id. The placeholder placement scatters
-//! them over wild land; the coast zone will be placed by hand (M1 task 11).
+//! them over wild land outside the coast zone; inside it, they stand in the fields laid out by hand
+//! in `coast::NODE_FIELDS`.
 
 use std::path::Path;
 
@@ -63,10 +64,16 @@ fn unit(cx: u16, cz: u16, salt: u64) -> f32 {
     (v >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// The placeholder placement: one candidate per cell at a random spot, about half kept, on wild
-/// land only, the kind following the ground.
+/// Nodes of one field stand at least this far apart.
+const FIELD_SPACING_M: f32 = 6.0;
+/// Candidates tried per field.
+const FIELD_TRIES: u64 = 600;
+
+/// The placement: the coast zone's fields (`coast::NODE_FIELDS`), then, outside the zone, one
+/// candidate per cell at a random spot, about half kept, on wild land only, the kind following the
+/// ground.
 pub fn place(world: &World) -> Vec<Placement> {
-    let mut out = Vec::new();
+    let mut out = fields(world);
     for cz in 0..CELLS_PER_SIDE {
         // One row of cells at a time, so the cut chunks don't pile up.
         let mut chunks = FileChunks::new(&world.heights);
@@ -77,7 +84,7 @@ pub fn place(world: &World) -> Vec<Placement> {
             let x = -WORLD_HALF_M + (f32::from(cx) + 0.1 + 0.8 * unit(cx, cz, 2)) * CELL_SIZE_M;
             let z = -WORLD_HALF_M + (f32::from(cz) + 0.1 + 0.8 * unit(cx, cz, 3)) * CELL_SIZE_M;
             let Some(t) = world.land_at(x, z) else { continue };
-            if texel_use(t) != Some(LandUse::Wild) {
+            if texel_use(t) != Some(LandUse::Wild) || crate::coast::in_zone(x, z) {
                 continue;
             }
             let Some(g) = sim::terrain::ground(&mut chunks, x, z) else { continue };
@@ -87,6 +94,35 @@ pub fn place(world: &World) -> Vec<Placement> {
                 let y = sim::terrain::ground(&mut chunks, x, z).map_or(g.lo, |g| g.lo);
                 out.push(Placement { kind, x, y: round2(y), z, yaw_deg: (unit(cx, cz, 5) * 360.0) as u16 % 360 });
             }
+        }
+    }
+    out
+}
+
+/// The hand-laid fields: deterministic candidates round each centre, kept on dry wild land a
+/// gatherer can stand on and apart from each other, until the field has its count.
+fn fields(world: &World) -> Vec<Placement> {
+    let mut chunks = FileChunks::new(&world.heights);
+    let mut out: Vec<Placement> = Vec::new();
+    for (f, &(id, cx, cz, radius, count)) in crate::coast::NODE_FIELDS.iter().enumerate() {
+        let Some(kind) = node_by_id(id) else { continue };
+        let start = out.len();
+        for i in 0..FIELD_TRIES {
+            if out.len() - start == count {
+                break;
+            }
+            let seed = (f as u64 + 1000) << 32 | i;
+            let r = radius * crate::spawns::unit(seed * 3).sqrt();
+            let a = crate::spawns::unit(seed * 3 + 1) * std::f32::consts::TAU;
+            let (x, z) = (round2(cx + r * a.cos()), round2(cz + r * a.sin()));
+            if world.land_at(x, z).and_then(texel_use) != Some(LandUse::Wild) {
+                continue;
+            }
+            let Some(g) = sim::terrain::ground(&mut chunks, x, z) else { continue };
+            if g.lo < MIN_HEIGHT_M || g.gradient > MAX_GRADIENT || out[start..].iter().any(|p| (p.x - x).hypot(p.z - z) < FIELD_SPACING_M) {
+                continue;
+            }
+            out.push(Placement { kind, x, y: round2(g.lo), z, yaw_deg: (crate::spawns::unit(seed * 3 + 2) * 360.0) as u16 % 360 });
         }
     }
     out

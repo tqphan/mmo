@@ -69,7 +69,7 @@ Every number is ours, for the playtest to tune.
 
 ### Spawn points
 - The private **`spawn`** table: `id`, `cell`, `kind`, `x`, `y`, `z`, `yaw` (home), `npc` (the entity there now, or 0) and `ready_at` (the earliest it may spawn again). Placed from **`world/spawns.tsv`** (`kind x y z yaw-degrees`) by `worldtool spawns` and `cargo xtask world`, like Wayshrines. Admins have `admin_put_spawns`, `admin_remove_spawns` and `admin_clear_spawns`; removing a spawn point removes its NPC.
-- The placeholder placement puts camps of each kind on wild land round Gullhaven and Furrowdale, rising in level with the distance from Gullhaven: Skitters on the island's beaches, Boars and Croakers inland, Wolves and Brigands across the sea, and the rest further out. The coast task lays them out by hand.
+- The camps are laid out by hand in Hearthshore (docs/design/coast.md, `coast::CAMPS`), rising in level with the distance from Furrowdale, with Skitters on Gullhaven's beach too; `worldtool spawns` places each camp's points on dry, gentle wild land round its centre.
 
 ### Waking and sleeping
 - Every `brain_ms` (`world_tick`, every second tick) the brain gathers the living characters in the world. A spawn point with no NPC, past its `ready_at` and with a character within `wake_m` **spawns** its kind at home: an `entity` (kind 4, `ref_id` the kind's wire), a `transform`, `vitals` (the kind's level and HP, no mana) and a private **`npc`** row.
@@ -114,7 +114,6 @@ Every number is ours, for the playtest to tune.
 - **No gear or durability**, so a PvE death costs experience only; no gold drops until there is gold to drop.
 - **Returning NPCs still take damage** (they ignore threat but aren't invulnerable); they heal fully at home anyway.
 - **One NPC per spawn point**; no roaming patrols, groups that aggro together, elites or named rares yet.
-- **Placement is a placeholder** until the coast task.
 - The trophies (hides, fangs and so on) are materials with no recipes yet.
 
 ## 4. Test plan

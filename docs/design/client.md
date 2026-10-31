@@ -39,7 +39,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 - A failed first connection isn't retried. A passenger comes back in the world frame where it dropped, not on the deck.
 
 ### The world
-- The client loads the world's files at start (`--world`, default `world/`, the files `cargo xtask world` uploads to the server; about 0.2 s) and draws them with the terrain tiles and the sea from the world-scale spike, centred on the camera (docs/design/worldstream.md, world.md). If they can't be read, or don't match their manifest's terrain hash, it stops with a message. Housing land and towns are tinted, and the HUD shows the land use and climate underfoot.
+- The client loads the world's files at start (`--world`, default `world/`, the files `cargo xtask world` uploads to the server; about 0.2 s) and draws them with the terrain tiles and the sea from the world-scale spike, centred on the camera (docs/design/worldstream.md, world.md). If they can't be read, or don't match their manifest's terrain hash, it stops with a message. Housing land and towns are tinted, and the HUD shows the land use and climate underfoot, and the named area (`world/areas.tsv`: "area Croaker Fen, Hearthshore"; docs/design/coast.md).
 - The player stands on `HeightMapShape3D`s for the 3 × 3 cells around it, holding the server's own samples (`TerrainCollision`, docs/design/worldstream.md). The camera stays 0.5 m above the ground.
 - Until the world has spawn points, new characters appear at (0, 0), on the placeholder world's trade island about 13 m up. The server settles them on its ground.
 
@@ -75,7 +75,9 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--world DIR` | The world's files (default `world`), or a bare `.mmoh` height file |
 | `--secs S` | Quit after S seconds |
 | `--cam-yaw DEG` | Starting camera yaw, 0 looking north (-z) |
-| `--cam-distance M` | Starting camera distance behind the player, 3 to 30 m (8); the mouse wheel changes it |
+| `--cam-distance M` | Starting camera distance behind the player, 3 to 400 m (8); the mouse wheel changes it, up to 30 |
+| `--cam-pitch DEG` | The camera's pitch, −89 (straight down) to 30 (−20) |
+| `--teleport X,Z` | Dev builds: a second after entering, go to (X, Z) by dev teleport (docs/design/coast.md) |
 | `--trace` | Log where each other entity is drawn every frame, to measure smoothness |
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
 | `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |

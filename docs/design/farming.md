@@ -91,7 +91,7 @@ Hearthgrain matches the barley example; every other number is ours, for the play
 - **No care.** Watering, feeding and medicine (and sickness) come in M2 with climates' full rules; until then plants grow unattended and crops only wither when left ripe.
 - **Instant harvest.** The original had a short harvest cast; ours finishes at once. A cast can reuse the gathering job if the playtest wants one.
 - **Theft isn't refused**; it leaves evidence for others to report (docs/design/crime.md).
-- **No seed merchants.** Seeds are crafted until gold exists.
+- **No seed merchants.** Seeds are crafted until gold exists, and every new character starts with 10 Hearthgrain Seed, 6 Whiteflax Seed and an Amberpear Sapling (`[bag] start`, docs/design/coast.md).
 - **Planting costs no labor**; only harvests do.
 - **No growth rings for livestock offspring as pets or mounts**, only lambs.
 - Withered and orphaned plantings stay as rows until someone plants over them or uproots them; a sweep can come later if they pile up.

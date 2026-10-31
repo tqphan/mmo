@@ -232,6 +232,12 @@ namespace Mmo.Gameplay
                 GlobalPosition += new Vector3(0, 0, -30);
                 session.Log($"test cheat: jumped to ({GlobalPosition.X:F1}, {GlobalPosition.Z:F1})");
             }
+            if (options.Teleport is { } to && now - enteredAt > 1.0)
+            {
+                options.Teleport = null;
+                DevTeleport(to.X, to.Z);
+                return;
+            }
 
             if (Parent == 0 && IsOnFloor() && !swimming)
                 worstGap = Mathf.Max(worstGap, Mathf.Abs(GlobalPosition.Y - ground.Map.Height(GlobalPosition.X, GlobalPosition.Z)));

@@ -52,6 +52,23 @@ namespace Mmo.Tests
             Assert.Equal(LandUse.Town, LandRaster.Use(world.Land!.At(0, 0)));
             Assert.Equal(Climate.Subarctic, LandRaster.ClimateOf(world.Land.At(0, -6000)));
             Assert.Equal(LandUse.Wild, LandRaster.Use(world.Land.At(0, 7900)));
+            Assert.Equal("Furrowdale, Hearthshore", Areas.Describe(world.Areas, -3330, 380));
+            Assert.Equal("Gullhaven, Gullhaven Isle", Areas.Describe(world.Areas, 0, 0));
+        }
+
+        [Fact]
+        public void AreasParseAndTheSmallestNamesAPlace()
+        {
+            var areas = Areas.Parse("# comment\nCoast\t0\t0\t100\nFen\t10\t0\t20\r\n\nIsle\t500\t0\t50\n");
+            Assert.Equal(3, areas.Count);
+            Assert.Equal("Fen, Coast", Areas.Describe(areas, 12, 0));
+            Assert.Equal("Coast", Areas.Describe(areas, -50, 0));
+            Assert.Equal("Isle", Areas.Describe(areas, 500, 10));
+            Assert.Equal("", Areas.Describe(areas, 300, 0));
+            Assert.Throws<InvalidDataException>(() => Areas.Parse("Coast\t0\t0"));
+            Assert.Throws<InvalidDataException>(() => Areas.Parse("Coast\t0\tx\t5"));
+            Assert.Throws<InvalidDataException>(() => Areas.Parse("Coast\t0\t0\t0"));
+            Assert.Empty(Areas.Load(Path.GetTempPath()));
         }
 
         [Fact]

@@ -9,8 +9,8 @@ using System.Threading.Tasks;
 
 namespace Mmo.World
 {
-    /// <summary>The world as the client holds it: heights, land use, and the terrain hash it sends on entering.</summary>
-    public sealed record WorldData(HeightMap Heights, LandRaster? Land, ulong TerrainHash);
+    /// <summary>The world as the client holds it: heights, land use, the terrain hash it sends on entering, and named areas.</summary>
+    public sealed record WorldData(HeightMap Heights, LandRaster? Land, ulong TerrainHash, IReadOnlyList<Area> Areas);
 
     /// <summary>
     /// Reads the world's files (<c>world/</c>, docs/design/world.md) as <c>tools/worldtool</c> writes
@@ -36,7 +36,7 @@ namespace Mmo.World
             if (File.Exists(path))
             {
                 var map = HeightMap.Load(path);
-                return new WorldData(map, null, map.TerrainHash());
+                return new WorldData(map, null, map.TerrainHash(), Array.Empty<Area>());
             }
             var (format, regionCells, hash) = ParseManifest(File.ReadAllText(Path.Combine(path, Manifest)));
             if (format != Format || regionCells != RegionCells)
@@ -82,7 +82,7 @@ namespace Mmo.World
             ulong actual = heights.TerrainHash();
             if (actual != hash)
                 throw new InvalidDataException($"the regions' terrain hash is {actual:x16}, but the manifest says {hash:x16}");
-            return new WorldData(heights, new LandRaster(land), actual);
+            return new WorldData(heights, new LandRaster(land), actual, Areas.Load(path));
         }
 
         /// <summary><c>key = value</c> lines and <c># comments</c>, as <c>worldtool::Manifest</c> writes them.</summary>

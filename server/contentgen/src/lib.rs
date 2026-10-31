@@ -356,6 +356,10 @@ struct ItemsFile {
 #[serde(deny_unknown_fields)]
 pub struct BagDef {
     pub slots: u16,
+    /// What every new character's bag starts with: items by id, each a stack or less, in as many
+    /// slots as the bag has.
+    #[serde(default)]
+    pub start: Vec<IngredientDef>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -693,6 +697,9 @@ pub struct ShrineDef {
     pub wire: u8,
     pub id: String,
     pub name: String,
+    /// New characters start in front of this one; exactly one shrine has it.
+    #[serde(default)]
+    pub start: bool,
 }
 
 /// `npcs.toml`: NPC rules and kinds (docs/design/npcs.md).
@@ -1274,6 +1281,20 @@ fn check_items(f: &ItemsFile, errors: &mut Vec<String>) {
             errors.push(format!("{at}: {} items don't stack (stack = 1)", it.kind));
         }
     }
+    for (k, st) in f.bag.start.iter().enumerate() {
+        let at = format!("{file}: bag.start {:?}", st.item);
+        match f.item.iter().find(|it| it.id == st.item) {
+            None => errors.push(format!("{at}: no such item")),
+            Some(it) if !(1..=it.stack).contains(&st.count) => errors.push(format!("{at}: count must be from 1 to its stack, {}", it.stack)),
+            Some(_) => {}
+        }
+        if f.bag.start[..k].iter().any(|o| o.item == st.item) {
+            errors.push(format!("{at}: listed twice"));
+        }
+    }
+    if f.bag.start.len() > usize::from(f.bag.slots) {
+        errors.push(format!("{file}: bag.start needs more slots than the bag has"));
+    }
 }
 
 fn check_gathering(g: &GatheringFile, items: &[ItemDef], errors: &mut Vec<String>) {
@@ -1512,6 +1533,9 @@ fn check_combat(k: &CombatFile, errors: &mut Vec<String>) {
     }
     check_ids(file, "skillset", k.skillset.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
     check_ids(file, "shrine", k.shrine.iter().map(|s| (s.id.as_str(), usize::from(s.wire))), errors);
+    if k.shrine.iter().filter(|s| s.start).count() != 1 {
+        errors.push(format!("{file}: exactly one shrine must have start = true"));
+    }
     let mut names = std::collections::HashSet::new();
     for (what, id, name) in k.skillset.iter().map(|s| ("skillset", &s.id, &s.name)).chain(k.shrine.iter().map(|s| ("shrine", &s.id, &s.name))) {
         if !is_item_name(name) {
@@ -1891,7 +1915,11 @@ fn canonical(c: &Content) -> String {
         write!(s, "\t{}", f.value.bits()).unwrap();
     }
     s += "\n";
-    writeln!(s, "bag\t{}", c.bag.slots).unwrap();
+    write!(s, "bag\t{}", c.bag.slots).unwrap();
+    for i in &c.bag.start {
+        write!(s, "\t{}:{}", i.item, i.count).unwrap();
+    }
+    s += "\n";
     for i in &c.items {
         writeln!(s, "item\t{}\t{}\t{}\t{}\t{}", i.wire, i.id, i.name, i.kind, i.stack).unwrap();
     }
@@ -1992,7 +2020,7 @@ fn canonical(c: &Content) -> String {
         s += "\n";
     }
     for k in &c.shrines {
-        writeln!(s, "shrine\t{}\t{}\t{}", k.wire, k.id, k.name).unwrap();
+        writeln!(s, "shrine\t{}\t{}\t{}\t{}", k.wire, k.id, k.name, k.start).unwrap();
     }
     let p = &c.progress;
     writeln!(
@@ -2592,6 +2620,9 @@ pub fn render_rust(c: &Content) -> String {
     s += "];\n\n";
     s += "/// Slots in every character's bag.\n";
     writeln!(s, "pub const BAG_SLOTS: u16 = {};\n", c.bag.slots).unwrap();
+    s += "/// What every new character's bag starts with, one stack each.\n";
+    let start: Vec<String> = c.bag.start.iter().map(|i| format!("Ingredient {{ item: {}, count: {} }}", c.item_wire(&i.item), i.count)).collect();
+    writeln!(s, "pub static BAG_START: [Ingredient; {}] = [{}];\n", start.len(), start.join(", ")).unwrap();
     s += "/// The item stored as `wire`, if it still exists.\n";
     s += "pub fn item(wire: u16) -> Option<&'static ItemData> {\n";
     s += "    ITEMS.binary_search_by_key(&wire, |d| d.wire).ok().map(|i| &ITEMS[i])\n}\n\n";
@@ -2872,6 +2903,8 @@ pub fn render_rust(c: &Content) -> String {
         writeln!(s, "    ShrineData {{ wire: {}, id: {:?}, name: {:?} }},", k.wire, k.id, k.name).unwrap();
     }
     s += "];\n\n";
+    s += "/// The Wayshrine new characters start in front of.\n";
+    writeln!(s, "pub const START_SHRINE: u8 = {};\n", c.shrines.iter().find(|k| k.start).map_or(0, |k| k.wire)).unwrap();
     s += "/// The Wayshrine kind stored as `wire`.\n";
     s += "pub fn shrine(wire: u8) -> Option<&'static ShrineData> {\n    SHRINES.get(usize::from(wire))\n}\n\n";
     s += "/// The Wayshrine kind with content id `id`.\n";
@@ -4021,6 +4054,7 @@ mod tests {
         wire = 0
         id = "town_shrine"
         name = "Town Shrine"
+        start = true
     "#;
 
     const NPCS: &str = r#"
@@ -4686,6 +4720,9 @@ mod tests {
         let (rs, cs) = (render_rust(&c), render_csharp(&c));
         assert!(rs.contains(r#"ItemData { wire: 3, id: "reedcutter_knife", name: "Reedcutter's Knife", kind: ItemKind::Gear, stack: 1 },"#), "{rs}");
         assert!(rs.contains("pub static ITEMS: [ItemData; 12] = [") && rs.contains("pub const BAG_SLOTS: u16 = 50;"));
+        assert!(rs.contains("pub static BAG_START: [Ingredient; 0] = [];"), "{rs}");
+        let c = parse_items(&ITEMS.replace("slots = 50", "slots = 50\nstart = [{ item = \"driftpine_log\", count = 10 }]")).unwrap();
+        assert!(render_rust(&c).contains("pub static BAG_START: [Ingredient; 1] = [Ingredient { item: 20, count: 10 }];"));
         assert!(rs.contains("Consumable = 1,") && cs.contains("Consumable = 1,") && rs.contains("Design = 7,"));
         assert!(cs.contains(r#"new(20, "driftpine_log", "Driftpine Log", ItemKind.Material, 1000),"#), "{cs}");
         assert!(cs.contains("public const ushort BagSlots = 50;"));
@@ -4739,6 +4776,13 @@ mod tests {
         assert!(item_errors(&ITEMS.replace("\"driftpine_log\"", "\"Driftpine\"")).contains("ids are lower-case"));
         assert!(item_errors("item = []\n[bag]\nslots = 50").contains("no items"));
         assert!(item_errors(&ITEMS.replace("stack = 1000", "stack = 1000\nweight = 2")).contains("unknown field `weight`"));
+        let start = |list: &str| ITEMS.replace("slots = 50", &format!("slots = 50\nstart = [{list}]"));
+        assert!(parse_items(&start(r#"{ item = "driftpine_log", count = 10 }"#)).is_ok());
+        assert!(item_errors(&start(r#"{ item = "gold", count = 1 }"#)).contains("no such item"));
+        assert!(item_errors(&start(r#"{ item = "driftpine_log", count = 1001 }"#)).contains("count must be from 1 to its stack"));
+        assert!(item_errors(&start(r#"{ item = "driftpine_log", count = 0 }"#)).contains("count must be from 1 to its stack"));
+        assert!(item_errors(&start(r#"{ item = "driftpine_log", count = 1 }, { item = "driftpine_log", count = 2 }"#)).contains("listed twice"));
+        assert!(item_errors(&start(r#"{ item = "driftpine_log", count = 1 }, { item = "crate", count = 1 }"#).replace("slots = 50", "slots = 1")).contains("more slots than the bag"));
     }
 
     #[test]
@@ -5080,6 +5124,7 @@ mod tests {
         assert!(cs.contains("public static readonly ProgressRules Progress = new(new uint[] { 100u, 150u }, new byte[] { 1, 3 }, 100, 40, 40u, 20u, 25u, 5u);"), "{cs}");
         assert!(cs.contains("public static readonly ControlRules Diminishing = new(15u, new uint[] { 100u, 50u });"), "{cs}");
         assert!(rs.contains(r#"ShrineData { wire: 0, id: "town_shrine", name: "Town Shrine" },"#), "{rs}");
+        assert!(rs.contains("pub const START_SHRINE: u8 = 0;"), "{rs}");
         assert!(cs.contains("public static readonly CombatRules Combat = new(1000, 800, 20, 4, 16, 6, 6, 1000, 0.5f, 3.0f, 5, 25, 180, 600, 50, 5000);"), "{cs}");
         assert!(cs.contains(r#"new(210, "mend", "Mend", 1, 1, SkillTarget.Ally, 1500, 0, 25.0f, 60, 0.0f, false, new EffectData[] { new(EffectKind.Heal, 260, null, 0, null), new(EffectKind.Status, 0, 2, 5000, null), new(EffectKind.Cleanse, 0, null, 0, null) }),"#), "{cs}");
         assert!(cs.contains(r#"new(0, "town_shrine", "Town Shrine"),"#), "{cs}");
@@ -5253,5 +5298,6 @@ mod tests {
             assert!(e.contains(want), "{want} missing from:\n{e}");
         }
         assert!(combat_errors(&COMBAT.replace("status = \"guarded\"", "status = \"warded\"")).contains("no status \"warded\""));
+        assert!(combat_errors(&COMBAT.replace("start = true", "")).contains("exactly one shrine must have start"));
     }
 }

@@ -413,6 +413,24 @@ fn only_admins_place_shrines_and_without_any_the_dead_respawn_at_spawn() {
     assert_eq!((p.x, p.z), (SPAWN[0], SPAWN[2]));
 }
 
+#[test]
+fn new_characters_start_in_front_of_the_start_shrine() {
+    let t = world();
+    let start = sim::combat::SHRINES[usize::from(sim::content::START_SHRINE)].id;
+    shrines(&t, &[("cairnwick_wayshrine", 50.0, 50.0), (start, -300.0, 200.0)]);
+    let me = arrive(&t, 1, "Mira");
+    let front = read(&t, |ctx| {
+        let s = ctx.db.shrine().iter().find(|s| s.kind == sim::content::START_SHRINE).unwrap();
+        let [fx, fz] = sim::ship::facing(sim::ship::yaw_from_u16(s.yaw));
+        [s.x + fx * crate::combat::SHRINE_STEP_M, s.z + fz * crate::combat::SHRINE_STEP_M]
+    });
+    assert_eq!([me.x, me.z], front);
+    // Without one, at the old spawn.
+    call(&t, ADMIN, admin_clear_shrines).unwrap();
+    let tobin = arrive(&t, 2, "Tobin");
+    assert_eq!((tobin.x, tobin.z), (SPAWN[0], SPAWN[2]));
+}
+
 fn status_id(id: &str) -> u8 {
     sim::combat::status_by_id(id).unwrap().wire
 }

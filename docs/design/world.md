@@ -17,9 +17,9 @@ Only what players see matters: where building is allowed, which climate a farm i
 ## 2. Our rules
 
 ### The world's files are the source
-- The world lives in the repo under `world/`, as files our own tool writes: `tools/worldtool` (`cargo run -p worldtool`). For now its generator writes them (the placeholder map from docs/design/worldstream.md). Editor tooling will later edit the same files, and from then on the files, not the generator, are the source of truth. Regenerating would overwrite hand edits.
+- The world lives in the repo under `world/`, as files our own tool writes: `tools/worldtool` (`cargo run -p worldtool`). For now its generator writes them: the placeholder map from docs/design/worldstream.md, with the M1 coast zone, Hearthshore, laid out by hand in `tools/worldtool/src/coast.rs` (docs/design/coast.md). Editor tooling will later edit the same files, and from then on the files, not the generator, are the source of truth. Regenerating would overwrite hand edits.
 - `world/world.toml` is the manifest: the format version, the region size, and the **terrain hash** of the heights (below). `worldtool` writes it, and nobody edits it by hand.
-- `world/stations.tsv` and `world/posts.tsv`: crafting stations (docs/design/crafting.md) and trade posts (docs/design/trade.md), written by `worldtool stations` and `worldtool posts`.
+- `world/stations.tsv` and `world/posts.tsv`: crafting stations (docs/design/crafting.md) and trade posts (docs/design/trade.md), written by `worldtool stations` and `worldtool posts`. Likewise `shrines.tsv` (docs/design/combat.md), `spawns.tsv` (docs/design/npcs.md) and `areas.tsv`, the named areas the client shows (docs/design/coast.md).
 - `world/nodes.tsv`: resource node placements, one per line (docs/design/gathering.md). `worldtool gen` writes it after the regions, and `worldtool nodes` rewrites it alone from the regions there. It isn't part of the terrain hash, since clients take nodes from the server.
 - `world/regions/x{RX}z{RZ}.mmor`: **625 regions** of 10 × 10 cells (640 m), 25 along each side. Small regions keep an edit's diff small. The whole placeholder world is about 9 MB, against 128 MB raw.
 
@@ -52,9 +52,10 @@ At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 
 ### The placeholder world's land use
 - **Climate** by place: the north (z < −4400 m) is subarctic, the west continent's south half (z > 1500 m) tropical, the east continent's south half arid, and everything else temperate.
-- **Towns:** Gullhaven, the trade island within 250 m of spawn (0, 0); and on the west continent Furrowdale (60 m round (−3800, 600), with the Packwright's Bench), Cairnwick (50 m round (−4500, −1400)) and Redfen (50 m round (−3900, 1800)), each with a trade post (docs/design/trade.md).
+- **Towns:** Gullhaven, the trade island within 250 m of (0, 0); and Hearthshore's Furrowdale (90 m round (−3330, 380), where characters start), Cairnwick (55 m round (−4600, −1050)) and Redfen (55 m round (−3930, 1250)) (docs/design/coast.md).
 - **Housing:** six areas of 400–600 m radius, three on each continent's lowlands, wherever the ground there is between 2 m and 60 m up and gentler than 1 in 4.
-- **Roads:** none yet (deviation).
+- **Roads:** Hearthshore's two, Furrowdale to Cairnwick and to Redfen, 4 m either side of their lines (docs/design/coast.md). None elsewhere yet.
+- **Landforms:** inside Hearthshore, `coast::shape` adds hills, a ridge and levelled ground (the fen, a tarn, a cove, town pads) to the placeholder's heights.
 
 ### The terrain hash
 - A chunk's hash is FNV-1a 64 over its cell key (`u64`) then its 1,089 samples (`u16`), all little-endian, passed through the splitmix64 finaliser (`sim::terrain::chunk_hash`). The **terrain hash** is the wrapping sum of the hashes of every chunk present. No terrain is 0. Because it's a sum, it doesn't depend on order, and the server can keep it up to date one chunk at a time.
@@ -80,8 +81,8 @@ At most 16 use classes and 8 climates fit the byte. contentgen enforces that.
 - The placeholder world is 40% land. Housing covers 3.6 km² in six areas, the town 0.2 km².
 
 ## 3. Deviations and not yet done
-- **No roads, no water bodies, no obstacle outlines or placements** (PLAN §5.4). Lakes and rivers above sea level need a water-surface layer; it can be another stream in the region file (version 2).
-- **No editor tooling.** The generator writes everything.
+- **Roads only in Hearthshore; no water bodies above sea level, no obstacle outlines or placements** (PLAN §5.4). Hexer's Tarn is a basin below sea level. Lakes and rivers above sea level need a water-surface layer; it can be another stream in the region file (version 2).
+- **No editor tooling.** The generator writes everything; `worldtool map` draws any part of it as a PNG and `worldtool probe` prints the ground at points, for checking a layout without the client (docs/design/coast.md).
 - **Ocean regions are stored in full.** They compress to almost nothing, so a special case isn't worth it yet.
 
 ## 4. Test plan
