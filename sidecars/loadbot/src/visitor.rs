@@ -5,14 +5,20 @@
 //! its Near tier and prints each one the first time it sees it. With `--expect N` it fails unless
 //! it saw at least N other characters; it always fails if it's corrected.
 //!
+//! It's sociable (docs/design/social.md): it takes any party invitation, and answers what's said to
+//! it, aloud nearby, in its party or in a whisper, with "heard: …" on the same channel.
+//!
 //! It runs on the ground of the world's files (`--world`, default `world/`), or of a height file with
 //! `--file`, and fails at once if the server's terrain hash differs from theirs (docs/design/world.md).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use sim::chat::Channel;
+
 use sim::terrain::{FileChunks, HeightFile, ground, terrain_hash};
-use spacetimedb_sdk::{DbContext, Table};
+use spacetimedb_sdk::{DbContext, EventTable as _, Table};
 
 use crate::module_bindings::*;
 use crate::{Args, Bot, Check, RUN_SPEED};
@@ -64,7 +70,13 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
             server.hash, server.chunks
         ));
     }
+    crate::gather::subscribe(&bot, &["SELECT * FROM my_party_invites", "SELECT * FROM my_chat"])?;
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let log = heard.clone();
+    bot.conn.db.local_chat().on_insert(move |_, e| log.lock().unwrap().push(e.clone()));
     let me = bot.arrive()?;
+    // Whatever was in our inbox from before isn't answered.
+    let mut answered: HashSet<u64> = bot.conn.db.my_chat().iter().map(|m| m.id).collect();
     let start = [CENTER[0] + RADIUS, CENTER[1]];
     bot.teleport(start[0], start[1])?;
     bot.watch_near(start[0], start[1])?;
@@ -97,6 +109,7 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
                 println!("V: sees {name} (entity {}) at ({:.1}, {:.1})", t.entity_id, t.x, t.z);
             }
         }
+        answer(&bot, &me, &heard, &mut answered, [x, 0.0, z]);
         if let Some(p) = bot.presence()
             && p.corrections > 0
         {
@@ -109,4 +122,29 @@ pub fn scenario(args: &Args, va: &VisitorArgs) -> Check {
         return Err(format!("expected to see {} characters, saw {}", va.expect, seen.len()));
     }
     Ok(())
+}
+
+/// Take any party invitation, and answer what others said to us since last time.
+fn answer(bot: &Bot, me: &Presence, heard: &Mutex<Vec<LocalChat>>, answered: &mut HashSet<u64>, at: [f32; 3]) {
+    let echo = |text: &str| format!("heard: {}", text.chars().take(160).collect::<String>());
+    for i in bot.conn.db.my_party_invites().iter().filter(|i| i.to_char == me.char_id) {
+        println!("V: joins {}'s party", i.from_name);
+        let _ = bot.conn.reducers.accept_party_invite(i.scheduled_id);
+    }
+    for e in heard.lock().unwrap().drain(..) {
+        if e.char_id != me.char_id && !e.text.starts_with("heard: ") && sim::chat::hears([e.x, e.y, e.z], at) {
+            println!("V: {} said \"{}\"", e.name, e.text);
+            let _ = bot.conn.reducers.chat(Channel::Local as u8, echo(&e.text));
+        }
+    }
+    for m in bot.conn.db.my_chat().iter() {
+        if !answered.insert(m.id) || m.char_id != me.char_id || m.from_char == me.char_id || m.from_char == 0 || m.text.starts_with("heard: ") {
+            continue;
+        }
+        println!("V: {} said \"{}\" ({})", m.from_name, m.text, Channel::from_u8(m.channel).map_or("?", |c| c.name()));
+        let _ = match Channel::from_u8(m.channel) {
+            Some(Channel::Whisper) => bot.conn.reducers.whisper(m.from_name.clone(), echo(&m.text)),
+            _ => bot.conn.reducers.chat(Channel::Party as u8, echo(&m.text)),
+        };
+    }
 }

@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x87b24db79b283032;
+pub const CONTENT_HASH: u64 = 0xf62cdb7136b10de0;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -443,6 +443,38 @@ pub struct LaborRules {
 }
 
 pub static LABOR: LaborRules = LaborRules { cap: 5000, regen_points: 10, regen_period_s: 300, start_points: 5000 };
+
+/// Party rules (`[party]` in `content/social.toml`, docs/design/social.md).
+#[derive(Debug, PartialEq)]
+pub struct PartyRules {
+    /// The most characters in a party.
+    pub size: i32,
+    /// How long an invitation stands, s.
+    pub invite_s: i32,
+    /// Members within this distance of a kill share its experience, m.
+    pub share_m: f32,
+    /// Experience added for each sharer beyond the first, %.
+    pub bonus_pct: i32,
+}
+
+pub static PARTY: PartyRules = PartyRules { size: 5, invite_s: 60, share_m: 100.0, bonus_pct: 10 };
+
+/// Chat rules (`[chat]` in `content/social.toml`, docs/design/social.md).
+#[derive(Debug, PartialEq)]
+pub struct ChatRules {
+    /// How far Local chat carries, horizontally, m.
+    pub local_m: f32,
+    /// The longest message, in characters.
+    pub max_chars: i32,
+    /// Messages a character may send at once.
+    pub burst: i32,
+    /// How often one more message is allowed after a burst, ms.
+    pub refill_ms: i32,
+    /// Party and whisper messages kept for each character.
+    pub inbox: i32,
+}
+
+pub static CHAT: ChatRules = ChatRules { local_m: 40.0, max_chars: 200, burst: 5, refill_ms: 2000, inbox: 50 };
 
 /// Item kinds (`content/items.toml`, docs/design/items.md). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

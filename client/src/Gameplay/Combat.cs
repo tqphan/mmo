@@ -128,15 +128,15 @@ namespace Mmo.Gameplay
         {
             if (session.Me is null)
                 return;
-            if (Input.IsActionJustPressed("target_next"))
+            if (GameInput.JustPressed("target_next"))
                 TabNext();
-            if (Input.IsActionJustPressed("target_self"))
+            if (GameInput.JustPressed("target_self"))
                 SetTarget(Me);
-            if (Input.IsActionJustPressed("target_clear"))
+            if (GameInput.JustPressed("target_clear"))
                 SetTarget(0);
-            if (Input.IsActionJustPressed("skillsets"))
+            if (GameInput.JustPressed("skillsets"))
                 Picking = !Picking;
-            if (Dead && Input.IsActionJustPressed("respawn"))
+            if (Dead && GameInput.JustPressed("respawn"))
                 Respawn();
             if (Target != 0 && Info(Target) is null)
                 Target = 0;

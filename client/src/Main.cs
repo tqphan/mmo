@@ -119,6 +119,12 @@ namespace Mmo
             AddChild(evidence);
             var crime = new Crime(session, player, evidence);
             AddChild(crime);
+            var party = new Party(session);
+            AddChild(party);
+            entities.IsMate = party.IsMate;
+            AddChild(new PartyFrame(session, party, combat));
+            var chat = new ChatBox(session, player, party);
+            AddChild(chat);
             var looting = new Looting(session, player, entities);
             AddChild(looting);
             player.Looting = looting;
@@ -183,6 +189,8 @@ namespace Mmo
                 AddChild(new NpcDemo(session, player, entities, combat, looting));
             if (options.CrimeDemo)
                 AddChild(new CrimeDemo(session, player, entities, combat, crime, evidence));
+            if (options.PartyDemo)
+                AddChild(new PartyDemo(session, player, entities, party, chat));
             // Last, so it sees where the camera went this frame.
             AddChild(new Scenery(camera, terrain, water));
             if (OS.HasFeature("movie"))

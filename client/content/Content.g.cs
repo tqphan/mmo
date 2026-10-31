@@ -96,6 +96,21 @@ namespace Mmo.Content
     /// <param name="StartPoints">What a new account starts with.</param>
     public sealed record LaborRules(int Cap, int RegenPoints, int RegenPeriodS, int StartPoints);
 
+    /// <summary>Party rules ([party] in content/social.toml, docs/design/social.md).</summary>
+    /// <param name="Size">The most characters in a party.</param>
+    /// <param name="InviteS">How long an invitation stands, s.</param>
+    /// <param name="ShareM">Members within this distance of a kill share its experience, m.</param>
+    /// <param name="BonusPct">Experience added for each sharer beyond the first, %.</param>
+    public sealed record PartyRules(int Size, int InviteS, float ShareM, int BonusPct);
+
+    /// <summary>Chat rules ([chat] in content/social.toml, docs/design/social.md).</summary>
+    /// <param name="LocalM">How far Local chat carries, horizontally, m.</param>
+    /// <param name="MaxChars">The longest message, in characters.</param>
+    /// <param name="Burst">Messages a character may send at once.</param>
+    /// <param name="RefillMs">How often one more message is allowed after a burst, ms.</param>
+    /// <param name="Inbox">Party and whisper messages kept for each character.</param>
+    public sealed record ChatRules(float LocalM, int MaxChars, int Burst, int RefillMs, int Inbox);
+
     /// <summary>Item kinds (content/items.toml, docs/design/items.md). The value is the wire value.</summary>
     public enum ItemKind : byte
     {
@@ -354,7 +369,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x87b24db79b283032UL;
+        public const ulong Hash = 0xf62cdb7136b10de0UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -431,6 +446,10 @@ namespace Mmo.Content
         public static PlotData? PlotByDeed(ushort item) => Plots.FirstOrDefault(p => p.Deed == item);
 
         public static readonly LaborRules Labor = new(5000, 10, 300, 5000);
+
+        public static readonly PartyRules Party = new(5, 60, 100.0f, 10);
+
+        public static readonly ChatRules Chat = new(40.0f, 200, 5, 2000, 50);
 
         /// <summary>Slots in every character's bag.</summary>
         public const ushort BagSlots = 50;

@@ -2,6 +2,7 @@
 //! No SpacetimeDB dependency, so everything here is plain unit-testable Rust.
 
 pub mod cell;
+pub mod chat;
 pub mod combat;
 pub mod content;
 pub mod craft;
@@ -12,6 +13,7 @@ pub mod labor;
 pub mod land;
 pub mod movement;
 pub mod npc;
+pub mod party;
 pub mod ship;
 pub mod terrain;
 pub mod tick;

@@ -52,7 +52,7 @@ namespace Mmo.Gameplay
 
         public override void _Process(double delta)
         {
-            yaw += (Input.GetActionStrength("turn_left") - Input.GetActionStrength("turn_right")) * TurnSpeed * (float)delta;
+            yaw += (GameInput.Strength("turn_left") - GameInput.Strength("turn_right")) * TurnSpeed * (float)delta;
             // Aboard, the view turns with the ship.
             float frameYaw = player.FrameYaw;
             if (player.Parent != 0 && player.Parent == lastFrame)

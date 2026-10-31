@@ -295,6 +295,27 @@ fn a_weak_tagger_owns_nothing_and_loot_frees_up() {
 }
 
 #[test]
+fn a_party_tags_together_and_shares_the_loot() {
+    let t = world();
+    let a = arrive(&t, 1, "Mira");
+    let b = arrive(&t, 2, "Tobin");
+    veteran(&t, 1);
+    veteran(&t, 2);
+    put(&t, 2, 1.0, 0.0);
+    super::party::group(&t, &[(1, &a, "Mira"), (2, &b, "Tobin")]);
+    let id = summon(&t, 1, "wreck_captain", 0.0, -3.0);
+    set_hp(&t, id, 200);
+    use_on(&t, 1, "threefold_cut", id).unwrap();
+    // As in the weak tagger's case, but Tobin is in Mira's party, so their damage is hers.
+    use_on(&t, 2, "rending_blow", id).unwrap();
+    assert!(vitals_of(&t, id).dead_at.is_some());
+    assert!(read(&t, |ctx| ctx.db.loot().iter().all(|r| r.owner == a.char_id)));
+    call(&t, 2, |ctx| loot_corpse(ctx, id)).unwrap();
+    let token = sim::content::item_by_id("brigands_token").unwrap().wire;
+    assert!(bag(&t, b.char_id, token) >= 2);
+}
+
+#[test]
 fn a_corpse_lies_then_goes_and_the_npc_respawns_later() {
     let t = world();
     let p = arrive(&t, 1, "Mira");

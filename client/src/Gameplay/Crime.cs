@@ -60,7 +60,7 @@ namespace Mmo.Gameplay
 
         public override void _Process(double delta)
         {
-            if (Input.IsActionJustPressed("report"))
+            if (GameInput.JustPressed("report"))
                 Report();
             Prompt = Nearest() is { } e ? CrimeModel.Prompt(e) : "";
             if (System.DateTime.UtcNow < resultUntil)

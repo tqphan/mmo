@@ -19,6 +19,7 @@ mod labor;
 mod farm;
 mod land;
 mod npc;
+mod party;
 mod metrics;
 mod ship;
 mod shipyard;
@@ -38,7 +39,7 @@ const RUN_SPEED: f32 = 5.4;
 const HEARTBEAT: Duration = Duration::from_millis(500);
 const WAIT: Duration = Duration::from_secs(5);
 /// The Near tier's tables (PLAN §4.3), 5×5 cells.
-const NEAR_TABLES: &[&str] = &["entity", "transform"];
+const NEAR_TABLES: &[&str] = &["entity", "transform", "local_chat"];
 
 struct Args {
     uri: String,
@@ -122,6 +123,7 @@ fn main() {
         "npc" => npc::scenario(&args),
         "vehicle" => vehicle::scenario(&args),
         "shipyard" => shipyard::scenario(&args),
+        "party" => party::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \
@@ -147,7 +149,8 @@ fn main() {
                  crime            assault, murder and theft leave evidence; reports, crime points, Sought; evidence fades by the dev clock\n  \
                  npc              a wolf notices, chases and bites; kills, loot and its owner; the corpse goes and it respawns; leash; a passive Skitter; a PvE death\n  \
                  vehicle          a bot summons a cart, loads packs, drives a rider and stows it; then rows a skiff and stows it\n  \
-                 shipyard         two bots build a Swiftgull through every stage; it's hit, repaired, sunk, its pack taken from the water, and mended"
+                 shipyard         two bots build a Swiftgull through every stage; it's hit, repaired, sunk, its pack taken from the water, and mended\n  \
+                 party            invitations declined, lapsed and taken; no harming members; Local, party and whisper chat; the rate limit; kicks and leaving"
             );
             std::process::exit(2);
         }

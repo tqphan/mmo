@@ -187,17 +187,17 @@ namespace Mmo.Gameplay
             else if (options.Autopilot is null && ship.Hull.Land)
             {
                 // A cart is driven while W or S is held, and brakes when let go.
-                t = (sbyte)(((Input.IsActionPressed("forward") ? 1 : 0) - (Input.IsActionPressed("back") ? 1 : 0)) * Ship.InputMax);
-                r = (sbyte)(((Input.IsActionPressed("right") ? 1 : 0) - (Input.IsActionPressed("left") ? 1 : 0)) * Ship.InputMax);
+                t = (sbyte)(((GameInput.Pressed("forward") ? 1 : 0) - (GameInput.Pressed("back") ? 1 : 0)) * Ship.InputMax);
+                r = (sbyte)(((GameInput.Pressed("right") ? 1 : 0) - (GameInput.Pressed("left") ? 1 : 0)) * Ship.InputMax);
             }
             else if (options.Autopilot is null)
             {
-                if (Input.IsActionJustPressed("forward"))
+                if (GameInput.JustPressed("forward"))
                     t = (sbyte)Math.Min(Ship.InputMax, t + ThrottleStep);
-                if (Input.IsActionJustPressed("back"))
+                if (GameInput.JustPressed("back"))
                     t = (sbyte)Math.Max(-Ship.InputMax, t - ThrottleStep);
                 // Positive rudder is to starboard (right).
-                r = (sbyte)(((Input.IsActionPressed("right") ? 1 : 0) - (Input.IsActionPressed("left") ? 1 : 0)) * Ship.InputMax);
+                r = (sbyte)(((GameInput.Pressed("right") ? 1 : 0) - (GameInput.Pressed("left") ? 1 : 0)) * Ship.InputMax);
             }
             else if (order.Helm is ShipInput want)
             {
@@ -217,9 +217,9 @@ namespace Mmo.Gameplay
             bool fire;
             if (options.Autopilot is null)
             {
-                aimYaw += ((Input.IsActionPressed("left") ? 1 : 0) - (Input.IsActionPressed("right") ? 1 : 0)) * AimRate * dt;
-                aimPitch += ((Input.IsActionPressed("forward") ? 1 : 0) - (Input.IsActionPressed("back") ? 1 : 0)) * PitchRate * dt;
-                fire = Input.IsActionJustPressed("jump");
+                aimYaw += ((GameInput.Pressed("left") ? 1 : 0) - (GameInput.Pressed("right") ? 1 : 0)) * AimRate * dt;
+                aimPitch += ((GameInput.Pressed("forward") ? 1 : 0) - (GameInput.Pressed("back") ? 1 : 0)) * PitchRate * dt;
+                fire = GameInput.JustPressed("jump");
             }
             else
             {
@@ -374,7 +374,7 @@ namespace Mmo.Gameplay
             }
             if (options.Autopilot is not null)
                 return;
-            if (Input.IsActionJustPressed("dev_spawn_ship"))
+            if (GameInput.JustPressed("dev_spawn_ship"))
             {
                 var (fx, fz) = Yaw.Facing(player.CameraYaw);
                 var at = new Vector2(here.X + fx * SpawnAheadM, here.Z + fz * SpawnAheadM);
@@ -397,7 +397,7 @@ namespace Mmo.Gameplay
                     session.Log($"F9: spawned a clipper at ({at.X:F0}, {at.Y:F0})");
                 }
             }
-            if (Input.IsActionJustPressed("dev_remove_ship"))
+            if (GameInput.JustPressed("dev_remove_ship"))
             {
                 Deck? nearest = null;
                 float best = 60.0f;

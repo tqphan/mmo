@@ -456,6 +456,9 @@ pub fn use_skill(ctx: &ReducerContext, skill: u16, target: u64) -> Result<(), St
     let mine = settled(&v, at);
     let target = resolve(ctx, s, p.entity_id, target);
     let tv = ctx.db.vitals().entity_id().find(target).ok_or(Refusal::NoTarget.message())?;
+    if s.target == SkillTarget::Enemy && ctx.db.presence().entity_id().find(target).is_some_and(|q| crate::party::together(ctx, p.char_id, q.char_id)) {
+        return Err("you can't attack a party member".into());
+    }
     let me = crate::ship::world_position(ctx, &p);
     let them = world_at(ctx, target).ok_or(Refusal::NoTarget.message())?;
     let caster = Caster {
@@ -762,7 +765,7 @@ fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     let character = |id: u64| ctx.db.entity().id().find(id).is_some_and(|e| e.kind == entity_kind::CHARACTER);
     let npc = crate::npc::is_npc(ctx, entity_id);
     if !character(entity_id) && killer != entity_id && !npc {
-        reward(ctx, killer, v.level);
+        reward(ctx, killer, entity_id, v.level);
     }
     if ctx.db.entity().id().find(entity_id).is_some_and(|e| e.kind == entity_kind::DUMMY) {
         ctx.db.vitals().entity_id().update(Vitals { hp: v.hp_max, at, combat_until: at, statuses: Vec::new(), resists: Vec::new(), ..v });
@@ -789,11 +792,21 @@ fn die(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     log::info!("char {} died to entity {killer}", p.char_id);
 }
 
-/// A character's kill of a foe at `victim` that isn't a character: experience, and maybe levels.
-pub(crate) fn reward(ctx: &ReducerContext, killer: u64, victim: u8) {
+/// A character's kill of `victim`, a foe at `level` that isn't a character: experience, and maybe
+/// levels, shared with its party members nearby (docs/design/social.md).
+pub(crate) fn reward(ctx: &ReducerContext, killer: u64, victim: u64, level: u8) {
     let Some(p) = ctx.db.presence().entity_id().find(killer) else { return };
+    let sharers = crate::party::sharers(ctx, &p, world_at(ctx, victim));
+    for s in &sharers {
+        gain(ctx, s, level, sharers.len());
+    }
+}
+
+/// `p`'s part of a kill of a foe at `victim`, among `sharers`.
+fn gain(ctx: &ReducerContext, p: &Presence, victim: u8, sharers: usize) {
+    let killer = p.entity_id;
     let Some(f) = ctx.db.fighter().char_id().find(p.char_id) else { return };
-    let gained = sim::combat::kill_xp(victim, f.level);
+    let gained = sim::party::share(sim::combat::kill_xp(victim, f.level), sharers);
     if gained == 0 {
         return;
     }

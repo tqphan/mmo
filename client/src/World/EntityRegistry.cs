@@ -49,6 +49,9 @@ namespace Mmo.World
 
         public IEnumerable<RemoteView> Views => views.Values;
 
+        /// <summary>Whether a character is in our party, to tag its name (docs/design/social.md).</summary>
+        public Func<ulong, bool>? IsMate { get; set; }
+
         /// <summary>Every ship in view, where it was placed this physics frame.</summary>
         public IReadOnlyList<Gameplay.Deck> Decks => decks;
 
@@ -146,6 +149,8 @@ namespace Mmo.World
                 }
                 v.Visible = true;
                 v.Place(now, parent);
+                if (v.Kind == EntityKind.Character)
+                    v.SetMate(IsMate?.Invoke(v.RefId) == true);
                 if (trace)
                     session.Log(FormattableString.Invariant($"trace {v.Name} {now:F4} {v.GlobalPosition.X:F3} {v.GlobalPosition.Z:F3}"));
             }
@@ -239,6 +244,17 @@ namespace Mmo.World
         {
             SetLabel(text);
             label.Modulate = color;
+        }
+
+        private bool mate;
+
+        /// <summary>A party member's name is green (docs/design/social.md).</summary>
+        public void SetMate(bool isMate)
+        {
+            if (isMate == mate)
+                return;
+            mate = isMate;
+            label.Modulate = mate ? new Color(0.55f, 1.0f, 0.6f) : Colors.White;
         }
 
         /// <summary>Lie down when dead; tag the name when Sought (docs/design/crime.md).</summary>

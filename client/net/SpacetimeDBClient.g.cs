@@ -35,14 +35,18 @@ namespace SpacetimeDB.Types
             AddTable(Entity = new(conn));
             AddTable(Evidence = new(conn));
             AddTable(GameClock = new(conn));
+            AddTable(LocalChat = new(conn));
             AddTable(Loot = new(conn));
             AddTable(MyCharacters = new(conn));
+            AddTable(MyChat = new(conn));
             AddTable(MyCraft = new(conn));
             AddTable(MyCrime = new(conn));
             AddTable(MyFighter = new(conn));
             AddTable(MyInventory = new(conn));
             AddTable(MyLabor = new(conn));
             AddTable(MyPack = new(conn));
+            AddTable(MyParty = new(conn));
+            AddTable(MyPartyInvites = new(conn));
             AddTable(MyPresence = new(conn));
             AddTable(MyPurse = new(conn));
             AddTable(MyVehicles = new(conn));
@@ -562,14 +566,18 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.Entity().ToSql(),
             new QueryBuilder().From.Evidence().ToSql(),
             new QueryBuilder().From.GameClock().ToSql(),
+            new QueryBuilder().From.LocalChat().ToSql(),
             new QueryBuilder().From.Loot().ToSql(),
             new QueryBuilder().From.MyCharacters().ToSql(),
+            new QueryBuilder().From.MyChat().ToSql(),
             new QueryBuilder().From.MyCraft().ToSql(),
             new QueryBuilder().From.MyCrime().ToSql(),
             new QueryBuilder().From.MyFighter().ToSql(),
             new QueryBuilder().From.MyInventory().ToSql(),
             new QueryBuilder().From.MyLabor().ToSql(),
             new QueryBuilder().From.MyPack().ToSql(),
+            new QueryBuilder().From.MyParty().ToSql(),
+            new QueryBuilder().From.MyPartyInvites().ToSql(),
             new QueryBuilder().From.MyPresence().ToSql(),
             new QueryBuilder().From.MyPurse().ToSql(),
             new QueryBuilder().From.MyVehicles().ToSql(),
@@ -599,14 +607,18 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<Entity, EntityCols, EntityIxCols> Entity() => new("entity", new EntityCols("entity"), new EntityIxCols("entity"));
         public global::SpacetimeDB.Table<Evidence, EvidenceCols, EvidenceIxCols> Evidence() => new("evidence", new EvidenceCols("evidence"), new EvidenceIxCols("evidence"));
         public global::SpacetimeDB.Table<GameClock, GameClockCols, GameClockIxCols> GameClock() => new("game_clock", new GameClockCols("game_clock"), new GameClockIxCols("game_clock"));
+        public global::SpacetimeDB.Table<LocalChat, LocalChatCols, LocalChatIxCols> LocalChat() => new("local_chat", new LocalChatCols("local_chat"), new LocalChatIxCols("local_chat"));
         public global::SpacetimeDB.Table<Loot, LootCols, LootIxCols> Loot() => new("loot", new LootCols("loot"), new LootIxCols("loot"));
         public global::SpacetimeDB.Table<CharacterPrivate, MyCharactersCols, MyCharactersIxCols> MyCharacters() => new("my_characters", new MyCharactersCols("my_characters"), new MyCharactersIxCols("my_characters"));
+        public global::SpacetimeDB.Table<ChatMessage, MyChatCols, MyChatIxCols> MyChat() => new("my_chat", new MyChatCols("my_chat"), new MyChatIxCols("my_chat"));
         public global::SpacetimeDB.Table<CraftJob, MyCraftCols, MyCraftIxCols> MyCraft() => new("my_craft", new MyCraftCols("my_craft"), new MyCraftIxCols("my_craft"));
         public global::SpacetimeDB.Table<CrimeRecord, MyCrimeCols, MyCrimeIxCols> MyCrime() => new("my_crime", new MyCrimeCols("my_crime"), new MyCrimeIxCols("my_crime"));
         public global::SpacetimeDB.Table<Fighter, MyFighterCols, MyFighterIxCols> MyFighter() => new("my_fighter", new MyFighterCols("my_fighter"), new MyFighterIxCols("my_fighter"));
         public global::SpacetimeDB.Table<Item, MyInventoryCols, MyInventoryIxCols> MyInventory() => new("my_inventory", new MyInventoryCols("my_inventory"), new MyInventoryIxCols("my_inventory"));
         public global::SpacetimeDB.Table<Labor, MyLaborCols, MyLaborIxCols> MyLabor() => new("my_labor", new MyLaborCols("my_labor"), new MyLaborIxCols("my_labor"));
         public global::SpacetimeDB.Table<Pack, MyPackCols, MyPackIxCols> MyPack() => new("my_pack", new MyPackCols("my_pack"), new MyPackIxCols("my_pack"));
+        public global::SpacetimeDB.Table<PartyMember, MyPartyCols, MyPartyIxCols> MyParty() => new("my_party", new MyPartyCols("my_party"), new MyPartyIxCols("my_party"));
+        public global::SpacetimeDB.Table<PartyInvite, MyPartyInvitesCols, MyPartyInvitesIxCols> MyPartyInvites() => new("my_party_invites", new MyPartyInvitesCols("my_party_invites"), new MyPartyInvitesIxCols("my_party_invites"));
         public global::SpacetimeDB.Table<Presence, MyPresenceCols, MyPresenceIxCols> MyPresence() => new("my_presence", new MyPresenceCols("my_presence"), new MyPresenceIxCols("my_presence"));
         public global::SpacetimeDB.Table<Purse, MyPurseCols, MyPurseIxCols> MyPurse() => new("my_purse", new MyPurseCols("my_purse"), new MyPurseIxCols("my_purse"));
         public global::SpacetimeDB.Table<Vehicle, MyVehiclesCols, MyVehiclesIxCols> MyVehicles() => new("my_vehicles", new MyVehiclesCols("my_vehicles"), new MyVehiclesIxCols("my_vehicles"));
@@ -705,6 +717,7 @@ namespace SpacetimeDB.Types
             {
                 Reducer.AbandonPlot args => Reducers.InvokeAbandonPlot(eventContext, args),
                 Reducer.AbandonShipyard args => Reducers.InvokeAbandonShipyard(eventContext, args),
+                Reducer.AcceptPartyInvite args => Reducers.InvokeAcceptPartyInvite(eventContext, args),
                 Reducer.AdminClearLand args => Reducers.InvokeAdminClearLand(eventContext, args),
                 Reducer.AdminClearNodes args => Reducers.InvokeAdminClearNodes(eventContext, args),
                 Reducer.AdminClearPosts args => Reducers.InvokeAdminClearPosts(eventContext, args),
@@ -732,8 +745,10 @@ namespace SpacetimeDB.Types
                 Reducer.CancelCast args => Reducers.InvokeCancelCast(eventContext, args),
                 Reducer.CancelCraft args => Reducers.InvokeCancelCraft(eventContext, args),
                 Reducer.CancelGather args => Reducers.InvokeCancelGather(eventContext, args),
+                Reducer.Chat args => Reducers.InvokeChat(eventContext, args),
                 Reducer.Craft args => Reducers.InvokeCraft(eventContext, args),
                 Reducer.CreateCharacter args => Reducers.InvokeCreateCharacter(eventContext, args),
+                Reducer.DeclinePartyInvite args => Reducers.InvokeDeclinePartyInvite(eventContext, args),
                 Reducer.DestroyItem args => Reducers.InvokeDestroyItem(eventContext, args),
                 Reducer.DevAdvanceClock args => Reducers.InvokeDevAdvanceClock(eventContext, args),
                 Reducer.DevDamageVehicle args => Reducers.InvokeDevDamageVehicle(eventContext, args),
@@ -760,10 +775,14 @@ namespace SpacetimeDB.Types
                 Reducer.Gather args => Reducers.InvokeGather(eventContext, args),
                 Reducer.Harvest args => Reducers.InvokeHarvest(eventContext, args),
                 Reducer.Helm args => Reducers.InvokeHelm(eventContext, args),
+                Reducer.InviteToParty args => Reducers.InvokeInviteToParty(eventContext, args),
+                Reducer.KickFromParty args => Reducers.InvokeKickFromParty(eventContext, args),
                 Reducer.LeaveHelm args => Reducers.InvokeLeaveHelm(eventContext, args),
+                Reducer.LeaveParty args => Reducers.InvokeLeaveParty(eventContext, args),
                 Reducer.LeaveWorld args => Reducers.InvokeLeaveWorld(eventContext, args),
                 Reducer.LoadPack args => Reducers.InvokeLoadPack(eventContext, args),
                 Reducer.LootCorpse args => Reducers.InvokeLootCorpse(eventContext, args),
+                Reducer.MakePartyLeader args => Reducers.InvokeMakePartyLeader(eventContext, args),
                 Reducer.MendVehicle args => Reducers.InvokeMendVehicle(eventContext, args),
                 Reducer.MoveEvent args => Reducers.InvokeMoveEvent(eventContext, args),
                 Reducer.MoveItem args => Reducers.InvokeMoveItem(eventContext, args),
@@ -786,6 +805,7 @@ namespace SpacetimeDB.Types
                 Reducer.UnloadPack args => Reducers.InvokeUnloadPack(eventContext, args),
                 Reducer.Uproot args => Reducers.InvokeUproot(eventContext, args),
                 Reducer.UseSkill args => Reducers.InvokeUseSkill(eventContext, args),
+                Reducer.Whisper args => Reducers.InvokeWhisper(eventContext, args),
                 Reducer.WorkShipyard args => Reducers.InvokeWorkShipyard(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };

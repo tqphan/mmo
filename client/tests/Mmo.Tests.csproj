@@ -24,6 +24,7 @@
     <Compile Include="../src/Gameplay/CombatModel.cs" Link="Client/Gameplay/CombatModel.cs" />
     <Compile Include="../src/Gameplay/NpcModel.cs" Link="Client/Gameplay/NpcModel.cs" />
     <Compile Include="../src/Gameplay/CrimeModel.cs" Link="Client/Gameplay/CrimeModel.cs" />
+    <Compile Include="../src/Gameplay/ChatModel.cs" Link="Client/Gameplay/ChatModel.cs" />
     <Compile Include="../src/Gameplay/VehicleModel.cs" Link="Client/Gameplay/VehicleModel.cs" />
     <Compile Include="../src/Gameplay/ShipyardModel.cs" Link="Client/Gameplay/ShipyardModel.cs" />
     <Compile Include="../src/World/ShipPredictor.cs" Link="Client/World/ShipPredictor.cs" />

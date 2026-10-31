@@ -9,6 +9,7 @@ use sim::content::CONTENT_HASH;
 
 #[cfg(feature = "dev")]
 mod combat;
+mod chat;
 mod crafting;
 #[cfg(feature = "dev")]
 mod crime;
@@ -18,6 +19,7 @@ mod items;
 mod labor;
 #[cfg(feature = "dev")]
 mod npc;
+mod party;
 mod land;
 #[cfg(feature = "dev")]
 mod ships;

@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod abandon_plot_reducer;
 pub mod abandon_shipyard_reducer;
+pub mod accept_party_invite_reducer;
 pub mod account_type;
 pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
@@ -42,6 +43,9 @@ pub mod cast_job_type;
 pub mod character_private_type;
 pub mod character_public_table;
 pub mod character_public_type;
+pub mod chat_message_type;
+pub mod chat_rate_type;
+pub mod chat_reducer;
 pub mod combat_event_table;
 pub mod combat_event_type;
 pub mod cooldown_type;
@@ -51,6 +55,7 @@ pub mod create_character_reducer;
 pub mod crime_record_type;
 pub mod crop_table;
 pub mod crop_type;
+pub mod decline_party_invite_reducer;
 pub mod destroy_item_reducer;
 pub mod dev_advance_clock_reducer;
 pub mod dev_damage_vehicle_reducer;
@@ -90,26 +95,35 @@ pub mod gather_job_type;
 pub mod gather_reducer;
 pub mod harvest_reducer;
 pub mod helm_reducer;
+pub mod invite_to_party_reducer;
 pub mod item_type;
+pub mod kick_from_party_reducer;
 pub mod labor_type;
 pub mod land_chunk_type;
 pub mod leave_helm_reducer;
+pub mod leave_party_reducer;
 pub mod leave_world_reducer;
 pub mod load_pack_reducer;
+pub mod local_chat_table;
+pub mod local_chat_type;
 pub mod loot_corpse_reducer;
 pub mod loot_table;
 pub mod loot_type;
+pub mod make_party_leader_reducer;
 pub mod mend_vehicle_reducer;
 pub mod move_event_reducer;
 pub mod move_item_reducer;
 pub mod moved_type;
 pub mod my_characters_table;
+pub mod my_chat_table;
 pub mod my_craft_table;
 pub mod my_crime_table;
 pub mod my_fighter_table;
 pub mod my_inventory_table;
 pub mod my_labor_table;
 pub mod my_pack_table;
+pub mod my_party_invites_table;
+pub mod my_party_table;
 pub mod my_presence_table;
 pub mod my_purse_table;
 pub mod my_vehicles_table;
@@ -118,6 +132,9 @@ pub mod node_placement_type;
 pub mod npc_type;
 pub mod owner_type;
 pub mod pack_type;
+pub mod party_invite_type;
+pub mod party_member_type;
+pub mod party_type;
 pub mod pay_tax_reducer;
 pub mod periodic_type;
 pub mod pick_skillset_reducer;
@@ -177,12 +194,14 @@ pub mod vehicle_type;
 pub mod vehicle_wreck_type;
 pub mod vitals_table;
 pub mod vitals_type;
+pub mod whisper_reducer;
 pub mod work_shipyard_reducer;
 pub mod world_tick_timer_type;
 pub mod wreck_type;
 
 pub use abandon_plot_reducer::abandon_plot;
 pub use abandon_shipyard_reducer::abandon_shipyard;
+pub use accept_party_invite_reducer::accept_party_invite;
 pub use account_type::Account;
 pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
@@ -217,6 +236,9 @@ pub use cast_job_type::CastJob;
 pub use character_private_type::CharacterPrivate;
 pub use character_public_table::*;
 pub use character_public_type::CharacterPublic;
+pub use chat_message_type::ChatMessage;
+pub use chat_rate_type::ChatRate;
+pub use chat_reducer::chat;
 pub use combat_event_table::*;
 pub use combat_event_type::CombatEvent;
 pub use cooldown_type::Cooldown;
@@ -226,6 +248,7 @@ pub use create_character_reducer::create_character;
 pub use crime_record_type::CrimeRecord;
 pub use crop_table::*;
 pub use crop_type::Crop;
+pub use decline_party_invite_reducer::decline_party_invite;
 pub use destroy_item_reducer::destroy_item;
 pub use dev_advance_clock_reducer::dev_advance_clock;
 pub use dev_damage_vehicle_reducer::dev_damage_vehicle;
@@ -265,26 +288,35 @@ pub use gather_job_type::GatherJob;
 pub use gather_reducer::gather;
 pub use harvest_reducer::harvest;
 pub use helm_reducer::helm;
+pub use invite_to_party_reducer::invite_to_party;
 pub use item_type::Item;
+pub use kick_from_party_reducer::kick_from_party;
 pub use labor_type::Labor;
 pub use land_chunk_type::LandChunk;
 pub use leave_helm_reducer::leave_helm;
+pub use leave_party_reducer::leave_party;
 pub use leave_world_reducer::leave_world;
 pub use load_pack_reducer::load_pack;
+pub use local_chat_table::*;
+pub use local_chat_type::LocalChat;
 pub use loot_corpse_reducer::loot_corpse;
 pub use loot_table::*;
 pub use loot_type::Loot;
+pub use make_party_leader_reducer::make_party_leader;
 pub use mend_vehicle_reducer::mend_vehicle;
 pub use move_event_reducer::move_event;
 pub use move_item_reducer::move_item;
 pub use moved_type::Moved;
 pub use my_characters_table::*;
+pub use my_chat_table::*;
 pub use my_craft_table::*;
 pub use my_crime_table::*;
 pub use my_fighter_table::*;
 pub use my_inventory_table::*;
 pub use my_labor_table::*;
 pub use my_pack_table::*;
+pub use my_party_invites_table::*;
+pub use my_party_table::*;
 pub use my_presence_table::*;
 pub use my_purse_table::*;
 pub use my_vehicles_table::*;
@@ -293,6 +325,9 @@ pub use node_placement_type::NodePlacement;
 pub use npc_type::Npc;
 pub use owner_type::Owner;
 pub use pack_type::Pack;
+pub use party_invite_type::PartyInvite;
+pub use party_member_type::PartyMember;
+pub use party_type::Party;
 pub use pay_tax_reducer::pay_tax;
 pub use periodic_type::Periodic;
 pub use pick_skillset_reducer::pick_skillset;
@@ -352,6 +387,7 @@ pub use vehicle_type::Vehicle;
 pub use vehicle_wreck_type::VehicleWreck;
 pub use vitals_table::*;
 pub use vitals_type::Vitals;
+pub use whisper_reducer::whisper;
 pub use work_shipyard_reducer::work_shipyard;
 pub use world_tick_timer_type::WorldTickTimer;
 pub use wreck_type::Wreck;
@@ -369,6 +405,9 @@ pub enum Reducer {
     },
     AbandonShipyard {
         yard_id: u64,
+    },
+    AcceptPartyInvite {
+        id: u64,
     },
     AdminClearLand,
     AdminClearNodes,
@@ -431,6 +470,10 @@ pub enum Reducer {
     CancelCast,
     CancelCraft,
     CancelGather,
+    Chat {
+        channel: u8,
+        text: String,
+    },
     Craft {
         station_id: u64,
         recipe: u16,
@@ -438,6 +481,9 @@ pub enum Reducer {
     },
     CreateCharacter {
         name: String,
+    },
+    DeclinePartyInvite {
+        id: u64,
     },
     DestroyItem {
         item_id: u64,
@@ -530,7 +576,14 @@ pub enum Reducer {
         throttle: i8,
         rudder: i8,
     },
+    InviteToParty {
+        name: String,
+    },
+    KickFromParty {
+        char_id: u64,
+    },
     LeaveHelm,
+    LeaveParty,
     LeaveWorld,
     LoadPack {
         vehicle_id: u64,
@@ -538,6 +591,9 @@ pub enum Reducer {
     },
     LootCorpse {
         corpse: u64,
+    },
+    MakePartyLeader {
+        char_id: u64,
     },
     MendVehicle {
         item_id: u64,
@@ -619,6 +675,10 @@ pub enum Reducer {
         skill: u16,
         target: u64,
     },
+    Whisper {
+        to: String,
+        text: String,
+    },
     WorkShipyard {
         yard_id: u64,
     },
@@ -633,6 +693,7 @@ impl __sdk::Reducer for Reducer {
         match self {
             Reducer::AbandonPlot { .. } => "abandon_plot",
             Reducer::AbandonShipyard { .. } => "abandon_shipyard",
+            Reducer::AcceptPartyInvite { .. } => "accept_party_invite",
             Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearPosts => "admin_clear_posts",
@@ -660,8 +721,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelCast => "cancel_cast",
             Reducer::CancelCraft => "cancel_craft",
             Reducer::CancelGather => "cancel_gather",
+            Reducer::Chat { .. } => "chat",
             Reducer::Craft { .. } => "craft",
             Reducer::CreateCharacter { .. } => "create_character",
+            Reducer::DeclinePartyInvite { .. } => "decline_party_invite",
             Reducer::DestroyItem { .. } => "destroy_item",
             Reducer::DevAdvanceClock { .. } => "dev_advance_clock",
             Reducer::DevDamageVehicle { .. } => "dev_damage_vehicle",
@@ -688,10 +751,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::Gather { .. } => "gather",
             Reducer::Harvest { .. } => "harvest",
             Reducer::Helm { .. } => "helm",
+            Reducer::InviteToParty { .. } => "invite_to_party",
+            Reducer::KickFromParty { .. } => "kick_from_party",
             Reducer::LeaveHelm => "leave_helm",
+            Reducer::LeaveParty => "leave_party",
             Reducer::LeaveWorld => "leave_world",
             Reducer::LoadPack { .. } => "load_pack",
             Reducer::LootCorpse { .. } => "loot_corpse",
+            Reducer::MakePartyLeader { .. } => "make_party_leader",
             Reducer::MendVehicle { .. } => "mend_vehicle",
             Reducer::MoveEvent { .. } => "move_event",
             Reducer::MoveItem { .. } => "move_item",
@@ -714,6 +781,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UnloadPack { .. } => "unload_pack",
             Reducer::Uproot { .. } => "uproot",
             Reducer::UseSkill { .. } => "use_skill",
+            Reducer::Whisper { .. } => "whisper",
             Reducer::WorkShipyard { .. } => "work_shipyard",
             _ => unreachable!(),
         }
@@ -729,6 +797,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AbandonShipyard { yard_id } => {
                 __sats::bsatn::to_vec(&abandon_shipyard_reducer::AbandonShipyardArgs {
                     yard_id: yard_id.clone(),
+                })
+            }
+            Reducer::AcceptPartyInvite { id } => {
+                __sats::bsatn::to_vec(&accept_party_invite_reducer::AcceptPartyInviteArgs {
+                    id: id.clone(),
                 })
             }
             Reducer::AdminClearLand => {
@@ -844,6 +917,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelGather => {
                 __sats::bsatn::to_vec(&cancel_gather_reducer::CancelGatherArgs {})
             }
+            Reducer::Chat { channel, text } => __sats::bsatn::to_vec(&chat_reducer::ChatArgs {
+                channel: channel.clone(),
+                text: text.clone(),
+            }),
             Reducer::Craft {
                 station_id,
                 recipe,
@@ -856,6 +933,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateCharacter { name } => {
                 __sats::bsatn::to_vec(&create_character_reducer::CreateCharacterArgs {
                     name: name.clone(),
+                })
+            }
+            Reducer::DeclinePartyInvite { id } => {
+                __sats::bsatn::to_vec(&decline_party_invite_reducer::DeclinePartyInviteArgs {
+                    id: id.clone(),
                 })
             }
             Reducer::DestroyItem { item_id, count } => {
@@ -994,7 +1076,18 @@ impl __sdk::Reducer for Reducer {
                 throttle: throttle.clone(),
                 rudder: rudder.clone(),
             }),
+            Reducer::InviteToParty { name } => {
+                __sats::bsatn::to_vec(&invite_to_party_reducer::InviteToPartyArgs {
+                    name: name.clone(),
+                })
+            }
+            Reducer::KickFromParty { char_id } => {
+                __sats::bsatn::to_vec(&kick_from_party_reducer::KickFromPartyArgs {
+                    char_id: char_id.clone(),
+                })
+            }
             Reducer::LeaveHelm => __sats::bsatn::to_vec(&leave_helm_reducer::LeaveHelmArgs {}),
+            Reducer::LeaveParty => __sats::bsatn::to_vec(&leave_party_reducer::LeavePartyArgs {}),
             Reducer::LeaveWorld => __sats::bsatn::to_vec(&leave_world_reducer::LeaveWorldArgs {}),
             Reducer::LoadPack { vehicle_id, slot } => {
                 __sats::bsatn::to_vec(&load_pack_reducer::LoadPackArgs {
@@ -1005,6 +1098,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::LootCorpse { corpse } => {
                 __sats::bsatn::to_vec(&loot_corpse_reducer::LootCorpseArgs {
                     corpse: corpse.clone(),
+                })
+            }
+            Reducer::MakePartyLeader { char_id } => {
+                __sats::bsatn::to_vec(&make_party_leader_reducer::MakePartyLeaderArgs {
+                    char_id: char_id.clone(),
                 })
             }
             Reducer::MendVehicle { item_id } => {
@@ -1128,6 +1226,10 @@ impl __sdk::Reducer for Reducer {
                     target: target.clone(),
                 })
             }
+            Reducer::Whisper { to, text } => __sats::bsatn::to_vec(&whisper_reducer::WhisperArgs {
+                to: to.clone(),
+                text: text.clone(),
+            }),
             Reducer::WorkShipyard { yard_id } => {
                 __sats::bsatn::to_vec(&work_shipyard_reducer::WorkShipyardArgs {
                     yard_id: yard_id.clone(),
@@ -1150,14 +1252,18 @@ pub struct DbUpdate {
     entity: __sdk::TableUpdate<Entity>,
     evidence: __sdk::TableUpdate<Evidence>,
     game_clock: __sdk::TableUpdate<GameClock>,
+    local_chat: __sdk::TableUpdate<LocalChat>,
     loot: __sdk::TableUpdate<Loot>,
     my_characters: __sdk::TableUpdate<CharacterPrivate>,
+    my_chat: __sdk::TableUpdate<ChatMessage>,
     my_craft: __sdk::TableUpdate<CraftJob>,
     my_crime: __sdk::TableUpdate<CrimeRecord>,
     my_fighter: __sdk::TableUpdate<Fighter>,
     my_inventory: __sdk::TableUpdate<Item>,
     my_labor: __sdk::TableUpdate<Labor>,
     my_pack: __sdk::TableUpdate<Pack>,
+    my_party: __sdk::TableUpdate<PartyMember>,
+    my_party_invites: __sdk::TableUpdate<PartyInvite>,
     my_presence: __sdk::TableUpdate<Presence>,
     my_purse: __sdk::TableUpdate<Purse>,
     my_vehicles: __sdk::TableUpdate<Vehicle>,
@@ -1205,12 +1311,18 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "game_clock" => db_update
                     .game_clock
                     .append(game_clock_table::parse_table_update(table_update)?),
+                "local_chat" => db_update
+                    .local_chat
+                    .append(local_chat_table::parse_table_update(table_update)?),
                 "loot" => db_update
                     .loot
                     .append(loot_table::parse_table_update(table_update)?),
                 "my_characters" => db_update
                     .my_characters
                     .append(my_characters_table::parse_table_update(table_update)?),
+                "my_chat" => db_update
+                    .my_chat
+                    .append(my_chat_table::parse_table_update(table_update)?),
                 "my_craft" => db_update
                     .my_craft
                     .append(my_craft_table::parse_table_update(table_update)?),
@@ -1229,6 +1341,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_pack" => db_update
                     .my_pack
                     .append(my_pack_table::parse_table_update(table_update)?),
+                "my_party" => db_update
+                    .my_party
+                    .append(my_party_table::parse_table_update(table_update)?),
+                "my_party_invites" => db_update
+                    .my_party_invites
+                    .append(my_party_invites_table::parse_table_update(table_update)?),
                 "my_presence" => db_update
                     .my_presence
                     .append(my_presence_table::parse_table_update(table_update)?),
@@ -1319,6 +1437,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.game_clock = cache
             .apply_diff_to_table::<GameClock>("game_clock", &self.game_clock)
             .with_updates_by_pk(|row| &row.id);
+        diff.local_chat = self.local_chat.into_event_diff();
         diff.loot = cache
             .apply_diff_to_table::<Loot>("loot", &self.loot)
             .with_updates_by_pk(|row| &row.id);
@@ -1358,12 +1477,16 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.dev_tick = cache.apply_diff_to_table::<TickState>("dev_tick", &self.dev_tick);
         diff.my_characters =
             cache.apply_diff_to_table::<CharacterPrivate>("my_characters", &self.my_characters);
+        diff.my_chat = cache.apply_diff_to_table::<ChatMessage>("my_chat", &self.my_chat);
         diff.my_craft = cache.apply_diff_to_table::<CraftJob>("my_craft", &self.my_craft);
         diff.my_crime = cache.apply_diff_to_table::<CrimeRecord>("my_crime", &self.my_crime);
         diff.my_fighter = cache.apply_diff_to_table::<Fighter>("my_fighter", &self.my_fighter);
         diff.my_inventory = cache.apply_diff_to_table::<Item>("my_inventory", &self.my_inventory);
         diff.my_labor = cache.apply_diff_to_table::<Labor>("my_labor", &self.my_labor);
         diff.my_pack = cache.apply_diff_to_table::<Pack>("my_pack", &self.my_pack);
+        diff.my_party = cache.apply_diff_to_table::<PartyMember>("my_party", &self.my_party);
+        diff.my_party_invites =
+            cache.apply_diff_to_table::<PartyInvite>("my_party_invites", &self.my_party_invites);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
         diff.my_purse = cache.apply_diff_to_table::<Purse>("my_purse", &self.my_purse);
         diff.my_vehicles = cache.apply_diff_to_table::<Vehicle>("my_vehicles", &self.my_vehicles);
@@ -1399,11 +1522,17 @@ impl __sdk::DbUpdate for DbUpdate {
                 "game_clock" => db_update
                     .game_clock
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "local_chat" => db_update
+                    .local_chat
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "loot" => db_update
                     .loot
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_chat" => db_update
+                    .my_chat
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_craft" => db_update
                     .my_craft
@@ -1422,6 +1551,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_pack" => db_update
                     .my_pack
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_party" => db_update
+                    .my_party
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_party_invites" => db_update
+                    .my_party_invites
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
@@ -1505,11 +1640,17 @@ impl __sdk::DbUpdate for DbUpdate {
                 "game_clock" => db_update
                     .game_clock
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "local_chat" => db_update
+                    .local_chat
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "loot" => db_update
                     .loot
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_characters" => db_update
                     .my_characters
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_chat" => db_update
+                    .my_chat
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_craft" => db_update
                     .my_craft
@@ -1528,6 +1669,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_pack" => db_update
                     .my_pack
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_party" => db_update
+                    .my_party
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_party_invites" => db_update
+                    .my_party_invites
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_presence" => db_update
                     .my_presence
@@ -1597,14 +1744,18 @@ pub struct AppliedDiff<'r> {
     entity: __sdk::TableAppliedDiff<'r, Entity>,
     evidence: __sdk::TableAppliedDiff<'r, Evidence>,
     game_clock: __sdk::TableAppliedDiff<'r, GameClock>,
+    local_chat: __sdk::TableAppliedDiff<'r, LocalChat>,
     loot: __sdk::TableAppliedDiff<'r, Loot>,
     my_characters: __sdk::TableAppliedDiff<'r, CharacterPrivate>,
+    my_chat: __sdk::TableAppliedDiff<'r, ChatMessage>,
     my_craft: __sdk::TableAppliedDiff<'r, CraftJob>,
     my_crime: __sdk::TableAppliedDiff<'r, CrimeRecord>,
     my_fighter: __sdk::TableAppliedDiff<'r, Fighter>,
     my_inventory: __sdk::TableAppliedDiff<'r, Item>,
     my_labor: __sdk::TableAppliedDiff<'r, Labor>,
     my_pack: __sdk::TableAppliedDiff<'r, Pack>,
+    my_party: __sdk::TableAppliedDiff<'r, PartyMember>,
+    my_party_invites: __sdk::TableAppliedDiff<'r, PartyInvite>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     my_purse: __sdk::TableAppliedDiff<'r, Purse>,
     my_vehicles: __sdk::TableAppliedDiff<'r, Vehicle>,
@@ -1653,18 +1804,26 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Entity>("entity", &self.entity, event);
         callbacks.invoke_table_row_callbacks::<Evidence>("evidence", &self.evidence, event);
         callbacks.invoke_table_row_callbacks::<GameClock>("game_clock", &self.game_clock, event);
+        callbacks.invoke_table_row_callbacks::<LocalChat>("local_chat", &self.local_chat, event);
         callbacks.invoke_table_row_callbacks::<Loot>("loot", &self.loot, event);
         callbacks.invoke_table_row_callbacks::<CharacterPrivate>(
             "my_characters",
             &self.my_characters,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<ChatMessage>("my_chat", &self.my_chat, event);
         callbacks.invoke_table_row_callbacks::<CraftJob>("my_craft", &self.my_craft, event);
         callbacks.invoke_table_row_callbacks::<CrimeRecord>("my_crime", &self.my_crime, event);
         callbacks.invoke_table_row_callbacks::<Fighter>("my_fighter", &self.my_fighter, event);
         callbacks.invoke_table_row_callbacks::<Item>("my_inventory", &self.my_inventory, event);
         callbacks.invoke_table_row_callbacks::<Labor>("my_labor", &self.my_labor, event);
         callbacks.invoke_table_row_callbacks::<Pack>("my_pack", &self.my_pack, event);
+        callbacks.invoke_table_row_callbacks::<PartyMember>("my_party", &self.my_party, event);
+        callbacks.invoke_table_row_callbacks::<PartyInvite>(
+            "my_party_invites",
+            &self.my_party_invites,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<Purse>("my_purse", &self.my_purse, event);
         callbacks.invoke_table_row_callbacks::<Vehicle>("my_vehicles", &self.my_vehicles, event);
@@ -2360,14 +2519,18 @@ impl __sdk::SpacetimeModule for RemoteModule {
         entity_table::register_table(client_cache);
         evidence_table::register_table(client_cache);
         game_clock_table::register_table(client_cache);
+        local_chat_table::register_table(client_cache);
         loot_table::register_table(client_cache);
         my_characters_table::register_table(client_cache);
+        my_chat_table::register_table(client_cache);
         my_craft_table::register_table(client_cache);
         my_crime_table::register_table(client_cache);
         my_fighter_table::register_table(client_cache);
         my_inventory_table::register_table(client_cache);
         my_labor_table::register_table(client_cache);
         my_pack_table::register_table(client_cache);
+        my_party_table::register_table(client_cache);
+        my_party_invites_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         my_purse_table::register_table(client_cache);
         my_vehicles_table::register_table(client_cache);
@@ -2393,14 +2556,18 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "entity",
         "evidence",
         "game_clock",
+        "local_chat",
         "loot",
         "my_characters",
+        "my_chat",
         "my_craft",
         "my_crime",
         "my_fighter",
         "my_inventory",
         "my_labor",
         "my_pack",
+        "my_party",
+        "my_party_invites",
         "my_presence",
         "my_purse",
         "my_vehicles",

@@ -563,14 +563,17 @@ pub fn died(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     let t = micros(at);
     let rows: Vec<Threat> = ctx.db.threat().npc().filter(entity_id).collect();
     let total: i64 = rows.iter().map(|r| r.damage).sum();
-    let tagged = rows.iter().find(|r| r.entity == m.tagger).map_or(0, |r| r.damage);
+    // The tagger's party fights for it: their damage counts towards the loot as the tagger's.
+    let party = crate::party::mates(ctx, m.tagger_char);
+    let ours = |e: u64| e == m.tagger || ctx.db.presence().entity_id().find(e).is_some_and(|p| party.contains(&p.char_id));
+    let tagged: i64 = rows.iter().filter(|r| m.tagger != 0 && ours(r.entity)).map(|r| r.damage).sum();
     let owner = if m.tagger != 0 && sim::npc::owns_loot(tagged, total) { m.tagger_char } else { 0 };
     for r in rows {
         ctx.db.threat().id().delete(r.id);
     }
     let in_world = ctx.db.presence().entity_id().find(m.tagger).is_some_and(|p| p.char_id == m.tagger_char);
     let earner = if owner != 0 && in_world { m.tagger } else { killer };
-    crate::combat::reward(ctx, earner, kind.level);
+    crate::combat::reward(ctx, earner, entity_id, kind.level);
     let cell = ctx.db.vitals().entity_id().find(entity_id).map_or(0, |v| v.cell);
     let free_at = stamp(t + sim::npc::free_micros());
     for line in kind.loot {
@@ -599,7 +602,7 @@ pub fn loot_corpse(ctx: &ReducerContext, corpse: u64) -> Result<(), String> {
         return Err("too far away".into());
     }
     let at = now(ctx);
-    if rows.iter().any(|r| r.owner != p.char_id && at < r.free_at) {
+    if rows.iter().any(|r| r.owner != p.char_id && !crate::party::together(ctx, r.owner, p.char_id) && at < r.free_at) {
         return Err("that isn't yours to loot yet".into());
     }
     let mut took = 0;

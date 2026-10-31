@@ -1,5 +1,6 @@
 //! The `world` SpacetimeDB module: the whole game world in one database (PLAN §4, §5).
 
+mod chat;
 mod combat;
 mod crafting;
 mod crime;
@@ -12,6 +13,7 @@ mod labor;
 mod land;
 mod movement;
 mod npc;
+mod party;
 mod session;
 mod ship;
 mod shipyard;

@@ -200,6 +200,11 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The character called `name`, ignoring case.
+pub fn character_named(ctx: &ReducerContext, name: &str) -> Option<CharacterPublic> {
+    ctx.db.character_public().name().find(normalise_name(name.trim()))
+}
+
 /// `Abcd` form, so uniqueness ignores case.
 fn normalise_name(name: &str) -> String {
     let lower = name.to_ascii_lowercase();
@@ -278,6 +283,7 @@ pub fn enter_world(ctx: &ReducerContext, char_id: u64, content_hash: u64, terrai
         mode: mode as u8,
     });
     crate::combat::enter(ctx, ctx.sender(), char_id, e.id, cell);
+    crate::party::entered(ctx, char_id, e.id);
     let t = now(ctx);
     ctx.db.presence().insert(Presence {
         identity: ctx.sender(),
@@ -316,6 +322,7 @@ fn despawn(ctx: &ReducerContext, who: Identity) {
     crate::gathering::cancel(ctx, p.char_id);
     crate::crafting::cancel(ctx, p.char_id);
     crate::combat::leave(ctx, p.char_id, p.entity_id);
+    crate::party::left(ctx, p.char_id);
     if let Some(c) = ctx.db.character_private().char_id().find(p.char_id) {
         ctx.db.character_private().char_id().update(CharacterPrivate { x, y, z, ..c });
     }

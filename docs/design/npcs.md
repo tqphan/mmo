@@ -94,7 +94,7 @@ Every number is ours, for the playtest to tune.
 
 ### Death and loot
 - At 0 HP an NPC dies as a character does (statuses and casts end, `dead_at` set), stops, and lies there for `corpse_s`. Then its rows go and its spawn point is ready `respawn_s` after the death.
-- **Tagging:** the first character to damage or debuff an NPC tags it (`npc.tagger`). At death, the tagger **owns the loot** if it did at least `tag_pct`% of the threat rows' damage; otherwise nobody does.
+- **Tagging:** the first character to damage or debuff an NPC tags it (`npc.tagger`). At death, the tagger **owns the loot** if it did at least `tag_pct`% of the threat rows' damage, its party's damage counted as its own; otherwise nobody does. The owner's party members may take what it owns (docs/design/social.md).
 - **Experience** (docs/design/combat.md's `kill_xp`) goes to the owner if there is one and it's in the world, and to the killer otherwise.
 - **Loot:** each of the kind's loot lines rolls (`ctx.random`); what drops becomes rows of the public **`loot`** table (Near tier): `id`, `cell`, `corpse`, `owner` (a `char_id`, or 0), `free_at` (death + `free_s`), `def` and `count`. Public because anyone near can see a corpse has loot, as in the original.
 - **`loot_corpse(corpse)`** takes every stack it can into the caller's bag. It refuses when not in the world, dead or controlled ("you can't act right now"), with no such corpse or nothing on it ("nothing to loot"), out of `loot_m` ("too far away"), when the loot isn't ours and not free yet ("that isn't yours to loot yet"), and when the bag can't take any of it ("your bag is full"). What doesn't fit stays on the corpse.

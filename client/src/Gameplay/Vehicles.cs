@@ -142,14 +142,14 @@ namespace Mmo.Gameplay
         public override void _Process(double delta)
         {
             var seen = Seen().ToList();
-            if (Input.IsActionJustPressed("stow_vehicle"))
+            if (GameInput.JustPressed("stow_vehicle"))
             {
                 if (VehicleModel.StowTarget(seen, player.Parent, At, Owned) is ulong v)
                     Stow(v);
                 else
                     (lastResult, resultUntil) = ("no vehicle of yours in sight", System.DateTime.UtcNow.AddSeconds(4));
             }
-            if (Input.IsActionJustPressed("repair_vehicle"))
+            if (GameInput.JustPressed("repair_vehicle"))
             {
                 if (VehicleModel.RepairTarget(seen, player.Parent, At) is ulong v)
                     Repair(v);

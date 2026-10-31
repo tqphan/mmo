@@ -138,12 +138,12 @@ namespace Mmo.Gameplay
                 Prompt = LastResult.Length > 0 ? $"land: {LastResult}" : "";
                 return;
             }
-            if (Input.IsActionJustPressed("ui_cancel"))
+            if (GameInput.JustPressed("ui_cancel"))
             {
                 Cancel();
                 return;
             }
-            if (Input.IsActionJustPressed("rotate"))
+            if (GameInput.JustPressed("rotate"))
                 Turn();
             var kind = act.Kind;
             // Just far enough ahead that the player stands outside the square.

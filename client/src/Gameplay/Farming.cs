@@ -180,7 +180,7 @@ namespace Mmo.Gameplay
         {
             if (Active is { } a && !session.Bag.Any(s => s.Def == a.Def))
                 Cancel();
-            if (Input.IsActionJustPressed("uproot") && Active is null && player.Parent == 0)
+            if (GameInput.JustPressed("uproot") && Active is null && player.Parent == 0)
                 Uproot();
             crops.Focus = Active is null && player.Parent == 0 && Nearest(_ => true) is { } near ? near.Id : 0;
             if (Active is not { } act)
@@ -188,7 +188,7 @@ namespace Mmo.Gameplay
                 Prompt = TendPrompt();
                 return;
             }
-            if (Input.IsActionJustPressed("ui_cancel"))
+            if (GameInput.JustPressed("ui_cancel"))
             {
                 Cancel();
                 return;

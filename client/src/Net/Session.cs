@@ -18,8 +18,8 @@ namespace Mmo.Net
     /// </summary>
     public partial class Session : Node
     {
-        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP; <c>vitals</c> and <c>combat_event</c> are combat's (docs/design/combat.md), <c>loot</c> NPCs' (docs/design/npcs.md), <c>evidence</c> crime's (docs/design/crime.md).</summary>
-        public static readonly string[] NearTables = { "entity", "transform", "vehicle", "vitals", "combat_event", "loot", "evidence" };
+        /// <summary>The Near tier's tables (PLAN §4.3), 5×5 cells. <c>vehicle</c> carries ships' helm input and HP; <c>vitals</c> and <c>combat_event</c> are combat's (docs/design/combat.md), <c>loot</c> NPCs' (docs/design/npcs.md), <c>evidence</c> crime's (docs/design/crime.md), <c>local_chat</c> chat's (docs/design/social.md).</summary>
+        public static readonly string[] NearTables = { "entity", "transform", "vehicle", "vitals", "combat_event", "loot", "evidence", "local_chat" };
         public const ushort NearRadius = 2;
         /// <summary>The Static tier's tables (PLAN §4.3), 9×9 cells: things that rarely change, such as resource nodes (docs/design/gathering.md), crafting stations (docs/design/crafting.md), plots (docs/design/land.md), crops (docs/design/farming.md), trade posts and dropped packs (docs/design/trade.md), Wayshrines (docs/design/combat.md), and shipyards (docs/design/vehicles.md).</summary>
         public static readonly string[] StaticTables = { "resource_node", "station", "plot", "crop", "trade_post", "dropped_pack", "shrine", "shipyard" };
@@ -100,7 +100,7 @@ namespace Mmo.Net
                 SetStatus("left the world");
             }
             // Dev builds: spend labor as work would, until there is work (docs/design/labor.md).
-            if (Me is not null && Input.IsActionJustPressed("dev_spend_labor"))
+            if (Me is not null && Gameplay.GameInput.JustPressed("dev_spend_labor"))
             {
                 Conn.Reducers.DevSpendLabor(100);
                 Log("F8: spent 100 labor");
@@ -139,7 +139,7 @@ namespace Mmo.Net
                     "SELECT * FROM my_characters", "SELECT * FROM my_presence", "SELECT * FROM character_public",
                     "SELECT * FROM my_labor", "SELECT * FROM game_clock", "SELECT * FROM my_inventory", "SELECT * FROM my_craft",
                     "SELECT * FROM my_pack", "SELECT * FROM my_purse", "SELECT * FROM my_wrecks", "SELECT * FROM my_vehicles", "SELECT * FROM trade_demand", "SELECT * FROM my_fighter",
-                    "SELECT * FROM my_crime",
+                    "SELECT * FROM my_crime", "SELECT * FROM my_party", "SELECT * FROM my_party_invites", "SELECT * FROM my_chat",
                 });
         }
 

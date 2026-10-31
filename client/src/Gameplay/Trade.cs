@@ -125,7 +125,7 @@ namespace Mmo.Gameplay
 
         public override void _Process(double delta)
         {
-            if (Input.IsActionJustPressed("drop_pack") && Carried is not null && player.Parent == 0)
+            if (GameInput.JustPressed("drop_pack") && Carried is not null && player.Parent == 0)
                 Drop();
             long now = session.GameNowMicros;
             var carried = Carried is { } pk ? Info(pk) : (PackInfo?)null;

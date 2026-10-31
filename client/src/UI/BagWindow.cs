@@ -103,11 +103,11 @@ namespace Mmo.UI
         {
             if (session.Me is null)
                 return;
-            if (Input.IsActionJustPressed("bag"))
+            if (Gameplay.GameInput.JustPressed("bag"))
                 Open = !Open;
             if (!Open)
                 return;
-            if (Input.IsActionJustPressed("ui_cancel"))
+            if (Gameplay.GameInput.JustPressed("ui_cancel"))
                 Model.Cancel();
             Grid = BagModel.Grid(session.Bag, GameContent.BagSlots);
             Model.Refresh(Grid);

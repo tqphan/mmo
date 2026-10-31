@@ -1,0 +1,23 @@
+# Parties and chat (docs/design/social.md). A party of five is the original's (B); the rest is ours,
+# since the original's ranges and limits weren't found.
+
+[party]
+# The most characters in a party (B).
+size = 5
+# How long an invitation stands before it lapses, s.
+invite_s = 60
+# Members alive in the world within this distance of a kill share its experience, m.
+share_m = 100.0
+# Experience added for each sharer beyond the first, before splitting it evenly, %.
+bonus_pct = 10
+
+[chat]
+# How far Local chat carries, horizontally, m. Well inside the Near tier the client hears through.
+local_m = 40.0
+# The longest message, in characters.
+max_chars = 200
+# Messages a character may send at once, and how often one more is allowed after that, ms.
+burst = 5
+refill_ms = 2000
+# Party and whisper messages kept for each character; older ones go.
+inbox = 50

@@ -188,7 +188,7 @@ namespace Mmo.Gameplay
             float dt = (float)delta;
             swimming = Parent == 0 && Swimming.Swims(swimming, ground.Map.Height(GlobalPosition.X, GlobalPosition.Z), GlobalPosition.Y);
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
-            bool interact = options.Autopilot is null && Input.IsActionJustPressed("interact");
+            bool interact = options.Autopilot is null && GameInput.JustPressed("interact");
             if (interact && Parent == 0
                 && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Vehicles?.Interact() == true
                     || Shipyards?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
@@ -213,7 +213,7 @@ namespace Mmo.Gameplay
             }
             else if (IsOnFloor())
             {
-                bool jump = Combat?.Controlled != true && (options.Autopilot is null ? Controls?.Manning is null && Input.IsActionJustPressed("jump") : order.Jump);
+                bool jump = Combat?.Controlled != true && (options.Autopilot is null ? Controls?.Manning is null && GameInput.JustPressed("jump") : order.Jump);
                 if (jump)
                 {
                     v.Y = JumpSpeed;
@@ -383,7 +383,7 @@ namespace Mmo.Gameplay
                     dir = ship.Pose.Turn(dir, toWorld: true);
                 return new Vector2(dir.X, dir.Z);
             }
-            var input = Input.GetVector("left", "right", "forward", "back");
+            var input = GameInput.Vector("left", "right", "forward", "back");
             // Rotate the input from camera space into the world: forward is the camera's -z.
             return input.Rotated(-CameraYaw).LimitLength(1.0f);
         }

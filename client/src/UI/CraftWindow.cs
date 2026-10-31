@@ -169,7 +169,7 @@ namespace Mmo.UI
         {
             if (!Open)
                 return;
-            if (session.Me is null || Input.IsActionJustPressed("ui_cancel"))
+            if (session.Me is null || Gameplay.GameInput.JustPressed("ui_cancel"))
             {
                 Close();
                 return;

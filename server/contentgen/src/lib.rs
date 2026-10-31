@@ -71,6 +71,7 @@ pub struct Sources {
     pub trade: String,
     pub combat: String,
     pub npcs: String,
+    pub social: String,
 }
 
 impl Sources {
@@ -90,6 +91,7 @@ impl Sources {
             trade: read("trade.toml")?,
             combat: read("combat.toml")?,
             npcs: read("npcs.toml")?,
+            social: read("social.toml")?,
         })
     }
 }
@@ -311,6 +313,35 @@ pub struct LaborDef {
     pub regen_points: i32,
     pub regen_period_s: i32,
     pub start_points: i32,
+}
+
+/// `social.toml`: parties and chat (docs/design/social.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SocialFile {
+    party: PartyRulesDef,
+    chat: ChatRulesDef,
+}
+
+/// `[party]` in `social.toml`.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PartyRulesDef {
+    pub size: u32,
+    pub invite_s: u32,
+    pub share_m: f32,
+    pub bonus_pct: u32,
+}
+
+/// `[chat]` in `social.toml`.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ChatRulesDef {
+    pub local_m: f32,
+    pub max_chars: u32,
+    pub burst: u32,
+    pub refill_ms: u32,
+    pub inbox: u32,
 }
 
 /// `items.toml`: item definitions and the bag (docs/design/items.md).
@@ -774,6 +805,8 @@ pub struct Content {
     pub npc: NpcRules,
     /// Sorted by `wire`, like the modes.
     pub npc_kinds: Vec<NpcKindDef>,
+    pub party: PartyRulesDef,
+    pub chat: ChatRulesDef,
     pub hash: u64,
 }
 
@@ -822,10 +855,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let trade: Result<TradeFile, _> = from_toml("trade.toml", &src.trade);
     let combat: Result<CombatFile, _> = from_toml("combat.toml", &src.combat);
     let npcs: Result<NpcsFile, _> = from_toml("npcs.toml", &src.npcs);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs) =
-        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n)) => (m.mode, s, l, b, i, g, c, f, t, k, n),
-            (m, s, l, b, i, g, c, f, t, k, n) => {
+    let social: Result<SocialFile, _> = from_toml("social.toml", &src.social);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs, social) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs, social) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n), Ok(o)) => (m.mode, s, l, b, i, g, c, f, t, k, n, o),
+            (m, s, l, b, i, g, c, f, t, k, n, o) => {
                 let all = m
                     .err()
                     .into_iter()
@@ -838,7 +872,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
                     .chain(f.err())
                     .chain(t.err())
                     .chain(k.err())
-                    .chain(n.err());
+                    .chain(n.err())
+                    .chain(o.err());
                 return Err(all.flatten().collect());
             }
         };
@@ -873,6 +908,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_trade(&trade, &items.item, &crafting.recipe, &mut errors);
     check_combat(&combat, &mut errors);
     check_npcs(&npcs, &combat, &items.item, &mut errors);
+    check_social(&social, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -901,6 +937,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         statuses: combat.status,
         npc: npcs.npc,
         npc_kinds: npcs.kind,
+        party: social.party,
+        chat: social.chat,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -1645,6 +1683,30 @@ fn check_crime(k: &CombatFile, errors: &mut Vec<String>) {
     }
 }
 
+fn check_social(o: &SocialFile, errors: &mut Vec<String>) {
+    let at = "social.toml";
+    let mut range = |name: &str, v: u32, lo: u32, hi: u32| {
+        if !(lo..=hi).contains(&v) {
+            errors.push(format!("{at}: {name} must be from {lo} to {hi}"));
+        }
+    };
+    range("party.size", o.party.size, 2, 50);
+    range("party.invite_s", o.party.invite_s, 5, 3600);
+    range("party.bonus_pct", o.party.bonus_pct, 0, 100);
+    range("chat.max_chars", o.chat.max_chars, 1, 1000);
+    range("chat.burst", o.chat.burst, 1, 100);
+    range("chat.refill_ms", o.chat.refill_ms, 50, 60_000);
+    range("chat.inbox", o.chat.inbox, 1, 1000);
+    if !(1.0..=1000.0).contains(&o.party.share_m) {
+        errors.push(format!("{at}: party.share_m must be from 1 to 1000"));
+    }
+    // The client hears Local chat through its Near tier, which reaches at least 2 cells less the
+    // window's 8 m margin in every direction (docs/design/interest.md).
+    if !(1.0..=100.0).contains(&o.chat.local_m) {
+        errors.push(format!("{at}: chat.local_m must be from 1 to 100"));
+    }
+}
+
 fn check_npcs(n: &NpcsFile, k: &CombatFile, items: &[ItemDef], errors: &mut Vec<String>) {
     let file = "npcs.toml";
     let r = &n.npc;
@@ -1945,6 +2007,15 @@ fn canonical(c: &Content) -> String {
         write!(s, "\t{}", f.value.bits()).unwrap();
     }
     s += "\n";
+    s += "party";
+    for f in party_fields(&c.party) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\nchat";
+    for f in chat_fields(&c.chat) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
     s += "npc";
     for f in npc_fields(&c.npc) {
         write!(s, "\t{}", f.value.bits()).unwrap();
@@ -2163,6 +2234,32 @@ fn crime_fields(c: &CrimeRulesDef) -> Vec<Field> {
         f("bloodstain_points", "Crime points for a reported Bloodstain.", i(c.bloodstain_points)),
         f("blood_pool_points", "Crime points for a reported Blood Pool.", i(c.blood_pool_points)),
         f("sought_points", "Crime points at or above this make a character Sought.", i(c.sought_points)),
+    ]
+}
+
+fn party_fields(p: &PartyRulesDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    // Every whole number is checked to fit an i32 with room to spare.
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("size", "The most characters in a party.", i(p.size)),
+        f("invite_s", "How long an invitation stands, s.", i(p.invite_s)),
+        f("share_m", "Members within this distance of a kill share its experience, m.", F32(p.share_m)),
+        f("bonus_pct", "Experience added for each sharer beyond the first, %.", i(p.bonus_pct)),
+    ]
+}
+
+fn chat_fields(c: &ChatRulesDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("local_m", "How far Local chat carries, horizontally, m.", F32(c.local_m)),
+        f("max_chars", "The longest message, in characters.", i(c.max_chars)),
+        f("burst", "Messages a character may send at once.", i(c.burst)),
+        f("refill_ms", "How often one more message is allowed after a burst, ms.", i(c.refill_ms)),
+        f("inbox", "Party and whisper messages kept for each character.", i(c.inbox)),
     ]
 }
 
@@ -2456,6 +2553,17 @@ pub fn render_rust(c: &Content) -> String {
     rust_struct_fields(&mut s, &labor);
     s += "}\n\n";
     writeln!(s, "pub static LABOR: LaborRules = LaborRules {{ {} }};\n", rust_values(&labor)).unwrap();
+
+    let party = party_fields(&c.party);
+    s += "/// Party rules (`[party]` in `content/social.toml`, docs/design/social.md).\n#[derive(Debug, PartialEq)]\npub struct PartyRules {\n";
+    rust_struct_fields(&mut s, &party);
+    s += "}\n\n";
+    writeln!(s, "pub static PARTY: PartyRules = PartyRules {{ {} }};\n", rust_values(&party)).unwrap();
+    let chat = chat_fields(&c.chat);
+    s += "/// Chat rules (`[chat]` in `content/social.toml`, docs/design/social.md).\n#[derive(Debug, PartialEq)]\npub struct ChatRules {\n";
+    rust_struct_fields(&mut s, &chat);
+    s += "}\n\n";
+    writeln!(s, "pub static CHAT: ChatRules = ChatRules {{ {} }};\n", rust_values(&chat)).unwrap();
 
     s += "/// Item kinds (`content/items.toml`, docs/design/items.md). The discriminant is the wire value.\n";
     s += "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum ItemKind {\n";
@@ -2916,6 +3024,14 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <summary>Labor rules (content/labor.toml, docs/design/labor.md).</summary>\n";
     csharp_param_docs(&mut s, &labor);
     writeln!(s, "    public sealed record LaborRules({});\n", csharp_params(&labor)).unwrap();
+    let party = party_fields(&c.party);
+    s += "    /// <summary>Party rules ([party] in content/social.toml, docs/design/social.md).</summary>\n";
+    csharp_param_docs(&mut s, &party);
+    writeln!(s, "    public sealed record PartyRules({});\n", csharp_params(&party)).unwrap();
+    let chat = chat_fields(&c.chat);
+    s += "    /// <summary>Chat rules ([chat] in content/social.toml, docs/design/social.md).</summary>\n";
+    csharp_param_docs(&mut s, &chat);
+    writeln!(s, "    public sealed record ChatRules({});\n", csharp_params(&chat)).unwrap();
     s += "    /// <summary>Item kinds (content/items.toml, docs/design/items.md). The value is the wire value.</summary>\n";
     s += "    public enum ItemKind : byte\n    {\n";
     for (w, k) in ITEM_KINDS.iter().enumerate() {
@@ -3168,6 +3284,8 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        /// <summary>The plot kind a deed item claims, if it is a deed.</summary>\n";
     s += "        public static PlotData? PlotByDeed(ushort item) => Plots.FirstOrDefault(p => p.Deed == item);\n\n";
     writeln!(s, "        public static readonly LaborRules Labor = new({});\n", csharp_values(&labor)).unwrap();
+    writeln!(s, "        public static readonly PartyRules Party = new({});\n", csharp_values(&party_fields(&c.party))).unwrap();
+    writeln!(s, "        public static readonly ChatRules Chat = new({});\n", csharp_values(&chat_fields(&c.chat))).unwrap();
     s += "        /// <summary>Slots in every character's bag.</summary>\n";
     writeln!(s, "        public const ushort BagSlots = {};\n", c.bag.slots).unwrap();
     s += "        /// <summary>Every item, sorted by wire.</summary>\n";
@@ -3954,6 +4072,21 @@ mod tests {
         loot = []
     "#;
 
+    const SOCIAL: &str = r#"
+        [party]
+        size = 5
+        invite_s = 60
+        share_m = 100.0
+        bonus_pct = 10
+
+        [chat]
+        local_m = 40.0
+        max_chars = 200
+        burst = 5
+        refill_ms = 2000
+        inbox = 50
+    "#;
+
     fn sources() -> Sources {
         Sources {
             movement: MOVEMENT.into(),
@@ -3967,6 +4100,7 @@ mod tests {
             trade: TRADE.into(),
             combat: COMBAT.into(),
             npcs: NPCS.into(),
+            social: SOCIAL.into(),
         }
     }
 
@@ -4177,9 +4311,10 @@ mod tests {
             trade: "[trade\n".into(),
             combat: "[combat\n".into(),
             npcs: "[npc\n".into(),
+            social: "[party\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml", "npcs.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml", "npcs.toml", "social.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -4253,6 +4388,41 @@ mod tests {
         for changed in [COMBAT.replace("mark_s = 30", "mark_s = 31"), COMBAT.replace("sought_points = 50", "sought_points = 51"), COMBAT.replace("reach_m = 4.0", "reach_m = 4.5")] {
             assert_ne!(parse_combat(&changed).unwrap().hash, a, "{changed}");
         }
+    }
+
+    fn parse_social(social: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { social: social.into(), ..sources() })
+    }
+
+    #[test]
+    fn social_rules_reach_both_outputs_and_the_hash() {
+        let c = parse_social(SOCIAL).unwrap();
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("pub static PARTY: PartyRules = PartyRules { size: 5, invite_s: 60, share_m: 100.0, bonus_pct: 10 };"), "{rs}");
+        assert!(rs.contains("pub static CHAT: ChatRules = ChatRules { local_m: 40.0, max_chars: 200, burst: 5, refill_ms: 2000, inbox: 50 };"), "{rs}");
+        assert!(cs.contains("public static readonly PartyRules Party = new(5, 60, 100.0f, 10);"), "{cs}");
+        assert!(cs.contains("public static readonly ChatRules Chat = new(40.0f, 200, 5, 2000, 50);"), "{cs}");
+        let a = c.hash;
+        for changed in [SOCIAL.replace("size = 5", "size = 6"), SOCIAL.replace("local_m = 40.0", "local_m = 41.0"), SOCIAL.replace("inbox = 50", "inbox = 51")] {
+            assert_ne!(parse_social(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_social_rules_are_reported_together() {
+        let bad = SOCIAL
+            .replace("size = 5", "size = 1")
+            .replace("invite_s = 60", "invite_s = 0")
+            .replace("share_m = 100.0", "share_m = 0.0")
+            .replace("local_m = 40.0", "local_m = 400.0")
+            .replace("burst = 5", "burst = 0")
+            .replace("refill_ms = 2000", "refill_ms = 10");
+        let e = parse_social(&bad).unwrap_err().join("\n");
+        for want in ["party.size must be from 2", "party.invite_s must be from 5", "party.share_m must be from 1", "chat.local_m must be from 1 to 100", "chat.burst must be from 1", "chat.refill_ms must be from 50"] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
+        let e = parse_social("[party]\nsize = 5\n").unwrap_err().join("\n");
+        assert!(e.contains("social.toml"), "{e}");
     }
 
     #[test]
