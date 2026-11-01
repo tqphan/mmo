@@ -246,13 +246,16 @@ namespace Mmo.Presentation
             return new TileMesh(tile, level, vertices, normals, colors, indices.ToArray());
         }
 
+        private Color Ground(float height, float up, float x, float z) => GroundColor(palette, land, height, up, x, z);
+
         /// <summary>
         /// Placeholder ground colours: sea floor, sand at the waterline, grass, rock when steep or high;
-        /// above the waterline, housing land, towns and roads are tinted.
+        /// above the waterline, housing land, towns and roads are tinted. <paramref name="up"/> is the
+        /// normal's y. Terrain3D's colour map uses them too (<see cref="Terrain3DWorld"/>).
         /// </summary>
-        private Color Ground(float height, float up, float x, float z)
+        public static Color GroundColor(Palette palette, LandRaster? land, float height, float up, float x, float z)
         {
-            var natural = Natural(height, up);
+            var natural = Natural(palette, height, up);
             if (land is null || height < 0.5f)
                 return natural;
             var tint = LandRaster.Use(land.At(x, z)) switch
@@ -265,7 +268,7 @@ namespace Mmo.Presentation
             return natural.Lerp(tint, 0.55f);
         }
 
-        private Color Natural(float height, float up)
+        private static Color Natural(Palette palette, float height, float up)
         {
             var low = palette.SeaFloor.Lerp(palette.Sand, Mathf.SmoothStep(-3.0f, -0.5f, height));
             var grass = palette.GrassLow.Lerp(palette.GrassHigh, Mathf.SmoothStep(20, 120, height));

@@ -37,6 +37,8 @@ namespace Mmo
     /// <item><c>--outline</c>: in the style test, outline the characters.</item>
     /// <item><c>--shot follow|wide</c>: in the style test, orbit the walking character or the whole island.</item>
     /// <item><c>--world-test DIR</c>: show the offline world-scale test with this world (a directory or a <c>.mmoh</c> file) instead of connecting (docs/design/worldstream.md).</item>
+    /// <item><c>--terrain3d</c>: draw the terrain with Terrain3D, the whole map loaded at start, instead of our own tiles; in the game, stand on its collision too (ADR 0032, docs/spikes/terrain3d.md).</item>
+    /// <item><c>--terrain3d-import</c>, <c>--terrain3d-export</c>: write the world (<c>--world</c>) into Terrain3D region files in <c>client/terrain3d/</c> for the Godot editor, or read them back into <c>target/terrain3d/export/</c> for <c>worldtool apply-terrain3d</c>, then quit (ADR 0032).</item>
     /// <item><c>--route sail|cross|walk|high</c>: the world test's camera route.</item>
     /// <item><c>--no-vsync</c>: in the world test, render as fast as possible, to measure frame times.</item>
     /// <item><c>--secs S</c>: quit after S seconds.</item>
@@ -77,6 +79,9 @@ namespace Mmo
         public string Shot = "follow";
         public string? WorldTest;
         public string Route = "sail";
+        public bool Terrain3D;
+        /// <summary><c>--terrain3d-import</c> (true) or <c>--terrain3d-export</c> (false).</summary>
+        public bool? Terrain3DFiles;
         public bool NoVsync;
         public double Secs;
 
@@ -129,6 +134,9 @@ namespace Mmo
                     case "--shot": o.Shot = OneOf(Next(), "follow", "wide"); break;
                     case "--world-test": o.WorldTest = Next(); break;
                     case "--route": o.Route = OneOf(Next(), "sail", "cross", "walk", "high"); break;
+                    case "--terrain3d": o.Terrain3D = true; break;
+                    case "--terrain3d-import": o.Terrain3DFiles = true; break;
+                    case "--terrain3d-export": o.Terrain3DFiles = false; break;
                     case "--no-vsync": o.NoVsync = true; break;
                     case "--secs": o.Secs = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--cam-yaw": o.CamYawDeg = float.Parse(Next(), CultureInfo.InvariantCulture); break;

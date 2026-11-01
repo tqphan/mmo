@@ -23,10 +23,13 @@ namespace Mmo.World
         public readonly HeightMap Map;
         private readonly Dictionary<ulong, CollisionShape3D> shapes = new();
         private ulong center = ulong.MaxValue;
+        /// <summary>False when Terrain3D's collision holds the player up: the window is still followed, so callers wait as before, but no shapes are made (ADR 0032).</summary>
+        private readonly bool makeShapes;
 
-        public TerrainCollision(HeightMap map)
+        public TerrainCollision(HeightMap map, bool shapes = true)
         {
             Map = map;
+            makeShapes = shapes;
             Name = "TerrainCollision";
         }
 
@@ -44,6 +47,8 @@ namespace Mmo.World
             if (next == center)
                 return false;
             center = next;
+            if (!makeShapes)
+                return true;
             var want = new HashSet<ulong>(Cell.WindowCells(center, Radius));
             foreach (var (cell, shape) in new List<KeyValuePair<ulong, CollisionShape3D>>(shapes))
             {

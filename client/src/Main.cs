@@ -39,6 +39,11 @@ namespace Mmo
                 AddChild(new Presentation.WorldTest(options));
                 return;
             }
+            if (options.Terrain3DFiles is bool import)
+            {
+                AddChild(new Presentation.Terrain3DFiles(options, import));
+                return;
+            }
             GetWindow().Title = $"mmo — {options.Profile}";
 
             if (LoadWorld(options.World) is not { } world)
@@ -50,8 +55,11 @@ namespace Mmo
 
             var session = new Session(options, world.TerrainHash);
             AddChild(session);
-            var terrain = new Presentation.Terrain(map, world.Land);
-            AddChild(terrain);
+            // With --terrain3d, Terrain3D draws the ground and its collision holds the player up,
+            // added once the player exists (ADR 0032).
+            var terrain = options.Terrain3D ? null : new Presentation.Terrain(map, world.Land);
+            if (terrain != null)
+                AddChild(terrain);
             var water = Presentation.Water.Create(faceted: false, new Presentation.Palette(), horizon: 80000.0f);
             AddChild(water);
             AddChild(new DirectionalLight3D
@@ -66,10 +74,12 @@ namespace Mmo
             AddChild(new WorldEnvironment { Environment = Presentation.StyleTest.Environment(fog: 0.00012f) });
             var entities = new EntityRegistry(session, options.Trace, map);
             AddChild(entities);
-            var ground = new TerrainCollision(map);
+            var ground = new TerrainCollision(map, shapes: !options.Terrain3D);
             AddChild(ground);
             var player = new PlayerController(session, options, ground, entities);
             AddChild(player);
+            if (options.Terrain3D)
+                Presentation.Terrain3DWorld.Create(this, world, player, collide: true);
             var controls = new ShipControls(session, player, entities, map, options);
             AddChild(controls);
             player.Controls = controls;
@@ -232,10 +242,11 @@ namespace Mmo
         private partial class Scenery : Node
         {
             private readonly Camera3D camera;
-            private readonly Presentation.Terrain terrain;
+            /// <summary>Null with <c>--terrain3d</c>, which follows the player itself.</summary>
+            private readonly Presentation.Terrain? terrain;
             private readonly Node3D water;
 
-            public Scenery(Camera3D camera, Presentation.Terrain terrain, Node3D water)
+            public Scenery(Camera3D camera, Presentation.Terrain? terrain, Node3D water)
             {
                 this.camera = camera;
                 this.terrain = terrain;
@@ -245,7 +256,8 @@ namespace Mmo
 
             public override void _Process(double delta)
             {
-                terrain.Focus = camera.GlobalPosition;
+                if (terrain != null)
+                    terrain.Focus = camera.GlobalPosition;
                 Presentation.Water.Follow(water, camera.GlobalPosition);
             }
         }

@@ -4,6 +4,8 @@
 //! rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
 //! prints what's in it. `worldtool probe X,Z...` prints the ground at points, and `worldtool map
 //! --area X0,Z0,X1,Z1 [--px N] [--out F]` draws part of the world as a PNG (docs/design/coast.md).
+//! `worldtool apply-terrain3d [--from D]` writes the client's Terrain3D export (`heights.mmoh` and
+//! `uses.raw` in D, default `target/terrain3d/export`) back into the world (ADR 0032).
 //! Paths are relative to the repo root, which `cargo xtask` runs from (docs/design/world.md).
 
 use std::path::PathBuf;
@@ -26,10 +28,11 @@ fn main() -> ExitCode {
         Some("spawns") => World::load(&dir).and_then(|w| write_spawns(&dir, &w)),
         Some("areas") => write_areas(&dir),
         Some("info") => info(&dir),
+        Some("apply-terrain3d") => apply_terrain3d(&dir, &args),
         Some("map") => map(&dir, &args),
         Some("probe") => probe(&dir, &args[1..]),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|givers|spawns|areas|info [--dir DIR]\n       worldtool probe X,Z...\n       worldtool map --area X0,Z0,X1,Z1 [--px N] [--out FILE] [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|givers|spawns|areas|info [--dir DIR]\n       worldtool apply-terrain3d [--from DIR] [--dir DIR]\n       worldtool probe X,Z...\n       worldtool map --area X0,Z0,X1,Z1 [--px N] [--out FILE] [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -164,6 +167,24 @@ fn map(dir: &std::path::Path, args: &[String]) -> Result<(), String> {
     let pic = worldtool::map::render(&world, area, px, &marks);
     worldtool::map::save(&out, &pic)?;
     println!("wrote {} ({} × {} px, {:.1} m a pixel)", out.display(), pic.w, pic.h, (area.x1 - area.x0) / px as f32);
+    Ok(())
+}
+
+/// Write the client's Terrain3D export back into `world/`, as one save of the whole world (ADR 0032).
+/// The placements (nodes, stations, …) aren't moved; rewrite them with their own commands if the
+/// ground under them changed.
+fn apply_terrain3d(dir: &std::path::Path, args: &[String]) -> Result<(), String> {
+    let from = PathBuf::from(args.iter().position(|a| a == "--from").and_then(|i| args.get(i + 1)).map_or("target/terrain3d/export", String::as_str));
+    let read = |name: &str| std::fs::read(from.join(name)).map_err(|e| format!("{}: {e}", from.join(name).display()));
+    let heights = sim::terrain::HeightFile::from_bytes(&read("heights.mmoh")?)?;
+    let uses = read("uses.raw")?;
+    let mut world = World::load(dir)?;
+    let (samples, texels) = world.apply_terrain3d(heights, &uses)?;
+    let hash = world.save(dir)?;
+    println!("applied {}: {samples} height samples and {texels} land texels changed, terrain hash {hash:016x}", from.display());
+    if samples > 0 {
+        println!("heights changed: check what stands on them (worldtool nodes, stations, posts, shrines, givers, spawns)");
+    }
     Ok(())
 }
 
