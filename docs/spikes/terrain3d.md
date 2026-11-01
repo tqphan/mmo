@@ -1,6 +1,6 @@
 # Spike: Terrain3D for the whole map
 
-Status: **done**, 2026-10-31. PLAN §11, M2's first task (BACKLOG). Decisions: ADR 0032, ADR 0038. Compared against: docs/spikes/world-scale.md (spike 4).
+Status: **done**, 2026-10-31; levers tried the same day (below). PLAN §11, M2's first task (BACKLOG). Decisions: ADR 0032, ADR 0038. Compared against: docs/spikes/world-scale.md (spike 4).
 
 ## Question
 
@@ -109,9 +109,31 @@ If it passes, the client's own tiles (`Presentation/Terrain.cs`, `TerrainPlan`) 
   - The 610M: 25–33 fps against 36–60 with our tiles. A mid-range GPU (9–16× the 610M by specifications) would be at roughly 2.5–4.5 ms for the whole scene, at the edge of the 4 ms budget.
 - **So the tiles stay.** The client still draws with its own tiles by default; `--terrain3d` is opt-in. Removing them waits until the levers below are tried, or the user accepts the cost (ADR 0038).
 
-## Levers, in order
-1. **Compressed colour maps** (ADR 0032's fallback; `Terrain3D.ColorCompressMode`): 4 MB → 1 MB a region, about −190 MB of video memory. Or no colour map at all, once real textures replace the placeholder colours.
-2. **Free the CPU images** after upload where Terrain3D allows it, keeping only the heights for collision: about −0.5 GB resident.
-3. **Skip regions wholly below −25 m** (ADR 0032 allows it until diving). Only the outer ocean's corners qualify at 2 km regions, so this needs a smaller region size, which means more regions.
-4. **A cheaper far field:** the vertex work over the seabed dominates on the 610M. Try fewer clipmap LODs, or a flat sea-floor mesh beyond the shore.
-5. A low-settings preset (spike 4's follow-up) helps both renderers equally.
+## Levers tried (2026-10-31)
+Measured on the Radeon 610M, 20 s per run, GPU p50 in ms. The levers were set through temporary hooks, since removed. "No sea" hides our water to isolate the terrain.
+
+| Run | `sail` | `walk` |
+|---|---|---|
+| Terrain3D, our shader (spike) | 39.8 | 30.4 |
+| displacement scale 0 (default 1) | 44.9 | 33.2 |
+| 4 clipmap LODs (default 7) | 40.2 | 30.1 |
+| no sea | 35.4 | 30.7 |
+| no sea, mesh size 16 (default 48) | 25.2 | 24.1 |
+| no sea, mesh size 8, 3 LODs | 13.6 | 18.4 |
+| **our tiles, no sea** | **10.0** | **19.0** |
+
+- **Terrain3D's defaults** are already lean: tessellation 0, no ocean mesh, 7 LODs of 48. Shadows off saves about 1 ms (spike).
+- **The cost is per vertex, not per pixel.** At mesh size 16, Terrain3D draws 0.1 M triangles in 24–25 ms; our tiles draw 0.87 M in 19 ms. Each clipmap vertex reads the region map and the height arrays, in the depth, colour and shadow passes. Only a mesh too small to draw the distance (size 8, 3 LODs) gets near our tiles.
+- **Colour compression can't be done at runtime:** `compress_color_map` refuses with "Cannot compress maps in export builds". Compressed colour maps would mean shipping Terrain3D's own region files, made in the editor, instead of building from `world/` at start.
+- **Memory has a floor:** the height and control maps alone are 64 × 8 MB = 512 MB on the GPU. Terrain3D keeps the images on the CPU too, for `get_height` and collision. Even with no colour map, the whole map at 2 m can't come near spike 4's 300 MB.
+
+### Conclusion
+**Terrain3D can't be brought within spike 4's budgets as the players' renderer** for the whole map at 2 m. As an **editor**, it passed everything: a lossless round trip, edits to the sample, and land use that survives painting.
+
+Two ways on, for the user (BACKLOG):
+1. **Terrain3D as the editor only:** our tiles stay the players' renderer and collision. Texture painting and foliage would then need exporting into our own formats.
+2. **Terrain3D as the renderer too:** accept about 1.2 GB of video memory, about 3 GB of RAM, and 25–33 fps on integrated GPUs (mid-range estimated at 2.5–4.5 ms a frame). Ship its region files so colour maps can be compressed.
+
+## Levers not tried
+- Skipping deep-sea regions: at 2 km regions only the corners qualify, and diving needs the seabed (ADR 0032).
+- A low-settings preset (spike 4's follow-up), which helps both renderers alike.

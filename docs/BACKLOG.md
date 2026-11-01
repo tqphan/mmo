@@ -12,7 +12,7 @@ Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<syst
 
 ## M2: "Two Continents" (PLAN §11)
 Broken down when M1 closes. Fixed so far:
-- **Terrain3D levers** (after the spike, docs/spikes/terrain3d.md "Levers"): bring `--terrain3d` within spike 4's budgets or show it can't be done: compressed colour maps, freeing the CPU images, a cheaper far field over the seabed. Acceptance: video memory, resident memory and 610M GPU p99 on the four routes, against the spike's table. Then the user decides whether the tiles go (ADR 0038).
+- **[needs OK]** Terrain3D's role (docs/spikes/terrain3d.md, "Levers tried"): the levers can't bring it within spike 4's budgets. Either use it as the **editor only**, with our tiles staying the players' renderer, or make it the **renderer too** and accept about 1.2 GB of video memory, about 3 GB of RAM and 25–33 fps on integrated GPUs. M2's world-building tasks follow from the answer.
 
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.
@@ -29,6 +29,7 @@ Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without t
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (docs/design/ships.md §1). An add-on clipper cannon is known: 48 m, 700 damage, 3 s.
 
 ## Done
+- 2026-10-31 **M2: Terrain3D levers**: displacement, fewer LODs, smaller meshes, no shadows and compressed colour maps tried on the Radeon 610M. Its cost is per clipmap vertex, colour maps can't be compressed at runtime, and the height and control maps alone need 512 MB of video memory, so it can't meet spike 4's budgets as the renderer; the role is now the user's call (docs/spikes/terrain3d.md).
 - 2026-10-31 **M2: Terrain3D spike** (done early, while M1 waits for its playtest): Terrain3D v1.1.0 in `client/addons/` (MIT; Linux and Windows x86_64 libraries committed); `Terrain3DLayout` maps `world/` onto 64 regions of 1024 px at 2 m with the use class in control bits 3–6; `--terrain3d` builds the whole map in memory at start and stands the player on Terrain3D's collision; `--terrain3d-import`/`-export` and `worldtool apply-terrain3d`; our own colour-map shader. Byte-identical round trip, edits come back to the sample, 10 minutes walking with 0 corrections; RTX whole scene ≤ 2.4 ms p99, but 1.15 GB of video memory, 2.5–3 GB resident and 25–33 fps on the 610M, so the tiles stay the default (ADR 0038); captures `docs/captures/2026-10-31-terrain3d-*.png` (docs/spikes/terrain3d.md).
 - 2026-10-25 **Repository scaffold**: STATUS, BACKLOG, ADRs 0001–0009, docs folders, asset ledger.
 - 2026-10-25 **Server skeleton and dev tasks**: Cargo workspace, `world` module, `sim` crate, `cargo xtask` (test/build/server/publish/generate/bot/check).
