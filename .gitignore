@@ -6,3 +6,6 @@ bin/
 obj/
 # Godot's script ids for generated code; it recreates them (client/src keeps its own)
 *.g.cs.uid
+
+# Personal Claude Code settings
+.claude/settings.local.json

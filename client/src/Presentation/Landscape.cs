@@ -1,20 +1,28 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Mmo.Presentation
 {
     /// <summary>
-    /// The world's terrain, sea, sun and sky, as the game and the world test both draw them
-    /// (docs/design/art.md).
+    /// The world's terrain, sea, flora, sun and sky, as the game and the world test both draw them
+    /// (docs/design/art.md). <see cref="Follow"/> keeps them all centred on the camera.
     /// </summary>
-    public static class Landscape
+    public partial class Landscape : Node3D
     {
-        public static (Terrain Terrain, Node3D Water) Add(Node parent, World.HeightMap map, World.LandRaster? land)
+        public readonly Terrain Terrain;
+        public readonly Node3D Sea;
+        public readonly Greenery Greenery;
+
+        public Landscape(World.HeightMap map, World.LandRaster? land, IReadOnlyList<World.Area> areas)
         {
-            var terrain = new Terrain(map, land);
-            parent.AddChild(terrain);
-            var water = Water.Create(faceted: false, new Palette(), horizon: 80000.0f, masks: terrain.Masks);
-            parent.AddChild(water);
-            parent.AddChild(new DirectionalLight3D
+            Name = "Landscape";
+            Terrain = new Terrain(map, land);
+            AddChild(Terrain);
+            Sea = Water.Create(faceted: false, new Palette(), horizon: 80000.0f, masks: Terrain.Masks);
+            AddChild(Sea);
+            Greenery = new Greenery(new World.FloraPlan(map, land, Terrain.MaskBytes, areas));
+            AddChild(Greenery);
+            AddChild(new DirectionalLight3D
             {
                 Name = "Sun",
                 RotationDegrees = new Vector3(-38, -35, 0),
@@ -23,8 +31,14 @@ namespace Mmo.Presentation
                 ShadowEnabled = true,
                 DirectionalShadowMaxDistance = 200,
             });
-            parent.AddChild(new WorldEnvironment { Environment = Environment() });
-            return (terrain, water);
+            AddChild(new WorldEnvironment { Environment = Environment() });
+        }
+
+        public void Follow(Vector3 eye)
+        {
+            Terrain.Focus = eye;
+            Greenery.Focus = eye;
+            Water.Follow(Sea, eye);
         }
 
         private static Godot.Environment Environment()

@@ -73,6 +73,22 @@ Hand-painted, the other option in ADR 0004, can't be shown with the tools we hav
 - **Sky:** Schlick fresnel to a sky tint, up to half. The engine's own specular fades past 300 m, where the flat far sea would otherwise mirror the pale horizon and wash out.
 - **Foam:** lapping bands within about 12 m of the waterline, measured by the A mask (beaches here fall about 2 cm a metre, so foam by depth spread over tens of metres), skipped on the thinnest film of water; streaks on the highest crests out at sea.
 
+**Flora** (ADR 0041; `World/FloraPlan.cs`, `Presentation/Greenery.cs`, `Props.cs`, `shaders/flora.gdshader`):
+- **Thirteen kinds, three variants each,** built from cones, tubes, blades and lumpy icospheres with vertex colours: pine (3–5 tiers), oak, birch, autumn tree (orange, red, gold), dead tree, bush (one with berries), boulder, rock, driftwood, grass tuft, flowers (yellow, violet, white), reeds with cattails, and pebbles.
+- **Placement:** a jittered grid, one candidate every 5 m for the big layer and 0.9 m for ground cover, hashed from the cell so it's the same on every machine. Each candidate gets at most one piece, chosen by the ground under it:
+
+| Ground | Big layer | Ground cover |
+|---|---|---|
+| sea, roads, towns | nothing | nothing (towns get a few tufts) |
+| housing land | the odd bush | tufts |
+| beach (the open-sea mask, as in the shader) | driftwood, rocks | pebbles, a few tufts |
+| marsh (flats away from the sea, round pools) | dead trees, bushes | reeds and tufts |
+| steep (slope over about 30°) | boulders, rocks, clinging pines | pebbles, tufts |
+| elsewhere | forest by wide noise with clearings, thicker by area: Greymane Wood 32%, Wrackline Point 22% (mostly pine), the crags and scarp 20%, the downs and meadow 6%. Pines take over with height. Lone trees, bushes and boulders in the open | tufts in clumps, flowers in patches (twice as many on the downs and meadow) |
+
+- **Drawing:** trees, bushes and stones in 256 m cells to 900 m with shadows, and ground cover in 32 m cells to 80 m without. Up to three worker threads plan cells nearest first, and the main thread spends at most 2 ms a frame making MultiMeshes. Each instance has a turn, a size and a tint.
+- **Shader:** vertex colours (sRGB, clamped) times the instance tint. Sway grows with the square of height: little for trees, more for bushes, most for grass. Ground cover is lit as facing straight up, like the ground under it.
+
 **Light** (`Landscape.cs`): sun at 38° in warm light, sky ambient 0.55, Filmic tonemap, thin fog with aerial perspective, a little glow, and saturation 1.12 and contrast 1.05.
 
 ## 3. Deviations and not yet done
@@ -81,7 +97,7 @@ Hand-painted, the other option in ADR 0004, can't be shown with the tools we hav
 - **The style test is a dev scene.** The game client still draws capsules on a flat checkerboard. Real terrain comes with spike 4 (our own tiles, ADR 0017); everything stays placeholder until the art pass (ADR 0004).
 - **No foot-sliding fix.** Animations play at their authored speed, so feet may slide a little at run speed.
 - **No day/night cycle, sky dome art or foliage wind** yet (PLAN §6.3).
-- **The world has no trees, grass tufts or rocks as props yet**; the style test's `Props.cs` isn't used in the game. The ground's colour carries everything.
+- **Flora doesn't collide** (ADR 0041), and doesn't fade between distances: trees pop in at 900 m (in the fog) and tufts at 80 m.
 - **Climate doesn't tint the ground** yet. Hearthshore is all temperate.
 - **Roads have stair-stepped edges** from the 4 m land raster.
 
@@ -104,4 +120,12 @@ Hand-painted, the other option in ADR 0004, can't be shown with the tools we hav
 | Shallows on a near-level beach: no foam sheets or rings | the `shallows` view (−3100, 330, 6 m up) | seabed through clear water, foam only at the waterline |
 | In the game | `cargo xtask capture` with a new profile at the Furrowdale Wayshrine | `2026-11-01-look-game-start.png` |
 | Cost | the world test's `walk` and `sail` routes with `--no-vsync`, laptop RTX 5070 Ti Mobile | GPU p50 1.35 → 1.76 ms walking, 1.05 → 1.43 ms sailing |
+
+### Flora, 2026-11-01
+| What | How | Result |
+|---|---|---|
+| Same flora every time; nothing in the sea, on roads or in towns; trees inland of the beach, driftwood and pebbles on it; no reeds by the sea; a named wood has many more trees; steep ground gets stones | xUnit, `FloraPlanTests.cs` | passes |
+| No flares from bad colours or normals | captures in the fen, the wood and the town | clean (vertex colours below zero made NaN in `pow`; they're clamped now) |
+| Looks | the world test's views | `docs/captures/2026-11-01-flora-{wood,fen,shore,game-start}.png` |
+| Cost | `walk`, `sail` and `cross` with `--no-vsync`, RTX 5070 Ti Mobile | GPU p50 2.41 / 1.44 / 2.49 ms, p99 3.08 / 1.76 / 2.97 ms; at most 2.6 M triangles and 1,199 draw calls; no frame over 33 ms |
 

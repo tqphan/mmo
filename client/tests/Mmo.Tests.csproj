@@ -13,6 +13,7 @@
     <Compile Include="../src/World/HeightMap.cs" Link="Client/World/HeightMap.cs" />
     <Compile Include="../src/World/LandRaster.cs" Link="Client/World/LandRaster.cs" />
     <Compile Include="../src/World/GroundMasks.cs" Link="Client/World/GroundMasks.cs" />
+    <Compile Include="../src/World/FloraPlan.cs" Link="Client/World/FloraPlan.cs" />
     <Compile Include="../src/World/WorldFiles.cs" Link="Client/World/WorldFiles.cs" />
     <Compile Include="../src/World/Areas.cs" Link="Client/World/Areas.cs" />
     <Compile Include="../src/World/TerrainPlan.cs" Link="Client/World/TerrainPlan.cs" />

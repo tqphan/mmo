@@ -18,6 +18,7 @@ namespace Mmo.Presentation
         public Color Leaves = new(0.30f, 0.62f, 0.27f);
         public Color LeavesAutumn = new(0.90f, 0.62f, 0.20f);
         public Color Pine = new(0.18f, 0.45f, 0.30f);
+        public Color GrassBlade = new(0.36f, 0.60f, 0.20f);
         public Color WaterShallow = new(0.16f, 0.72f, 0.70f);
         public Color WaterDeep = new(0.04f, 0.22f, 0.42f);
 

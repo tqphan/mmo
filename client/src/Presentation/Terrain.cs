@@ -31,6 +31,8 @@ namespace Mmo.Presentation
         private readonly ShaderMaterial material;
         /// <summary>The ground masks as a texture, shared with the sea's shader (<see cref="Water"/>).</summary>
         public readonly Texture2D Masks;
+        /// <summary>The ground masks' bytes (<see cref="GroundMasks"/>), for placing flora.</summary>
+        public readonly byte[] MaskBytes;
         private readonly Dictionary<int, MeshInstance3D> shown = new();
         private readonly Dictionary<int, int> shownLevel = new();
         private readonly Dictionary<int, long> shownBytes = new();
@@ -55,7 +57,8 @@ namespace Mmo.Presentation
             Plan = new TerrainPlan(map);
             Name = "Terrain";
             var clock = Stopwatch.StartNew();
-            var image = Image.CreateFromData(GroundMasks.Side, GroundMasks.Side, false, Image.Format.Rgba8, GroundMasks.Build(map, land));
+            MaskBytes = GroundMasks.Build(map, land);
+            var image = Image.CreateFromData(GroundMasks.Side, GroundMasks.Side, false, Image.Format.Rgba8, MaskBytes);
             image.GenerateMipmaps();
             Masks = ImageTexture.CreateFromImage(image);
             GD.Print($"terrain: ground masks built in {clock.ElapsedMilliseconds} ms");

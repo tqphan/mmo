@@ -44,3 +44,4 @@ One file per decision: `NNNN-short-title.md`, with status, context, decision and
 | [0038](0038-terrain3d-opt-in-own-shader.md) | Terrain3D with our own colour-map shader; opt-in in M1, then the editor and renderer from M2 at its measured cost (amended); its Linux and Windows libraries are committed | Superseded by 0039 |
 | [0039](0039-no-terrain3d.md) | No Terrain3D: our own tiles and `world/` throughout, with our own editing tools for M2 | Accepted |
 | [0040](0040-ground-and-sea-shaded-from-masks.md) | The ground and the sea get their look before the playtest: shaders reading height, slope and ground masks (road, town, inland water, open sea) | Accepted |
+| [0041](0041-cosmetic-flora-placed-by-the-client.md) | Trees, rocks and ground cover are cosmetic and client-only, placed from `world/` by rules shared with the terrain shader | Accepted |

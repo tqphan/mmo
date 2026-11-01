@@ -50,7 +50,8 @@ namespace Mmo
 
             var session = new Session(options, world.TerrainHash);
             AddChild(session);
-            var (terrain, water) = Presentation.Landscape.Add(this, map, world.Land);
+            var landscape = new Presentation.Landscape(map, world.Land, world.Areas);
+            AddChild(landscape);
             var entities = new EntityRegistry(session, options.Trace, map);
             AddChild(entities);
             var ground = new TerrainCollision(map);
@@ -190,7 +191,7 @@ namespace Mmo
             if (options.PartyDemo)
                 AddChild(new PartyDemo(session, player, entities, party, chat));
             // Last, so it sees where the camera went this frame.
-            AddChild(new Scenery(camera, terrain, water));
+            AddChild(new Scenery(camera, landscape));
             if (OS.HasFeature("movie"))
                 AddChild(new RealTime());
             if (options.Secs > 0)
@@ -215,26 +216,20 @@ namespace Mmo
             }
         }
 
-        /// <summary>Keeps the terrain's levels of detail and the sea centred on the camera.</summary>
+        /// <summary>Keeps the terrain's levels of detail, the flora and the sea centred on the camera.</summary>
         private partial class Scenery : Node
         {
             private readonly Camera3D camera;
-            private readonly Presentation.Terrain terrain;
-            private readonly Node3D water;
+            private readonly Presentation.Landscape landscape;
 
-            public Scenery(Camera3D camera, Presentation.Terrain terrain, Node3D water)
+            public Scenery(Camera3D camera, Presentation.Landscape landscape)
             {
                 this.camera = camera;
-                this.terrain = terrain;
-                this.water = water;
+                this.landscape = landscape;
                 Name = "Scenery";
             }
 
-            public override void _Process(double delta)
-            {
-                terrain.Focus = camera.GlobalPosition;
-                Presentation.Water.Follow(water, camera.GlobalPosition);
-            }
+            public override void _Process(double delta) => landscape.Follow(camera.GlobalPosition);
         }
 
         /// <summary>

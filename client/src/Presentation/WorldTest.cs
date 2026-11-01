@@ -21,7 +21,7 @@ namespace Mmo.Presentation
         private readonly ClientOptions options;
         private HeightMap map = null!;
         private Terrain terrain = null!;
-        private Node3D water = null!;
+        private Landscape landscape = null!;
         private Camera3D camera = null!;
         private Rid viewport;
         private double time;
@@ -50,7 +50,9 @@ namespace Mmo.Presentation
             }
             map = world.Heights;
             var clock = Stopwatch.StartNew();
-            (terrain, water) = Landscape.Add(this, map, world.Land);
+            landscape = new Landscape(map, world.Land, world.Areas);
+            AddChild(landscape);
+            terrain = landscape.Terrain;
             GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned and ground masks built in {clock.ElapsedMilliseconds} ms");
             camera = new Camera3D { Name = "Camera", Fov = 60, Near = 0.2f, Far = 40000 };
             AddChild(camera);
@@ -88,8 +90,7 @@ namespace Mmo.Presentation
                 eye = new Vector3(v[0], Mathf.Max(map.Height(v[0], v[1]), 0) + v[2], v[1]);
                 ahead = Basis.FromEuler(new Vector3(Mathf.DegToRad(v[4]), Mathf.DegToRad(v[3]), 0)) * Vector3.Forward;
                 camera.LookAtFromPosition(eye, eye + ahead, Vector3.Up);
-                terrain.Focus = eye;
-                Water.Follow(water, eye);
+                landscape.Follow(eye);
                 return;
             }
             switch (options.Route)
@@ -118,8 +119,7 @@ namespace Mmo.Presentation
                     break;
             }
             camera.LookAtFromPosition(eye, eye + ahead, Vector3.Up);
-            terrain.Focus = eye;
-            Water.Follow(water, eye);
+            landscape.Follow(eye);
         }
 
         private sealed class Second
