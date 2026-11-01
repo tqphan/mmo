@@ -2,7 +2,7 @@
 //! Game data from `content/` (docs/design/content.md).
 
 /// Identifies this build's content. Clients with a different hash are refused.
-pub const CONTENT_HASH: u64 = 0x315e3c88921e5c5b;
+pub const CONTENT_HASH: u64 = 0xd604c28170decf45;
 
 /// Movement modes (`content/movement.toml`). The discriminant is the wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1315,4 +1315,114 @@ pub fn npc_kind(wire: u8) -> Option<&'static NpcKindData> {
 /// The NPC kind with content id `id`.
 pub fn npc_kind_by_id(id: &str) -> Option<&'static NpcKindData> {
     NPC_KINDS.iter().find(|d| d.id == id)
+}
+
+/// Quest rules (`[quests]` in `content/quests.toml`, docs/design/quests.md).
+#[derive(Debug, PartialEq)]
+pub struct QuestRules {
+    /// The most quests a character may have open at once.
+    pub log: i32,
+    /// How close a character must stand to a giver, m.
+    pub reach_m: f32,
+    /// Every objective this far along lets a quest be turned in early, for that share of the experience, %.
+    pub early_pct: i32,
+    /// Objectives of 2 or more count on to this share, for that much experience, %.
+    pub over_pct: i32,
+}
+
+pub static QUEST: QuestRules = QuestRules { log: 50, reach_m: 5.0, early_pct: 50, over_pct: 150 };
+
+/// A quest giver (`content/quests.toml`). Its wire is stored in giver rows.
+#[derive(Debug, PartialEq)]
+pub struct GiverData {
+    pub wire: u8,
+    pub id: &'static str,
+    /// What players see: a name and a title.
+    pub name: &'static str,
+    pub title: &'static str,
+}
+
+pub static GIVERS: [GiverData; 4] = [
+    GiverData { wire: 0, id: "odda_fernwright", name: "Odda Fernwright", title: "Reeve of Furrowdale" },
+    GiverData { wire: 1, id: "brannoch_hale", name: "Brannoch Hale", title: "Warden of Cairnwick" },
+    GiverData { wire: 2, id: "yeva_mossgrove", name: "Yeva Mossgrove", title: "Fenkeeper of Redfen" },
+    GiverData { wire: 3, id: "quill_ambry", name: "Quill Ambry", title: "Harbourmaster of Gullhaven" },
+];
+
+pub fn giver(wire: u8) -> Option<&'static GiverData> {
+    GIVERS.get(usize::from(wire))
+}
+
+pub fn giver_by_id(id: &str) -> Option<&'static GiverData> {
+    GIVERS.iter().find(|d| d.id == id)
+}
+
+/// What a quest objective counts. The discriminant is the wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum QuestAct {
+    Kill = 0,
+    Gather = 1,
+    Craft = 2,
+    Harvest = 3,
+    Sell = 4,
+}
+
+/// One objective: `act` on `target` (an NPC kind's wire for `Kill`, otherwise an item's), `count`
+/// times; a `Sell` with a `post` counts only at that post kind.
+#[derive(Debug, PartialEq)]
+pub struct ObjectiveData {
+    pub act: QuestAct,
+    pub target: u16,
+    pub count: u32,
+    pub post: Option<u8>,
+}
+
+/// `count` of the item with wire `item`.
+#[derive(Debug, PartialEq)]
+pub struct RewardData {
+    pub item: u16,
+    pub count: u32,
+}
+
+/// A quest (`content/quests.toml`). Its wire is stored in quest-log rows.
+#[derive(Debug, PartialEq)]
+pub struct QuestData {
+    pub wire: u16,
+    pub id: &'static str,
+    pub name: &'static str,
+    /// The givers' wires: who gives it, and who it's turned in to.
+    pub giver: u8,
+    pub to: u8,
+    /// The level a character must be to take it.
+    pub level: u8,
+    /// Quests that must be turned in first, by wire.
+    pub after: &'static [u16],
+    pub text: &'static str,
+    /// None makes an errand, done on reaching `to`.
+    pub objectives: &'static [ObjectiveData],
+    pub xp: u32,
+    pub rewards: &'static [RewardData],
+}
+
+/// Every quest, sorted by wire, which is the index.
+pub static QUESTS: [QuestData; 10] = [
+    QuestData { wire: 0, id: "shore_pests", name: "Pinchers on the Strand", giver: 0, to: 0, level: 1, after: &[], text: "Skitters come up the beach every tide and cut the nets. Thin them out, either side of town.", objectives: &[ObjectiveData { act: QuestAct::Kill, target: 0, count: 6, post: None }], xp: 120, rewards: &[RewardData { item: 102, count: 2 }] },
+    QuestData { wire: 1, id: "first_furrows", name: "First Furrows", giver: 0, to: 0, level: 1, after: &[], text: "Plant the Hearthgrain seed you were given, wild ground will do, and bring in the first harvest.", objectives: &[ObjectiveData { act: QuestAct::Harvest, target: 80, count: 20, post: None }], xp: 250, rewards: &[RewardData { item: 400, count: 10 }] },
+    QuestData { wire: 2, id: "reed_and_twine", name: "Reed and Twine", giver: 0, to: 0, level: 1, after: &[], text: "Cut Saltreed on the strand, twist it into twine at the Joiner's Bench and weave two lengths of Reedcloth.", objectives: &[ObjectiveData { act: QuestAct::Gather, target: 1, count: 32, post: None }, ObjectiveData { act: QuestAct::Craft, target: 31, count: 2, post: None }], xp: 220, rewards: &[RewardData { item: 31, count: 2 }] },
+    QuestData { wire: 3, id: "cairnwick_road", name: "The Cairnwick Road", giver: 0, to: 1, level: 2, after: &[0], text: "Brannoch Hale keeps the road to Cairnwick and wants hands. Follow it north-west over the downs.", objectives: &[], xp: 100, rewards: &[] },
+    QuestData { wire: 4, id: "boar_trouble", name: "Bristle Downs Boars", giver: 1, to: 1, level: 2, after: &[3], text: "Boars on the downs have torn up every field this side of the wood. Bring their numbers down.", objectives: &[ObjectiveData { act: QuestAct::Kill, target: 1, count: 8, post: None }], xp: 320, rewards: &[RewardData { item: 103, count: 4 }] },
+    QuestData { wire: 5, id: "wolves_in_the_wood", name: "Wolves in Greymane Wood", giver: 1, to: 1, level: 3, after: &[4], text: "Greymane Wolves are taking travellers on the road through the wood. Go in and deal with them.", objectives: &[ObjectiveData { act: QuestAct::Kill, target: 3, count: 6, post: None }], xp: 520, rewards: &[RewardData { item: 201, count: 1 }] },
+    QuestData { wire: 6, id: "fen_croakers", name: "Croakers in the Fen", giver: 0, to: 2, level: 2, after: &[], text: "The Redfen road runs round Croaker Fen, and the croakers spit at anyone on it. Clear a way, then tell Yeva Mossgrove.", objectives: &[ObjectiveData { act: QuestAct::Kill, target: 2, count: 8, post: None }], xp: 360, rewards: &[RewardData { item: 100, count: 4 }] },
+    QuestData { wire: 7, id: "hexers_tarn", name: "The Hexers of the Tarn", giver: 2, to: 2, level: 5, after: &[6], text: "Sea-witches have come up from the cove to Hexer's Tarn. Drive them out before they sour the fen.", objectives: &[ObjectiveData { act: QuestAct::Kill, target: 5, count: 4, post: None }], xp: 700, rewards: &[RewardData { item: 102, count: 4 }] },
+    QuestData { wire: 8, id: "first_bale", name: "A Bale for Market", giver: 0, to: 0, level: 2, after: &[1, 2], text: "Bind twenty Hearthgrain in Reedcloth at the Packwright's Bench, carry it to Redfen or Cairnwick Post and sell it. Take this skiff for the next load.", objectives: &[ObjectiveData { act: QuestAct::Craft, target: 500, count: 1, post: None }, ObjectiveData { act: QuestAct::Sell, target: 500, count: 1, post: None }], xp: 450, rewards: &[RewardData { item: 701, count: 1 }] },
+    QuestData { wire: 9, id: "across_the_water", name: "Across the Water", giver: 0, to: 3, level: 3, after: &[8], text: "Gullhaven pays best for grain. Take a Grain Bale over the sea, sell it at Gullhaven Post and see the harbourmaster.", objectives: &[ObjectiveData { act: QuestAct::Sell, target: 500, count: 1, post: Some(2) }], xp: 800, rewards: &[RewardData { item: 203, count: 1 }] },
+];
+
+pub fn quest(wire: u16) -> Option<&'static QuestData> {
+    QUESTS.get(usize::from(wire))
+}
+
+pub fn quest_by_id(id: &str) -> Option<&'static QuestData> {
+    QUESTS.iter().find(|d| d.id == id)
 }

@@ -14,7 +14,7 @@ fn kind(id: &str) -> &'static sim::npc::NpcKindData {
 }
 
 /// Put a `kind` NPC at (x, z) and return its entity.
-fn summon(t: &TestContext, player: u128, kind: &str, x: f32, z: f32) -> u64 {
+pub(super) fn summon(t: &TestContext, player: u128, kind: &str, x: f32, z: f32) -> u64 {
     call(t, player, |ctx| dev_spawn_npc(ctx, kind.into(), x, z)).unwrap();
     read(t, |ctx| ctx.db.npc().iter().map(|n| n.entity_id).max().unwrap())
 }
@@ -47,7 +47,7 @@ fn threat_on(t: &TestContext, npc_id: u64) -> Vec<(u64, i64, i64)> {
     rows.into_iter().map(|(_, e, a, d)| (e, a, d)).collect()
 }
 
-fn set_hp(t: &TestContext, id: u64, hp: i32) {
+pub(super) fn set_hp(t: &TestContext, id: u64, hp: i32) {
     read(t, |ctx| {
         let v = ctx.db.vitals().entity_id().find(id).unwrap();
         ctx.db.vitals().entity_id().update(crate::combat::Vitals { hp, at: crate::time::now(ctx), ..v });

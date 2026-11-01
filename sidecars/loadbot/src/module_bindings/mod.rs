@@ -7,9 +7,12 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod abandon_plot_reducer;
+pub mod abandon_quest_reducer;
 pub mod abandon_shipyard_reducer;
 pub mod accept_party_invite_reducer;
+pub mod accept_quest_reducer;
 pub mod account_type;
+pub mod admin_clear_givers_reducer;
 pub mod admin_clear_land_reducer;
 pub mod admin_clear_nodes_reducer;
 pub mod admin_clear_posts_reducer;
@@ -17,6 +20,7 @@ pub mod admin_clear_shrines_reducer;
 pub mod admin_clear_spawns_reducer;
 pub mod admin_clear_stations_reducer;
 pub mod admin_clear_terrain_reducer;
+pub mod admin_put_givers_reducer;
 pub mod admin_put_land_reducer;
 pub mod admin_put_nodes_reducer;
 pub mod admin_put_posts_reducer;
@@ -26,6 +30,7 @@ pub mod admin_put_stations_reducer;
 pub mod admin_put_terrain_reducer;
 pub mod admin_remove_crops_reducer;
 pub mod admin_remove_dropped_packs_reducer;
+pub mod admin_remove_givers_reducer;
 pub mod admin_remove_land_reducer;
 pub mod admin_remove_nodes_reducer;
 pub mod admin_remove_plots_reducer;
@@ -65,6 +70,7 @@ pub mod dev_grant_item_reducer;
 pub mod dev_remove_dummy_reducer;
 pub mod dev_remove_npc_reducer;
 pub mod dev_remove_ship_reducer;
+pub mod dev_reset_quests_reducer;
 pub mod dev_set_crime_reducer;
 pub mod dev_set_gm_reducer;
 pub mod dev_set_labor_reducer;
@@ -93,6 +99,7 @@ pub mod game_clock_table;
 pub mod game_clock_type;
 pub mod gather_job_type;
 pub mod gather_reducer;
+pub mod giver_placement_type;
 pub mod harvest_reducer;
 pub mod helm_reducer;
 pub mod invite_to_party_reducer;
@@ -126,6 +133,7 @@ pub mod my_party_invites_table;
 pub mod my_party_table;
 pub mod my_presence_table;
 pub mod my_purse_table;
+pub mod my_quests_table;
 pub mod my_vehicles_table;
 pub mod my_wrecks_table;
 pub mod node_placement_type;
@@ -148,6 +156,9 @@ pub mod plot_type;
 pub mod post_placement_type;
 pub mod presence_type;
 pub mod purse_type;
+pub mod quest_giver_table;
+pub mod quest_giver_type;
+pub mod quest_log_type;
 pub mod repair_vehicle_reducer;
 pub mod report_evidence_reducer;
 pub mod resist_type;
@@ -186,6 +197,7 @@ pub mod trade_post_table;
 pub mod trade_post_type;
 pub mod transform_table;
 pub mod transform_type;
+pub mod turn_in_quest_reducer;
 pub mod unload_pack_reducer;
 pub mod uproot_reducer;
 pub mod use_skill_reducer;
@@ -200,9 +212,12 @@ pub mod world_tick_timer_type;
 pub mod wreck_type;
 
 pub use abandon_plot_reducer::abandon_plot;
+pub use abandon_quest_reducer::abandon_quest;
 pub use abandon_shipyard_reducer::abandon_shipyard;
 pub use accept_party_invite_reducer::accept_party_invite;
+pub use accept_quest_reducer::accept_quest;
 pub use account_type::Account;
+pub use admin_clear_givers_reducer::admin_clear_givers;
 pub use admin_clear_land_reducer::admin_clear_land;
 pub use admin_clear_nodes_reducer::admin_clear_nodes;
 pub use admin_clear_posts_reducer::admin_clear_posts;
@@ -210,6 +225,7 @@ pub use admin_clear_shrines_reducer::admin_clear_shrines;
 pub use admin_clear_spawns_reducer::admin_clear_spawns;
 pub use admin_clear_stations_reducer::admin_clear_stations;
 pub use admin_clear_terrain_reducer::admin_clear_terrain;
+pub use admin_put_givers_reducer::admin_put_givers;
 pub use admin_put_land_reducer::admin_put_land;
 pub use admin_put_nodes_reducer::admin_put_nodes;
 pub use admin_put_posts_reducer::admin_put_posts;
@@ -219,6 +235,7 @@ pub use admin_put_stations_reducer::admin_put_stations;
 pub use admin_put_terrain_reducer::admin_put_terrain;
 pub use admin_remove_crops_reducer::admin_remove_crops;
 pub use admin_remove_dropped_packs_reducer::admin_remove_dropped_packs;
+pub use admin_remove_givers_reducer::admin_remove_givers;
 pub use admin_remove_land_reducer::admin_remove_land;
 pub use admin_remove_nodes_reducer::admin_remove_nodes;
 pub use admin_remove_plots_reducer::admin_remove_plots;
@@ -258,6 +275,7 @@ pub use dev_grant_item_reducer::dev_grant_item;
 pub use dev_remove_dummy_reducer::dev_remove_dummy;
 pub use dev_remove_npc_reducer::dev_remove_npc;
 pub use dev_remove_ship_reducer::dev_remove_ship;
+pub use dev_reset_quests_reducer::dev_reset_quests;
 pub use dev_set_crime_reducer::dev_set_crime;
 pub use dev_set_gm_reducer::dev_set_gm;
 pub use dev_set_labor_reducer::dev_set_labor;
@@ -286,6 +304,7 @@ pub use game_clock_table::*;
 pub use game_clock_type::GameClock;
 pub use gather_job_type::GatherJob;
 pub use gather_reducer::gather;
+pub use giver_placement_type::GiverPlacement;
 pub use harvest_reducer::harvest;
 pub use helm_reducer::helm;
 pub use invite_to_party_reducer::invite_to_party;
@@ -319,6 +338,7 @@ pub use my_party_invites_table::*;
 pub use my_party_table::*;
 pub use my_presence_table::*;
 pub use my_purse_table::*;
+pub use my_quests_table::*;
 pub use my_vehicles_table::*;
 pub use my_wrecks_table::*;
 pub use node_placement_type::NodePlacement;
@@ -341,6 +361,9 @@ pub use plot_type::Plot;
 pub use post_placement_type::PostPlacement;
 pub use presence_type::Presence;
 pub use purse_type::Purse;
+pub use quest_giver_table::*;
+pub use quest_giver_type::QuestGiver;
+pub use quest_log_type::QuestLog;
 pub use repair_vehicle_reducer::repair_vehicle;
 pub use report_evidence_reducer::report_evidence;
 pub use resist_type::Resist;
@@ -379,6 +402,7 @@ pub use trade_post_table::*;
 pub use trade_post_type::TradePost;
 pub use transform_table::*;
 pub use transform_type::Transform;
+pub use turn_in_quest_reducer::turn_in_quest;
 pub use unload_pack_reducer::unload_pack;
 pub use uproot_reducer::uproot;
 pub use use_skill_reducer::use_skill;
@@ -403,12 +427,20 @@ pub enum Reducer {
     AbandonPlot {
         plot_id: u64,
     },
+    AbandonQuest {
+        quest: u16,
+    },
     AbandonShipyard {
         yard_id: u64,
     },
     AcceptPartyInvite {
         id: u64,
     },
+    AcceptQuest {
+        giver_id: u64,
+        quest: u16,
+    },
+    AdminClearGivers,
     AdminClearLand,
     AdminClearNodes,
     AdminClearPosts,
@@ -416,6 +448,9 @@ pub enum Reducer {
     AdminClearSpawns,
     AdminClearStations,
     AdminClearTerrain,
+    AdminPutGivers {
+        givers: Vec<GiverPlacement>,
+    },
     AdminPutLand {
         chunks: Vec<LandChunk>,
     },
@@ -441,6 +476,9 @@ pub enum Reducer {
         ids: Vec<u64>,
     },
     AdminRemoveDroppedPacks {
+        ids: Vec<u64>,
+    },
+    AdminRemoveGivers {
         ids: Vec<u64>,
     },
     AdminRemoveLand {
@@ -513,6 +551,7 @@ pub enum Reducer {
     DevRemoveShip {
         ship: u64,
     },
+    DevResetQuests,
     DevSetCrime {
         crime_points: u32,
         notoriety: u32,
@@ -664,6 +703,10 @@ pub enum Reducer {
         item_id: u64,
     },
     TakeHelm,
+    TurnInQuest {
+        giver_id: u64,
+        quest: u16,
+    },
     UnloadPack {
         vehicle_id: u64,
         slot: u8,
@@ -692,8 +735,11 @@ impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
             Reducer::AbandonPlot { .. } => "abandon_plot",
+            Reducer::AbandonQuest { .. } => "abandon_quest",
             Reducer::AbandonShipyard { .. } => "abandon_shipyard",
             Reducer::AcceptPartyInvite { .. } => "accept_party_invite",
+            Reducer::AcceptQuest { .. } => "accept_quest",
+            Reducer::AdminClearGivers => "admin_clear_givers",
             Reducer::AdminClearLand => "admin_clear_land",
             Reducer::AdminClearNodes => "admin_clear_nodes",
             Reducer::AdminClearPosts => "admin_clear_posts",
@@ -701,6 +747,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminClearSpawns => "admin_clear_spawns",
             Reducer::AdminClearStations => "admin_clear_stations",
             Reducer::AdminClearTerrain => "admin_clear_terrain",
+            Reducer::AdminPutGivers { .. } => "admin_put_givers",
             Reducer::AdminPutLand { .. } => "admin_put_land",
             Reducer::AdminPutNodes { .. } => "admin_put_nodes",
             Reducer::AdminPutPosts { .. } => "admin_put_posts",
@@ -710,6 +757,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdminPutTerrain { .. } => "admin_put_terrain",
             Reducer::AdminRemoveCrops { .. } => "admin_remove_crops",
             Reducer::AdminRemoveDroppedPacks { .. } => "admin_remove_dropped_packs",
+            Reducer::AdminRemoveGivers { .. } => "admin_remove_givers",
             Reducer::AdminRemoveLand { .. } => "admin_remove_land",
             Reducer::AdminRemoveNodes { .. } => "admin_remove_nodes",
             Reducer::AdminRemovePlots { .. } => "admin_remove_plots",
@@ -734,6 +782,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DevRemoveDummy { .. } => "dev_remove_dummy",
             Reducer::DevRemoveNpc { .. } => "dev_remove_npc",
             Reducer::DevRemoveShip { .. } => "dev_remove_ship",
+            Reducer::DevResetQuests => "dev_reset_quests",
             Reducer::DevSetCrime { .. } => "dev_set_crime",
             Reducer::DevSetGm { .. } => "dev_set_gm",
             Reducer::DevSetLabor { .. } => "dev_set_labor",
@@ -778,6 +827,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::StowVehicle { .. } => "stow_vehicle",
             Reducer::SummonVehicle { .. } => "summon_vehicle",
             Reducer::TakeHelm => "take_helm",
+            Reducer::TurnInQuest { .. } => "turn_in_quest",
             Reducer::UnloadPack { .. } => "unload_pack",
             Reducer::Uproot { .. } => "uproot",
             Reducer::UseSkill { .. } => "use_skill",
@@ -794,6 +844,11 @@ impl __sdk::Reducer for Reducer {
                     plot_id: plot_id.clone(),
                 })
             }
+            Reducer::AbandonQuest { quest } => {
+                __sats::bsatn::to_vec(&abandon_quest_reducer::AbandonQuestArgs {
+                    quest: quest.clone(),
+                })
+            }
             Reducer::AbandonShipyard { yard_id } => {
                 __sats::bsatn::to_vec(&abandon_shipyard_reducer::AbandonShipyardArgs {
                     yard_id: yard_id.clone(),
@@ -803,6 +858,15 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&accept_party_invite_reducer::AcceptPartyInviteArgs {
                     id: id.clone(),
                 })
+            }
+            Reducer::AcceptQuest { giver_id, quest } => {
+                __sats::bsatn::to_vec(&accept_quest_reducer::AcceptQuestArgs {
+                    giver_id: giver_id.clone(),
+                    quest: quest.clone(),
+                })
+            }
+            Reducer::AdminClearGivers => {
+                __sats::bsatn::to_vec(&admin_clear_givers_reducer::AdminClearGiversArgs {})
             }
             Reducer::AdminClearLand => {
                 __sats::bsatn::to_vec(&admin_clear_land_reducer::AdminClearLandArgs {})
@@ -824,6 +888,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::AdminClearTerrain => {
                 __sats::bsatn::to_vec(&admin_clear_terrain_reducer::AdminClearTerrainArgs {})
+            }
+            Reducer::AdminPutGivers { givers } => {
+                __sats::bsatn::to_vec(&admin_put_givers_reducer::AdminPutGiversArgs {
+                    givers: givers.clone(),
+                })
             }
             Reducer::AdminPutLand { chunks } => {
                 __sats::bsatn::to_vec(&admin_put_land_reducer::AdminPutLandArgs {
@@ -870,6 +939,11 @@ impl __sdk::Reducer for Reducer {
                     ids: ids.clone(),
                 },
             ),
+            Reducer::AdminRemoveGivers { ids } => {
+                __sats::bsatn::to_vec(&admin_remove_givers_reducer::AdminRemoveGiversArgs {
+                    ids: ids.clone(),
+                })
+            }
             Reducer::AdminRemoveLand { cells } => {
                 __sats::bsatn::to_vec(&admin_remove_land_reducer::AdminRemoveLandArgs {
                     cells: cells.clone(),
@@ -985,6 +1059,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&dev_remove_ship_reducer::DevRemoveShipArgs {
                     ship: ship.clone(),
                 })
+            }
+            Reducer::DevResetQuests => {
+                __sats::bsatn::to_vec(&dev_reset_quests_reducer::DevResetQuestsArgs {})
             }
             Reducer::DevSetCrime {
                 crime_points,
@@ -1211,6 +1288,12 @@ impl __sdk::Reducer for Reducer {
                 })
             }
             Reducer::TakeHelm => __sats::bsatn::to_vec(&take_helm_reducer::TakeHelmArgs {}),
+            Reducer::TurnInQuest { giver_id, quest } => {
+                __sats::bsatn::to_vec(&turn_in_quest_reducer::TurnInQuestArgs {
+                    giver_id: giver_id.clone(),
+                    quest: quest.clone(),
+                })
+            }
             Reducer::UnloadPack { vehicle_id, slot } => {
                 __sats::bsatn::to_vec(&unload_pack_reducer::UnloadPackArgs {
                     vehicle_id: vehicle_id.clone(),
@@ -1266,9 +1349,11 @@ pub struct DbUpdate {
     my_party_invites: __sdk::TableUpdate<PartyInvite>,
     my_presence: __sdk::TableUpdate<Presence>,
     my_purse: __sdk::TableUpdate<Purse>,
+    my_quests: __sdk::TableUpdate<QuestLog>,
     my_vehicles: __sdk::TableUpdate<Vehicle>,
     my_wrecks: __sdk::TableUpdate<Wreck>,
     plot: __sdk::TableUpdate<Plot>,
+    quest_giver: __sdk::TableUpdate<QuestGiver>,
     resource_node: __sdk::TableUpdate<ResourceNode>,
     shipyard: __sdk::TableUpdate<Shipyard>,
     shrine: __sdk::TableUpdate<Shrine>,
@@ -1353,6 +1438,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(my_purse_table::parse_table_update(table_update)?),
+                "my_quests" => db_update
+                    .my_quests
+                    .append(my_quests_table::parse_table_update(table_update)?),
                 "my_vehicles" => db_update
                     .my_vehicles
                     .append(my_vehicles_table::parse_table_update(table_update)?),
@@ -1362,6 +1450,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "plot" => db_update
                     .plot
                     .append(plot_table::parse_table_update(table_update)?),
+                "quest_giver" => db_update
+                    .quest_giver
+                    .append(quest_giver_table::parse_table_update(table_update)?),
                 "resource_node" => db_update
                     .resource_node
                     .append(resource_node_table::parse_table_update(table_update)?),
@@ -1444,6 +1535,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.plot = cache
             .apply_diff_to_table::<Plot>("plot", &self.plot)
             .with_updates_by_pk(|row| &row.id);
+        diff.quest_giver = cache
+            .apply_diff_to_table::<QuestGiver>("quest_giver", &self.quest_giver)
+            .with_updates_by_pk(|row| &row.id);
         diff.resource_node = cache
             .apply_diff_to_table::<ResourceNode>("resource_node", &self.resource_node)
             .with_updates_by_pk(|row| &row.id);
@@ -1489,6 +1583,7 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<PartyInvite>("my_party_invites", &self.my_party_invites);
         diff.my_presence = cache.apply_diff_to_table::<Presence>("my_presence", &self.my_presence);
         diff.my_purse = cache.apply_diff_to_table::<Purse>("my_purse", &self.my_purse);
+        diff.my_quests = cache.apply_diff_to_table::<QuestLog>("my_quests", &self.my_quests);
         diff.my_vehicles = cache.apply_diff_to_table::<Vehicle>("my_vehicles", &self.my_vehicles);
         diff.my_wrecks = cache.apply_diff_to_table::<Wreck>("my_wrecks", &self.my_wrecks);
 
@@ -1564,6 +1659,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_quests" => db_update
+                    .my_quests
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_vehicles" => db_update
                     .my_vehicles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -1572,6 +1670,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "plot" => db_update
                     .plot
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quest_giver" => db_update
+                    .quest_giver
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
@@ -1682,6 +1783,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_purse" => db_update
                     .my_purse
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_quests" => db_update
+                    .my_quests
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_vehicles" => db_update
                     .my_vehicles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -1690,6 +1794,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "plot" => db_update
                     .plot
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quest_giver" => db_update
+                    .quest_giver
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "resource_node" => db_update
                     .resource_node
@@ -1758,9 +1865,11 @@ pub struct AppliedDiff<'r> {
     my_party_invites: __sdk::TableAppliedDiff<'r, PartyInvite>,
     my_presence: __sdk::TableAppliedDiff<'r, Presence>,
     my_purse: __sdk::TableAppliedDiff<'r, Purse>,
+    my_quests: __sdk::TableAppliedDiff<'r, QuestLog>,
     my_vehicles: __sdk::TableAppliedDiff<'r, Vehicle>,
     my_wrecks: __sdk::TableAppliedDiff<'r, Wreck>,
     plot: __sdk::TableAppliedDiff<'r, Plot>,
+    quest_giver: __sdk::TableAppliedDiff<'r, QuestGiver>,
     resource_node: __sdk::TableAppliedDiff<'r, ResourceNode>,
     shipyard: __sdk::TableAppliedDiff<'r, Shipyard>,
     shrine: __sdk::TableAppliedDiff<'r, Shrine>,
@@ -1826,9 +1935,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Presence>("my_presence", &self.my_presence, event);
         callbacks.invoke_table_row_callbacks::<Purse>("my_purse", &self.my_purse, event);
+        callbacks.invoke_table_row_callbacks::<QuestLog>("my_quests", &self.my_quests, event);
         callbacks.invoke_table_row_callbacks::<Vehicle>("my_vehicles", &self.my_vehicles, event);
         callbacks.invoke_table_row_callbacks::<Wreck>("my_wrecks", &self.my_wrecks, event);
         callbacks.invoke_table_row_callbacks::<Plot>("plot", &self.plot, event);
+        callbacks.invoke_table_row_callbacks::<QuestGiver>("quest_giver", &self.quest_giver, event);
         callbacks.invoke_table_row_callbacks::<ResourceNode>(
             "resource_node",
             &self.resource_node,
@@ -2533,9 +2644,11 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_party_invites_table::register_table(client_cache);
         my_presence_table::register_table(client_cache);
         my_purse_table::register_table(client_cache);
+        my_quests_table::register_table(client_cache);
         my_vehicles_table::register_table(client_cache);
         my_wrecks_table::register_table(client_cache);
         plot_table::register_table(client_cache);
+        quest_giver_table::register_table(client_cache);
         resource_node_table::register_table(client_cache);
         shipyard_table::register_table(client_cache);
         shrine_table::register_table(client_cache);
@@ -2570,9 +2683,11 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_party_invites",
         "my_presence",
         "my_purse",
+        "my_quests",
         "my_vehicles",
         "my_wrecks",
         "plot",
+        "quest_giver",
         "resource_node",
         "shipyard",
         "shrine",

@@ -20,6 +20,7 @@ mod farm;
 mod land;
 mod npc;
 mod party;
+mod quests;
 mod metrics;
 mod ship;
 mod shipyard;
@@ -124,6 +125,7 @@ fn main() {
         "vehicle" => vehicle::scenario(&args),
         "shipyard" => shipyard::scenario(&args),
         "party" => party::scenario(&args),
+        "quests" => quests::scenario(&args),
         _ => {
             eprintln!(
                 "scenarios:\n  \

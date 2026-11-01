@@ -316,6 +316,39 @@ namespace Mmo.Content
     /// <param name="Skills">Skill wires, tried in order.</param>
     public sealed record NpcKindData(byte Wire, string Id, string Name, byte Level, int Hp, float SpeedMps, float AggroM, float WanderM, uint RespawnS, float SizeM, uint Color, IReadOnlyList<ushort> Skills, IReadOnlyList<LootData> Loot);
 
+    /// <summary>Quest rules ([quests] in content/quests.toml, docs/design/quests.md).</summary>
+    /// <param name="Log">The most quests a character may have open at once.</param>
+    /// <param name="ReachM">How close a character must stand to a giver, m.</param>
+    /// <param name="EarlyPct">Every objective this far along lets a quest be turned in early, for that share of the experience, %.</param>
+    /// <param name="OverPct">Objectives of 2 or more count on to this share, for that much experience, %.</param>
+    public sealed record QuestRules(int Log, float ReachM, int EarlyPct, int OverPct);
+
+    /// <summary>A quest giver (content/quests.toml). Its wire is stored in giver rows.</summary>
+    public sealed record GiverData(byte Wire, string Id, string Name, string Title);
+
+    /// <summary>What a quest objective counts. The value is the wire value.</summary>
+    public enum QuestAct : byte
+    {
+        Kill = 0,
+        Gather = 1,
+        Craft = 2,
+        Harvest = 3,
+        Sell = 4,
+    }
+
+    /// <summary>One objective: <paramref name="Act"/> on <paramref name="Target"/> (an NPC kind's wire for Kill, otherwise an item's), <paramref name="Count"/> times.</summary>
+    /// <param name="Post">A Sell counts only at this post kind, if it has one.</param>
+    public sealed record ObjectiveData(QuestAct Act, ushort Target, uint Count, byte? Post);
+
+    /// <summary><paramref name="Count"/> of the item with wire <paramref name="Item"/>.</summary>
+    public sealed record RewardData(ushort Item, uint Count);
+
+    /// <summary>A quest (content/quests.toml). Its wire is stored in quest-log rows.</summary>
+    /// <param name="Giver">Who gives it, by wire; <paramref name="To"/> is who it's turned in to.</param>
+    /// <param name="After">Quests that must be turned in first, by wire.</param>
+    /// <param name="Objectives">None makes an errand, done on reaching <paramref name="To"/>.</param>
+    public sealed record QuestData(ushort Wire, string Id, string Name, byte Giver, byte To, byte Level, IReadOnlyList<ushort> After, string Text, IReadOnlyList<ObjectiveData> Objectives, uint Xp, IReadOnlyList<RewardData> Rewards);
+
     /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>
     /// <param name="Wire">Stored in casts and combat events.</param>
     /// <param name="Skillset">The skillset's wire.</param>
@@ -369,7 +402,7 @@ namespace Mmo.Content
     public static class GameContent
     {
         /// <summary>Must match the server's, or entering the world is refused.</summary>
-        public const ulong Hash = 0x315e3c88921e5c5bUL;
+        public const ulong Hash = 0xd604c28170decf45UL;
 
         public static readonly IReadOnlyList<MoveModeData> MoveModes = new MoveModeData[]
         {
@@ -782,5 +815,37 @@ namespace Mmo.Content
 
         /// <summary>The NPC kind stored as <paramref name="wire"/>, if it exists.</summary>
         public static NpcKindData? NpcKind(byte wire) => wire < NpcKinds.Count ? NpcKinds[wire] : null;
+
+        public static readonly QuestRules Quest = new(50, 5.0f, 50, 150);
+
+        /// <summary>Every quest giver, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<GiverData> Givers = new GiverData[]
+        {
+            new(0, "odda_fernwright", "Odda Fernwright", "Reeve of Furrowdale"),
+            new(1, "brannoch_hale", "Brannoch Hale", "Warden of Cairnwick"),
+            new(2, "yeva_mossgrove", "Yeva Mossgrove", "Fenkeeper of Redfen"),
+            new(3, "quill_ambry", "Quill Ambry", "Harbourmaster of Gullhaven"),
+        };
+
+        /// <summary>The giver stored as <paramref name="wire"/>, if it exists.</summary>
+        public static GiverData? Giver(byte wire) => wire < Givers.Count ? Givers[wire] : null;
+
+        /// <summary>Every quest, sorted by wire, which is the index.</summary>
+        public static readonly IReadOnlyList<QuestData> Quests = new QuestData[]
+        {
+            new(0, "shore_pests", "Pinchers on the Strand", 0, 0, 1, new ushort[] {  }, "Skitters come up the beach every tide and cut the nets. Thin them out, either side of town.", new ObjectiveData[] { new(QuestAct.Kill, 0, 6u, null) }, 120u, new RewardData[] { new(102, 2u) }),
+            new(1, "first_furrows", "First Furrows", 0, 0, 1, new ushort[] {  }, "Plant the Hearthgrain seed you were given, wild ground will do, and bring in the first harvest.", new ObjectiveData[] { new(QuestAct.Harvest, 80, 20u, null) }, 250u, new RewardData[] { new(400, 10u) }),
+            new(2, "reed_and_twine", "Reed and Twine", 0, 0, 1, new ushort[] {  }, "Cut Saltreed on the strand, twist it into twine at the Joiner's Bench and weave two lengths of Reedcloth.", new ObjectiveData[] { new(QuestAct.Gather, 1, 32u, null), new(QuestAct.Craft, 31, 2u, null) }, 220u, new RewardData[] { new(31, 2u) }),
+            new(3, "cairnwick_road", "The Cairnwick Road", 0, 1, 2, new ushort[] { 0 }, "Brannoch Hale keeps the road to Cairnwick and wants hands. Follow it north-west over the downs.", new ObjectiveData[] {  }, 100u, new RewardData[] {  }),
+            new(4, "boar_trouble", "Bristle Downs Boars", 1, 1, 2, new ushort[] { 3 }, "Boars on the downs have torn up every field this side of the wood. Bring their numbers down.", new ObjectiveData[] { new(QuestAct.Kill, 1, 8u, null) }, 320u, new RewardData[] { new(103, 4u) }),
+            new(5, "wolves_in_the_wood", "Wolves in Greymane Wood", 1, 1, 3, new ushort[] { 4 }, "Greymane Wolves are taking travellers on the road through the wood. Go in and deal with them.", new ObjectiveData[] { new(QuestAct.Kill, 3, 6u, null) }, 520u, new RewardData[] { new(201, 1u) }),
+            new(6, "fen_croakers", "Croakers in the Fen", 0, 2, 2, new ushort[] {  }, "The Redfen road runs round Croaker Fen, and the croakers spit at anyone on it. Clear a way, then tell Yeva Mossgrove.", new ObjectiveData[] { new(QuestAct.Kill, 2, 8u, null) }, 360u, new RewardData[] { new(100, 4u) }),
+            new(7, "hexers_tarn", "The Hexers of the Tarn", 2, 2, 5, new ushort[] { 6 }, "Sea-witches have come up from the cove to Hexer's Tarn. Drive them out before they sour the fen.", new ObjectiveData[] { new(QuestAct.Kill, 5, 4u, null) }, 700u, new RewardData[] { new(102, 4u) }),
+            new(8, "first_bale", "A Bale for Market", 0, 0, 2, new ushort[] { 1, 2 }, "Bind twenty Hearthgrain in Reedcloth at the Packwright's Bench, carry it to Redfen or Cairnwick Post and sell it. Take this skiff for the next load.", new ObjectiveData[] { new(QuestAct.Craft, 500, 1u, null), new(QuestAct.Sell, 500, 1u, null) }, 450u, new RewardData[] { new(701, 1u) }),
+            new(9, "across_the_water", "Across the Water", 0, 3, 3, new ushort[] { 8 }, "Gullhaven pays best for grain. Take a Grain Bale over the sea, sell it at Gullhaven Post and see the harbourmaster.", new ObjectiveData[] { new(QuestAct.Sell, 500, 1u, 2) }, 800u, new RewardData[] { new(203, 1u) }),
+        };
+
+        /// <summary>The quest stored as <paramref name="wire"/>, if it exists.</summary>
+        public static QuestData? QuestOf(ushort wire) => wire < Quests.Count ? Quests[wire] : null;
     }
 }

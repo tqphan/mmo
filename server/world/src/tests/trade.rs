@@ -30,7 +30,7 @@ fn as_admin(t: &TestContext) {
 }
 
 /// A Packwright's Bench at `(x, 0, z)`; returns its id.
-fn bench(t: &TestContext, x: f32, z: f32) -> u64 {
+pub(super) fn bench(t: &TestContext, x: f32, z: f32) -> u64 {
     as_admin(t);
     let p = StationPlacement { kind: station_by_id("packwright_bench").unwrap().wire, x, y: 0.0, z, yaw: 0 };
     call(t, ADMIN, |ctx| admin_put_stations(ctx, vec![p])).unwrap();
@@ -38,7 +38,7 @@ fn bench(t: &TestContext, x: f32, z: f32) -> u64 {
 }
 
 /// A post of kind `id` at `(x, 0, z)`; returns its id.
-fn post(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
+pub(super) fn post(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
     as_admin(t);
     let p = PostPlacement { kind: post_by_id(id).unwrap().wire, x, y: 0.0, z, yaw: 0 };
     call(t, ADMIN, |ctx| admin_put_posts(ctx, vec![p])).unwrap();
@@ -93,7 +93,7 @@ fn place_at(t: &TestContext, player: u128, x: f32, z: f32) {
 }
 
 /// Put a fresh pack of `id` on `player`'s back, made where it stands, as a dev build's `dev_give_pack` does.
-fn give_pack(t: &TestContext, player: u128, id: &str) {
+pub(super) fn give_pack(t: &TestContext, player: u128, id: &str) {
     read(t, |ctx| {
         let p = ctx.db.presence().identity().find(identity(player)).unwrap();
         crate::trade::made(ctx, &p, wire(id), [p.x, p.y, p.z]);
@@ -101,7 +101,7 @@ fn give_pack(t: &TestContext, player: u128, id: &str) {
 }
 
 /// Craft a Grain Bale at `bench_id` and let it finish.
-fn craft_bale(t: &TestContext, player: u128, char_id: u64, bench_id: u64) {
+pub(super) fn craft_bale(t: &TestContext, player: u128, char_id: u64, bench_id: u64) {
     give(t, char_id, "hearthgrain", 20);
     give(t, char_id, "reedcloth", 2);
     let r = recipe_by_id("grain_bale").unwrap();

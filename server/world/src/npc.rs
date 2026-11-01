@@ -574,6 +574,7 @@ pub fn died(ctx: &ReducerContext, entity_id: u64, killer: u64) {
     let in_world = ctx.db.presence().entity_id().find(m.tagger).is_some_and(|p| p.char_id == m.tagger_char);
     let earner = if owner != 0 && in_world { m.tagger } else { killer };
     crate::combat::reward(ctx, earner, entity_id, kind.level);
+    crate::quests::killed(ctx, earner, entity_id, kind.wire);
     let cell = ctx.db.vitals().entity_id().find(entity_id).map_or(0, |v| v.cell);
     let free_at = stamp(t + sim::npc::free_micros());
     for line in kind.loot {

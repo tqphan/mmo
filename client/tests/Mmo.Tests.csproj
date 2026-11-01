@@ -28,6 +28,7 @@
     <Compile Include="../src/Gameplay/ChatModel.cs" Link="Client/Gameplay/ChatModel.cs" />
     <Compile Include="../src/Gameplay/VehicleModel.cs" Link="Client/Gameplay/VehicleModel.cs" />
     <Compile Include="../src/Gameplay/ShipyardModel.cs" Link="Client/Gameplay/ShipyardModel.cs" />
+    <Compile Include="../src/Gameplay/QuestModel.cs" Link="Client/Gameplay/QuestModel.cs" />
     <Compile Include="../src/World/ShipPredictor.cs" Link="Client/World/ShipPredictor.cs" />
     <Compile Include="../content/*.cs" Link="Client/Content/%(Filename)%(Extension)" />
   </ItemGroup>

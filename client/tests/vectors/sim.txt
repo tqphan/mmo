@@ -47,6 +47,9 @@
 # combat_dr <n> (<group> <count> <until>)×n <group> <now> <lasts µs> <pct, or none> <count after> <until after>
 # combat_damage <amount> <dealt pct> <taken pct> <damage>
 # combat_tick <start> <until> <tick ms> <last> <next, or none>
+# quest <wire> <done, comma-separated, or -> <score> <ready: 1 or 0> <xp paid> <standing: 0 going, 1 early, 2 done, 3 extra, 4 over>
+# quest_tally <done> <need> <add> <after>
+# quest_take <wire> <level> <turned in, comma-separated, or -> <ok, level:N or after:W>
 cell_of 0 0.0 0.0 8192125
 cell_of 0 -0.01 -0.01 8126588
 cell_of 0 64.0 0.0 8192126
@@ -3604,3 +3607,203 @@ combat_tick 1800000000000000 1800000010459537 750 1800000000752919 1800000001500
 combat_tick 1800000000000000 1800000005899666 2000 1800000012685356 none
 combat_tick 1800000000000000 1800000002781858 0 1800000012016358 none
 combat_tick 1800000000000000 1800000010491020 1000 1800000001139075 1800000002000000
+quest 0 1 16 0 19 0
+quest 0 4 66 1 79 1
+quest 0 9 150 1 180 4
+quest 0 4 66 1 79 1
+quest 0 4 66 1 79 1
+quest 0 4 66 1 79 1
+quest 0 0 0 0 0 0
+quest 0 4 66 1 79 1
+quest 0 5 83 1 99 1
+quest 0 3 50 1 60 1
+quest 0 7 116 1 139 3
+quest 0 7 116 1 139 3
+quest 1 0 0 0 0 0
+quest 1 30 150 1 375 4
+quest 1 26 130 1 325 3
+quest 1 12 60 1 150 1
+quest 1 21 105 1 262 3
+quest 1 6 30 0 75 0
+quest 1 29 145 1 362 3
+quest 1 30 150 1 375 4
+quest 1 10 50 1 125 1
+quest 1 12 60 1 150 1
+quest 1 16 80 1 200 1
+quest 1 22 110 1 275 3
+quest 2 40,4 125 1 275 3
+quest 2 8,2 25 0 55 0
+quest 2 3,0 0 0 0 0
+quest 2 10,1 31 0 68 0
+quest 2 42,4 131 1 288 3
+quest 2 8,0 0 0 0 0
+quest 2 10,0 0 0 0 0
+quest 2 48,2 100 1 220 3
+quest 2 21,3 65 1 143 1
+quest 2 21,4 65 1 143 1
+quest 2 7,2 21 0 46 0
+quest 2 30,1 50 1 110 1
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 3 - 100 1 100 2
+quest 4 13 150 1 480 4
+quest 4 4 50 1 160 1
+quest 4 1 12 0 38 0
+quest 4 0 0 0 0 0
+quest 4 10 125 1 400 3
+quest 4 1 12 0 38 0
+quest 4 1 12 0 38 0
+quest 4 1 12 0 38 0
+quest 4 6 75 1 240 1
+quest 4 10 125 1 400 3
+quest 4 4 50 1 160 1
+quest 4 5 62 1 198 1
+quest 5 2 33 0 171 0
+quest 5 5 83 1 431 1
+quest 5 3 50 1 260 1
+quest 5 2 33 0 171 0
+quest 5 10 150 1 780 4
+quest 5 4 66 1 343 1
+quest 5 2 33 0 171 0
+quest 5 1 16 0 83 0
+quest 5 6 100 1 520 2
+quest 5 0 0 0 0 0
+quest 5 7 116 1 603 3
+quest 5 9 150 1 780 4
+quest 6 12 150 1 540 4
+quest 6 10 125 1 450 3
+quest 6 3 37 0 133 0
+quest 6 2 25 0 90 0
+quest 6 4 50 1 180 1
+quest 6 2 25 0 90 0
+quest 6 5 62 1 223 1
+quest 6 3 37 0 133 0
+quest 6 11 137 1 493 3
+quest 6 1 12 0 43 0
+quest 6 13 150 1 540 4
+quest 6 4 50 1 180 1
+quest 7 7 150 1 1050 4
+quest 7 6 150 1 1050 4
+quest 7 0 0 0 0 0
+quest 7 3 75 1 525 1
+quest 7 1 25 0 175 0
+quest 7 3 75 1 525 1
+quest 7 2 50 1 350 1
+quest 7 1 25 0 175 0
+quest 7 7 150 1 1050 4
+quest 7 5 125 1 875 3
+quest 7 3 75 1 525 1
+quest 7 1 25 0 175 0
+quest 8 0,1 0 0 0 0
+quest 8 2,0 0 0 0 0
+quest 8 1,0 0 0 0 0
+quest 8 1,1 100 1 450 2
+quest 8 2,1 100 1 450 3
+quest 8 0,2 0 0 0 0
+quest 8 2,1 100 1 450 3
+quest 8 0,0 0 0 0 0
+quest 8 0,0 0 0 0 0
+quest 8 1,2 100 1 450 3
+quest 8 2,2 100 1 450 3
+quest 8 1,1 100 1 450 2
+quest 9 1 100 1 800 2
+quest 9 1 100 1 800 2
+quest 9 2 100 1 800 3
+quest 9 1 100 1 800 2
+quest 9 2 100 1 800 3
+quest 9 1 100 1 800 2
+quest 9 2 100 1 800 3
+quest 9 2 100 1 800 3
+quest 9 0 0 0 0 0
+quest 9 1 100 1 800 2
+quest 9 0 0 0 0 0
+quest 9 0 0 0 0 0
+quest_tally 19 5 7 7
+quest_tally 14 12 0 14
+quest_tally 14 1 6 1
+quest_tally 19 9 4 13
+quest_tally 7 6 7 9
+quest_tally 16 7 0 10
+quest_tally 11 12 4 15
+quest_tally 9 4 1 6
+quest_tally 16 8 1 12
+quest_tally 4 6 7 9
+quest_tally 11 8 3 12
+quest_tally 19 12 3 18
+quest_tally 17 10 7 15
+quest_tally 12 12 4 16
+quest_tally 7 8 7 12
+quest_tally 9 4 7 6
+quest_tally 3 2 4 3
+quest_tally 4 1 4 1
+quest_tally 5 10 7 12
+quest_tally 19 9 6 13
+quest_tally 19 2 7 3
+quest_tally 19 4 0 6
+quest_tally 14 1 7 1
+quest_tally 11 11 5 16
+quest_tally 7 7 6 10
+quest_tally 15 11 0 15
+quest_tally 11 9 5 13
+quest_tally 2 11 5 7
+quest_tally 16 3 6 4
+quest_tally 13 7 5 10
+quest_tally 14 4 0 6
+quest_tally 7 5 5 7
+quest_tally 3 6 4 7
+quest_tally 5 11 4 9
+quest_tally 4 2 3 3
+quest_tally 2 2 3 3
+quest_tally 1 11 5 6
+quest_tally 7 5 0 7
+quest_tally 14 6 0 9
+quest_tally 8 11 1 9
+quest_take 0 4 0,4,5,8,9 ok
+quest_take 0 2 1,4,5,8,9 ok
+quest_take 0 4 2,4,5,6,9 ok
+quest_take 0 5 0,2,3,8,9 ok
+quest_take 1 2 0,2,4,5,7,8 ok
+quest_take 1 3 1,3,4,5,7,8 ok
+quest_take 1 2 4,5,6 ok
+quest_take 1 5 0,1,2,5,6,7,9 ok
+quest_take 2 3 0,2,3,4,6,7 ok
+quest_take 2 2 1,3,5,6,8 ok
+quest_take 2 5 2,3,4,5,6,7,9 ok
+quest_take 2 6 0,1,2,3,4,6,7,9 ok
+quest_take 3 5 0,1,3,8 ok
+quest_take 3 5 1,3,4,6,7,8,9 after:0
+quest_take 3 2 2,3,8 after:0
+quest_take 3 2 2,5,6,8,9 after:0
+quest_take 4 4 0,2,3,5,6,7,9 ok
+quest_take 4 4 0,2,3,5,6,8 ok
+quest_take 4 4 2,5,8 after:3
+quest_take 4 2 1,4,5,7 after:3
+quest_take 5 1 2,3,5,6,7,8 level:3
+quest_take 5 5 0,2,3,4,5,6,7,9 ok
+quest_take 5 5 0,1,3,5,6,8,9 after:4
+quest_take 5 6 0,1,2,3,4,6,8 ok
+quest_take 6 3 2,3,4,6,7,8 ok
+quest_take 6 1 0,5,6,8 level:2
+quest_take 6 5 1,3,6,8 ok
+quest_take 6 1 0,1,3,7 level:2
+quest_take 7 1 2,4,6,7,8 level:5
+quest_take 7 6 1,3,9 after:6
+quest_take 7 4 2,3,4,5,6,8,9 level:5
+quest_take 7 5 0,1,3,4,6,8 ok
+quest_take 8 4 1,2,6,7,8,9 ok
+quest_take 8 6 2,4,7 after:1
+quest_take 8 1 0,3,4,6,9 level:2
+quest_take 8 5 0,3,5,7,8,9 after:1
+quest_take 9 2 1,7,9 level:3
+quest_take 9 4 0,1,5 after:8
+quest_take 9 1 0,2,5,6,8,9 level:3
+quest_take 9 2 0,2,5,7,9 level:3

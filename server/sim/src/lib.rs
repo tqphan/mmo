@@ -14,6 +14,7 @@ pub mod land;
 pub mod movement;
 pub mod npc;
 pub mod party;
+pub mod quest;
 pub mod ship;
 pub mod terrain;
 pub mod tick;

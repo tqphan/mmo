@@ -4,6 +4,7 @@
 
 pub mod areas;
 pub mod coast;
+pub mod givers;
 pub mod map;
 pub mod nodes;
 pub mod placeholder;

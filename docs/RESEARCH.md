@@ -165,6 +165,7 @@ Planned but never shipped in the West: a female-only fairy race, which appeared 
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (§2A.4)
 - The global cooldown, HP and mana regeneration in and out of combat, HP on respawning, and how long combat lasts (§2A.6)
 - How crowd control diminished, and the experience table (§2A.7)
+- How much early and overachieved quests paid (§2A.8)
 
 ### 2A.4 Movement and ship numbers (searched 2026-10-26)
 Fan wikis on Fandom sit behind a bot check, so these come from search extracts of them and from one item database. Wikis for private servers and emulators were left out on purpose (CLAUDE.md), and a wiki titled for *ArcheAge Chronicles*, a different game, was not relied on.
@@ -221,6 +222,18 @@ From search extracts of the Fandom wiki's status-effect page and player forums (
 | Diminishing returns | Disputed: one player describes immunity for 30 s after three stuns, counted from when the first ended; another says each control left about 1 s of immunity to its kind; a third says there were none | C | [Official forum archive](http://forums.archeagegame.com/archive/index.php/t-78736.html), [FFXIV forum](https://forum.square-enix.com/ffxiv/threads/487145-Crowd-Control-is...-out-of-control.), ArcheRage forum |
 | Level cap at launch | 50, later 55, then ancestral levels | C | §2.2 |
 | Experience table, kill experience | Not found | — | — |
+
+### 2A.8 Quests (searched 2026-10-31)
+From search extracts; the Fandom pages sit behind a bot check and archeage.info no longer resolves (docs/design/quests.md).
+
+| Fact | Value | Conf. | Source |
+|---|---|---|---|
+| Quest types and objectives | Regular (levels 1 to the cap), daily, story (a race's line to about level 30), Blue Salt and hidden quests; kill, collect, talk-to and deliver objectives | B | [Fandom: Quest Giver](https://archeage.fandom.com/wiki/Quest_Giver), [Fandom: Quests](https://archeage.fandom.com/wiki/Quests) |
+| Markers | ! to give, ? to turn in; a dark ? when not fully done, a ? with pluses when overachieved; green ! for the main line | B | archeage.info "Questing" and Orcz.com "Quest Types" (search extracts) |
+| Early completion | At about half of a repeated objective, for less experience and coin and every item | B | [Five Favorite Features: ArcheAge #2](https://fredelas.wordpress.com/2015/08/04/archeage-overachieving-quests/), [Wikipedia](https://en.wikipedia.org/wiki/ArcheAge) |
+| Overachieving | Counting on past the target to about 150%, for bonus experience; nothing counts after | B | Five Favorite Features, [PCGamesN](https://www.pcgamesn.com/archeage/archeage-review-progress) |
+| Log size | 50 ordinary quests; weekly quests (later) 20 more | C | [ArcheAge Asia: weekly quests](https://asia.archeage.com/guide/738?page=7); a player on a private server's forum, for the official game |
+| How much less or more early and overachieved quests paid | Not found | — | — |
 
 ---
 

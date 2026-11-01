@@ -1,0 +1,169 @@
+# Quests (docs/design/quests.md): quest givers and the quests they give. Giver `wire`s are stored
+# in giver rows and quest `wire`s in quest-log rows; both run 0, 1, 2, … like hulls and never
+# change meaning. Names come from docs/world/. Experience and rewards are ours, for the M1
+# playtest to tune.
+#
+# An objective is `act` on `target`, `count` times:
+#   kill     an NPC kind; kills are shared with party members near the kill
+#   gather   an item, counted as it comes from resource nodes
+#   craft    an item, counted as crafting makes it (a pack counts 1)
+#   harvest  an item, counted as it comes from plantings
+#   sell     a pack item, sold at any post, or at the post kind `at`
+# A quest is turned in to `to` (its giver when left out). A quest with no objectives is an errand:
+# it's done when its character reaches `to`.
+
+[quests]
+# The most quests a character may have open at once (C).
+log = 50
+# How close a character must stand to a giver: horizontally, and up or down.
+reach_m = 5.0
+# A quest may be turned in early once every objective is this far along, for that share of the
+# experience; items come in full (B: "about half").
+early_pct = 50
+# Objectives of 2 or more go on counting to this share, for that much experience (B: "about 150%").
+over_pct = 150
+
+[[giver]]
+wire = 0
+id = "odda_fernwright"
+name = "Odda Fernwright"
+title = "Reeve of Furrowdale"
+
+[[giver]]
+wire = 1
+id = "brannoch_hale"
+name = "Brannoch Hale"
+title = "Warden of Cairnwick"
+
+[[giver]]
+wire = 2
+id = "yeva_mossgrove"
+name = "Yeva Mossgrove"
+title = "Fenkeeper of Redfen"
+
+[[giver]]
+wire = 3
+id = "quill_ambry"
+name = "Quill Ambry"
+title = "Harbourmaster of Gullhaven"
+
+# Furrowdale: the first steps.
+[[quest]]
+wire = 0
+id = "shore_pests"
+name = "Pinchers on the Strand"
+giver = "odda_fernwright"
+level = 1
+text = "Skitters come up the beach every tide and cut the nets. Thin them out, either side of town."
+objectives = [{ act = "kill", target = "shore_skitter", count = 6 }]
+xp = 120
+rewards = [{ item = "emberleaf_salve", count = 2 }]
+
+[[quest]]
+wire = 1
+id = "first_furrows"
+name = "First Furrows"
+giver = "odda_fernwright"
+level = 1
+text = "Plant the Hearthgrain seed you were given, wild ground will do, and bring in the first harvest."
+objectives = [{ act = "harvest", target = "hearthgrain", count = 20 }]
+xp = 250
+rewards = [{ item = "hearthgrain_seed", count = 10 }]
+
+[[quest]]
+wire = 2
+id = "reed_and_twine"
+name = "Reed and Twine"
+giver = "odda_fernwright"
+level = 1
+text = "Cut Saltreed on the strand, twist it into twine at the Joiner's Bench and weave two lengths of Reedcloth."
+objectives = [{ act = "gather", target = "saltreed", count = 32 }, { act = "craft", target = "reedcloth", count = 2 }]
+xp = 220
+rewards = [{ item = "reedcloth", count = 2 }]
+
+[[quest]]
+wire = 3
+id = "cairnwick_road"
+name = "The Cairnwick Road"
+giver = "odda_fernwright"
+to = "brannoch_hale"
+level = 2
+after = ["shore_pests"]
+text = "Brannoch Hale keeps the road to Cairnwick and wants hands. Follow it north-west over the downs."
+xp = 100
+
+# Cairnwick: the road inland.
+[[quest]]
+wire = 4
+id = "boar_trouble"
+name = "Bristle Downs Boars"
+giver = "brannoch_hale"
+level = 2
+after = ["cairnwick_road"]
+text = "Boars on the downs have torn up every field this side of the wood. Bring their numbers down."
+objectives = [{ act = "kill", target = "bristleback_boar", count = 8 }]
+xp = 320
+rewards = [{ item = "emberleaf_tea", count = 4 }]
+
+[[quest]]
+wire = 5
+id = "wolves_in_the_wood"
+name = "Wolves in Greymane Wood"
+giver = "brannoch_hale"
+level = 3
+after = ["boar_trouble"]
+text = "Greymane Wolves are taking travellers on the road through the wood. Go in and deal with them."
+objectives = [{ act = "kill", target = "greymane_wolf", count = 6 }]
+xp = 520
+rewards = [{ item = "felling_axe", count = 1 }]
+
+# Redfen: the fen road.
+[[quest]]
+wire = 6
+id = "fen_croakers"
+name = "Croakers in the Fen"
+giver = "odda_fernwright"
+to = "yeva_mossgrove"
+level = 2
+text = "The Redfen road runs round Croaker Fen, and the croakers spit at anyone on it. Clear a way, then tell Yeva Mossgrove."
+objectives = [{ act = "kill", target = "fen_croaker", count = 8 }]
+xp = 360
+rewards = [{ item = "duskberry_tart", count = 4 }]
+
+[[quest]]
+wire = 7
+id = "hexers_tarn"
+name = "The Hexers of the Tarn"
+giver = "yeva_mossgrove"
+level = 5
+after = ["fen_croakers"]
+text = "Sea-witches have come up from the cove to Hexer's Tarn. Drive them out before they sour the fen."
+objectives = [{ act = "kill", target = "brine_hexer", count = 4 }]
+xp = 700
+rewards = [{ item = "emberleaf_salve", count = 4 }]
+
+# Trade: a bale to market, then across the water.
+[[quest]]
+wire = 8
+id = "first_bale"
+name = "A Bale for Market"
+giver = "odda_fernwright"
+level = 2
+after = ["first_furrows", "reed_and_twine"]
+text = "Bind twenty Hearthgrain in Reedcloth at the Packwright's Bench, carry it to Redfen or Cairnwick Post and sell it. Take this skiff for the next load."
+objectives = [{ act = "craft", target = "grain_bale", count = 1 }, { act = "sell", target = "grain_bale", count = 1 }]
+xp = 450
+rewards = [{ item = "driftpine_skiff", count = 1 }]
+
+[[quest]]
+wire = 9
+id = "across_the_water"
+name = "Across the Water"
+giver = "odda_fernwright"
+to = "quill_ambry"
+level = 3
+after = ["first_bale"]
+text = "Gullhaven pays best for grain. Take a Grain Bale over the sea, sell it at Gullhaven Post and see the harbourmaster."
+objectives = [{ act = "sell", target = "grain_bale", count = 1, at = "gullhaven_post" }]
+xp = 800
+rewards = [{ item = "tin_lantern", count = 1 }]

@@ -31,7 +31,7 @@ fn as_admin(t: &TestContext) {
 }
 
 /// Place a station of kind `id` at `(x, 0, z)` as the admin; returns its id.
-fn put(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
+pub(super) fn put(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
     as_admin(t);
     let before: Vec<u64> = read(t, |ctx| ctx.db.station().iter().map(|s| s.id).collect());
     let p = StationPlacement { kind: station_by_id(id).unwrap().wire, x, y: 0.0, z, yaw: 0 };
@@ -59,7 +59,7 @@ fn held(t: &TestContext, char_id: u64, item_id: &str) -> u32 {
 
 /// Run the current unit when it falls due, as the scheduler would: the reducer, then the
 /// scheduler's own delete of the row that fired.
-fn finish_unit(t: &TestContext, char_id: u64) {
+pub(super) fn finish_unit(t: &TestContext, char_id: u64) {
     let job = job_of(t, char_id).expect("a craft under way");
     advance_ms(t, craft_micros(sim::craft::recipe(job.recipe).unwrap()) / 1000);
     let id = job.scheduled_id;

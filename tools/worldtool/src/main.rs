@@ -1,6 +1,6 @@
 //! `worldtool gen [--dir D]` writes the placeholder world to `world/` (or D), resource nodes,
-//! crafting stations, trade posts, Wayshrines, NPC spawn points and named areas included;
-//! `worldtool nodes`, `stations`, `posts`, `shrines`, `spawns` and `areas` (each `[--dir D]`)
+//! crafting stations, trade posts, Wayshrines, quest givers, NPC spawn points and named areas
+//! included; `worldtool nodes`, `stations`, `posts`, `shrines`, `givers`, `spawns` and `areas` (each `[--dir D]`)
 //! rewrite only those, from the world there; `worldtool info [--dir D]` loads it, checks it and
 //! prints what's in it. `worldtool probe X,Z...` prints the ground at points, and `worldtool map
 //! --area X0,Z0,X1,Z1 [--px N] [--out F]` draws part of the world as a PNG (docs/design/coast.md).
@@ -22,13 +22,14 @@ fn main() -> ExitCode {
         Some("stations") => World::load(&dir).and_then(|w| write_stations(&dir, &w)),
         Some("posts") => World::load(&dir).and_then(|w| write_posts(&dir, &w)),
         Some("shrines") => World::load(&dir).and_then(|w| write_shrines(&dir, &w)),
+        Some("givers") => World::load(&dir).and_then(|w| write_givers(&dir, &w)),
         Some("spawns") => World::load(&dir).and_then(|w| write_spawns(&dir, &w)),
         Some("areas") => write_areas(&dir),
         Some("info") => info(&dir),
         Some("map") => map(&dir, &args),
         Some("probe") => probe(&dir, &args[1..]),
         _ => {
-            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|spawns|areas|info [--dir DIR]\n       worldtool probe X,Z...\n       worldtool map --area X0,Z0,X1,Z1 [--px N] [--out FILE] [--dir DIR]");
+            eprintln!("usage: worldtool gen|nodes|stations|posts|shrines|givers|spawns|areas|info [--dir DIR]\n       worldtool probe X,Z...\n       worldtool map --area X0,Z0,X1,Z1 [--px N] [--out FILE] [--dir DIR]");
             return ExitCode::from(2);
         }
     };
@@ -51,6 +52,7 @@ fn generate(dir: &std::path::Path) -> Result<(), String> {
     write_stations(dir, &world)?;
     write_posts(dir, &world)?;
     write_shrines(dir, &world)?;
+    write_givers(dir, &world)?;
     write_spawns(dir, &world)?;
     write_areas(dir)
 }
@@ -80,6 +82,14 @@ fn write_shrines(dir: &std::path::Path, world: &World) -> Result<(), String> {
     let shrines = worldtool::shrines::place(world);
     worldtool::shrines::save(dir, &shrines)?;
     println!("wrote {} Wayshrines to {}", shrines.len(), dir.join(worldtool::shrines::FILE).display());
+    Ok(())
+}
+
+/// Place quest givers on `world` and write them to `dir` (docs/design/quests.md).
+fn write_givers(dir: &std::path::Path, world: &World) -> Result<(), String> {
+    let givers = worldtool::givers::place(world);
+    worldtool::givers::save(dir, &givers)?;
+    println!("wrote {} quest givers to {}", givers.len(), dir.join(worldtool::givers::FILE).display());
     Ok(())
 }
 
@@ -150,6 +160,7 @@ fn map(dir: &std::path::Path, args: &[String]) -> Result<(), String> {
     marks.extend(worldtool::stations::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 140, 0], 3)));
     marks.extend(worldtool::posts::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 230, 0], 4)));
     marks.extend(worldtool::shrines::load(dir)?.iter().map(|p| mark(p.x, p.z, [255, 255, 255], 3)));
+    marks.extend(worldtool::givers::load(dir)?.iter().map(|p| mark(p.x, p.z, [80, 200, 255], 3)));
     let pic = worldtool::map::render(&world, area, px, &marks);
     worldtool::map::save(&out, &pic)?;
     println!("wrote {} ({} × {} px, {:.1} m a pixel)", out.display(), pic.w, pic.h, (area.x1 - area.x0) / px as f32);
@@ -182,6 +193,11 @@ fn info(dir: &std::path::Path) -> Result<(), String> {
     let shrines = worldtool::shrines::load(dir)?;
     println!("{} Wayshrines", shrines.len());
     for p in &shrines {
+        println!("  {:<20} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
+    }
+    let givers = worldtool::givers::load(dir)?;
+    println!("{} quest givers", givers.len());
+    for p in &givers {
         println!("  {:<20} ({:.1}, {:.1}, {:.1})", p.kind.id, p.x, p.y, p.z);
     }
     let areas = worldtool::areas::load(dir)?;

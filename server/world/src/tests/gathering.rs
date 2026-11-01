@@ -27,7 +27,7 @@ fn as_admin(t: &TestContext) {
 }
 
 /// Place a node of `id` at `(x, 0, z)` as the admin; returns its id.
-fn put(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
+pub(super) fn put(t: &TestContext, id: &str, x: f32, z: f32) -> u64 {
     as_admin(t);
     let before: Vec<u64> = read(t, |ctx| ctx.db.resource_node().iter().map(|n| n.id).collect());
     let p = NodePlacement { kind: kind(id).wire, x, y: 0.0, z, yaw: 0 };
@@ -54,7 +54,7 @@ fn held(t: &TestContext, char_id: u64, item_id: &str) -> u32 {
 }
 
 /// Run the job when it falls due, as the scheduler would.
-fn finish(t: &TestContext, char_id: u64) {
+pub(super) fn finish(t: &TestContext, char_id: u64) {
     let job = job_of(t, char_id).expect("a gather under way");
     advance_ms(t, sim::gather::gather_micros(kind(REED)) / 1000);
     t.with_reducer_tx::<_, String>(TestAuth::internal(), |ctx| gather_done(ctx, job)).unwrap();

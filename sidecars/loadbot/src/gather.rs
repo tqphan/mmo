@@ -138,7 +138,7 @@ pub(crate) fn subscribe(bot: &Bot, queries: &[&str]) -> Check {
 }
 
 /// Place a node of `kind` as an admin; returns its id once we see it.
-fn place(bot: &Bot, kind: &NodeData, x: f32, y: f32, z: f32) -> Result<u64, String> {
+pub(crate) fn place(bot: &Bot, kind: &NodeData, x: f32, y: f32, z: f32) -> Result<u64, String> {
     let before: Vec<u64> = bot.conn.db.resource_node().iter().map(|n| n.id).collect();
     let p = NodePlacement { kind: kind.wire, x, y, z, yaw: 0 };
     call(bot, |tx| bot.conn.reducers.admin_put_nodes_then(vec![p], tx))?;
@@ -167,7 +167,7 @@ fn refused(bot: &Bot, what: &str, want: &str, id: u64) -> Check {
 }
 
 /// Wait out the gather's time; the server's timer frees the node when it's done.
-fn wait_done(bot: &Bot, kind: &NodeData, id: u64) -> Check {
+pub(crate) fn wait_done(bot: &Bot, kind: &NodeData, id: u64) -> Check {
     std::thread::sleep(Duration::from_secs_f32(kind.gather_s));
     wait_for("the gather to finish", || node(bot, id).is_some_and(|n| n.gatherer == 0))
 }

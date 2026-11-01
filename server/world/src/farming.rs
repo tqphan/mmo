@@ -5,6 +5,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use sim::farm::{CropData, Planting, PlotSpot, Stage, check_spot, crop, crop_by_seed, in_reach, regrown_at, ripe_at, seed_back, stage, yield_for};
 use sim::land::{Rect, Standing};
+use sim::content::QuestAct;
 use sim::movement::MoveMode;
 
 use crate::land::{Land, Plot, access, characters_of, plot, plots_near, standing};
@@ -217,6 +218,7 @@ pub fn harvest(ctx: &ReducerContext, crop_id: u64) -> Result<(), String> {
     // A failed grant returns `Err`, which rolls back the labor too.
     crate::labor::spend(ctx, ctx.sender(), kind.labor)?;
     crate::items::grant(ctx, p.char_id, kind.product, count)?;
+    crate::quests::count(ctx, p.char_id, QuestAct::Harvest, kind.product, None, count);
     if seed {
         crate::items::grant(ctx, p.char_id, kind.seed, 1)?;
     }

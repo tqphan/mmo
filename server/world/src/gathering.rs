@@ -4,6 +4,7 @@
 
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp};
 use sim::gather::{NodeData, gather_micros, in_reach, moved_off, node, ready, regrown_at, yield_for};
+use sim::content::QuestAct;
 use sim::movement::MoveMode;
 
 use crate::session::{presence, require_admin};
@@ -162,6 +163,7 @@ fn finish(ctx: &ReducerContext, job: &GatherJob, n: &ResourceNode) -> Result<&'s
     }
     crate::labor::spend(ctx, job.identity, kind.labor)?;
     crate::items::grant(ctx, p.char_id, kind.item, job.count)?;
+    crate::quests::count(ctx, p.char_id, QuestAct::Gather, kind.item, None, job.count);
     Ok(kind)
 }
 

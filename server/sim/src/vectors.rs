@@ -84,7 +84,10 @@ pub fn generate() -> String {
          # combat_slots <n> (<status> <start> <until>)×n <now> <move from> <move to> <has the first> <controlled> <move scale> <dealt pct> <taken pct>\n\
          # combat_dr <n> (<group> <count> <until>)×n <group> <now> <lasts µs> <pct, or none> <count after> <until after>\n\
          # combat_damage <amount> <dealt pct> <taken pct> <damage>\n\
-         # combat_tick <start> <until> <tick ms> <last> <next, or none>\n",
+         # combat_tick <start> <until> <tick ms> <last> <next, or none>\n\
+         # quest <wire> <done, comma-separated, or -> <score> <ready: 1 or 0> <xp paid> <standing: 0 going, 1 early, 2 done, 3 extra, 4 over>\n\
+         # quest_tally <done> <need> <add> <after>\n\
+         # quest_take <wire> <level> <turned in, comma-separated, or -> <ok, level:N or after:W>\n",
     );
     let mut rng = Lcg(0x6d6d6f);
     let edge = WORLD_HALF_M;
@@ -182,7 +185,47 @@ pub fn generate() -> String {
     land(&mut out, &mut rng);
     trade(&mut out, &mut rng);
     combat(&mut out, &mut rng);
+    quests(&mut out, &mut rng);
     out
+}
+
+/// `sim::quest`'s counting, scores, pay and who may take what, for the client's port.
+fn quests(out: &mut String, rng: &mut Lcg) {
+    use crate::quest::{QUESTS, Refusal, Standing, cap, may_take, ready, score, standing, tally, xp_for};
+    let list = |v: &[String]| if v.is_empty() { "-".to_string() } else { v.join(",") };
+    for q in &QUESTS {
+        for _ in 0..12 {
+            let done: Vec<u32> = q.objectives.iter().map(|o| (rng.next() * (cap(o.count) + 2) as f32) as u32).collect();
+            let s = score(q.objectives, &done);
+            let st = match standing(q.objectives, &done) {
+                Standing::Going => 0,
+                Standing::Early => 1,
+                Standing::Done => 2,
+                Standing::Extra => 3,
+                Standing::Over => 4,
+            };
+            let shown: Vec<String> = done.iter().map(u32::to_string).collect();
+            out.push_str(&format!("quest {} {} {s} {} {} {st}\n", q.wire, list(&shown), u8::from(ready(s)), xp_for(q.xp, s)));
+        }
+    }
+    for _ in 0..40 {
+        let need = 1 + (rng.next() * 12.0) as u32;
+        let (done, add) = ((rng.next() * 20.0) as u32, (rng.next() * 8.0) as u32);
+        out.push_str(&format!("quest_tally {done} {need} {add} {}\n", tally(done, need, add)));
+    }
+    for q in &QUESTS {
+        for _ in 0..4 {
+            let level = 1 + (rng.next() * 6.0) as u8;
+            let done: Vec<u16> = QUESTS.iter().filter(|_| rng.next() < 0.5).map(|d| d.wire).collect();
+            let got = match may_take(q, level, &done) {
+                Ok(()) => "ok".to_string(),
+                Err(Refusal::Level(l)) => format!("level:{l}"),
+                Err(Refusal::After(a)) => format!("after:{a}"),
+            };
+            let shown: Vec<String> = done.iter().map(u16::to_string).collect();
+            out.push_str(&format!("quest_take {} {level} {} {got}\n", q.wire, list(&shown)));
+        }
+    }
 }
 
 /// `sim::combat`'s regeneration, death stacks, facing and skill checks, for the client's port.

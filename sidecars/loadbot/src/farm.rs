@@ -120,12 +120,12 @@ pub fn scenario(args: &Args) -> Check {
 }
 
 /// A stack of the item with wire `def` in the bot's bag.
-fn stack(bot: &Bot, char_id: u64, def: u16) -> Result<u64, String> {
+pub(crate) fn stack(bot: &Bot, char_id: u64, def: u16) -> Result<u64, String> {
     wait_for("a stack", || bot.conn.db.my_inventory().iter().any(|i| i.holder == char_id && i.def == def))?;
     bot.conn.db.my_inventory().iter().find(|i| i.holder == char_id && i.def == def).map(|i| i.id).ok_or_else(|| "no stack".into())
 }
 
-fn plant(bot: &Bot, char_id: u64, seed: u16, x: f32, z: f32) -> Check {
+pub(crate) fn plant(bot: &Bot, char_id: u64, seed: u16, x: f32, z: f32) -> Check {
     let item = stack(bot, char_id, seed)?;
     call(bot, |tx| bot.conn.reducers.plant_then(item, x, z, tx))
 }

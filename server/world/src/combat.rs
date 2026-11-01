@@ -804,9 +804,14 @@ pub(crate) fn reward(ctx: &ReducerContext, killer: u64, victim: u64, level: u8) 
 
 /// `p`'s part of a kill of a foe at `victim`, among `sharers`.
 fn gain(ctx: &ReducerContext, p: &Presence, victim: u8, sharers: usize) {
+    let Some(f) = ctx.db.fighter().char_id().find(p.char_id) else { return };
+    grant_xp(ctx, p, sim::party::share(sim::combat::kill_xp(victim, f.level), sharers));
+}
+
+/// Give `p` `gained` experience, and the levels it makes, with the events that show them.
+pub(crate) fn grant_xp(ctx: &ReducerContext, p: &Presence, gained: u32) {
     let killer = p.entity_id;
     let Some(f) = ctx.db.fighter().char_id().find(p.char_id) else { return };
-    let gained = sim::party::share(sim::combat::kill_xp(victim, f.level), sharers);
     if gained == 0 {
         return;
     }

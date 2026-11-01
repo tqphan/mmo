@@ -1,6 +1,6 @@
 # The coast: Hearthshore, its outpost and where characters start
 
-Status: v0.1, 2026-10-31 (M1 "The coast", first half: the layout). Code: `tools/worldtool/src/{coast,areas,map}.rs` (and `placeholder.rs`, `nodes.rs`, `spawns.rs`, `stations.rs`, `posts.rs`, `shrines.rs`, which take the layout from `coast.rs`), `server/world/src/combat.rs` (`start_point`), `server/world/src/session.rs` (`create_character`), `client/src/World/Areas.cs`, `client/src/UI/Hud.cs`. Data: `world/`, `content/items.toml` (`[bag] start`), `content/combat.toml` (`start = true`). Related: docs/design/world.md, PLAN §11 (M1), ADR 0036. Quests are the second half (BACKLOG).
+Status: v0.1, 2026-10-31 (M1 "The coast", first half: the layout). Code: `tools/worldtool/src/{coast,areas,map}.rs` (and `placeholder.rs`, `nodes.rs`, `spawns.rs`, `stations.rs`, `posts.rs`, `shrines.rs`, which take the layout from `coast.rs`), `server/world/src/combat.rs` (`start_point`), `server/world/src/session.rs` (`create_character`), `client/src/World/Areas.cs`, `client/src/UI/Hud.cs`. Data: `world/`, `content/items.toml` (`[bag] start`), `content/combat.toml` (`start = true`). Related: docs/design/world.md, docs/design/quests.md (the second half: quests and their givers), PLAN §11 (M1), ADR 0036.
 
 ## 1. How the original worked
 
@@ -44,6 +44,8 @@ Only the shape matters for M1: a zone that reads as places, an easy start beside
 | Redfen | the fen's west edge, (−3930, 1250), 1.0 km | Redfen Post, a Wayshrine |
 | Gullhaven | Gullhaven Isle, (0, 0), 3.3 km across the sea | Gullhaven Post, a Wayshrine, three stations |
 
+Each town has a quest giver a few steps from its Wayshrine (`coast::GIVERS`, `world/givers.tsv`): Odda Fernwright in Furrowdale, Brannoch Hale in Cairnwick, Yeva Mossgrove in Redfen and Quill Ambry in Gullhaven (docs/design/quests.md).
+
 - **Roads** join Furrowdale to Cairnwick (over the downs, through the wood) and to Redfen (round the fen). Land within 4 m of a road is the `road` use (no building, docs/design/land.md). Roads don't change the ground.
 - **Housing:** Furrowdale Commons, the placeholder's housing area between Furrowdale and the scarp (500 m round (−4300, 900)).
 
@@ -84,7 +86,6 @@ Levels rise with distance from Furrowdale; `worldtool spawns` places each camp's
 - Client: `--teleport X,Z` (dev builds) goes there a second after entering, and `--cam-pitch DEG` with `--cam-distance` up to 400 m frames a landmark from above (docs/design/client.md).
 
 ## 3. Deviations and not yet done
-- **Quests** (about ten, PLAN §11) are the second half of this task, with quest givers placed in the towns.
 - **The layout is code, not an editor's files.** Changing the zone means editing `coast.rs` and regenerating; M2 builds the world in Terrain3D (ADR 0032), and the layout moves into its regions then.
 - **No buildings, docks or props.** Towns are flat tinted pads with their stations and Wayshrine. Ships are summoned in deep water off the beach as before.
 - **The rest of the map stays placeholder:** the other continent, the north and the other islands keep scattered nodes and no camps.

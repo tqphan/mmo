@@ -114,6 +114,14 @@ namespace Mmo
             var combat = new Combat(session, player, entities);
             AddChild(combat);
             player.Combat = combat;
+            var givers = new GiverRegistry(session);
+            AddChild(givers);
+            var quests = new Quests(session, player, givers, combat);
+            AddChild(quests);
+            player.Quests = quests;
+            var questWindow = new QuestWindow(session, quests);
+            AddChild(questWindow);
+            quests.Window = questWindow;
             AddChild(new CombatHud(combat));
             var evidence = new EvidenceRegistry(session);
             AddChild(evidence);
@@ -138,6 +146,7 @@ namespace Mmo
             AddChild(camera);
             var hud = new Hud(session, player, entities, world.Land, world.Areas, controls, gathering, crafting);
             hud.Prompts.Add(() => placement.Prompt);
+            hud.Prompts.Add(() => quests.Prompt);
             hud.Prompts.Add(() => farming.Prompt);
             hud.Prompts.Add(() => looting.Prompt);
             hud.Prompts.Add(() => crime.RecordLine);
@@ -189,6 +198,8 @@ namespace Mmo
                 AddChild(new NpcDemo(session, player, entities, combat, looting));
             if (options.CrimeDemo)
                 AddChild(new CrimeDemo(session, player, entities, combat, crime, evidence));
+            if (options.QuestDemo)
+                AddChild(new QuestDemo(session, player, entities, combat, quests, questWindow));
             if (options.PartyDemo)
                 AddChild(new PartyDemo(session, player, entities, party, chat));
             // Last, so it sees where the camera went this frame.
@@ -294,6 +305,7 @@ namespace Mmo
             Bind("stow_vehicle", Key.V);
             Bind("repair_vehicle", Key.H);
             Bind("report", Key.J);
+            Bind("quest_log", Key.L);
         }
     }
 }

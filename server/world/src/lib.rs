@@ -14,6 +14,7 @@ mod land;
 mod movement;
 mod npc;
 mod party;
+mod quests;
 mod session;
 mod ship;
 mod shipyard;

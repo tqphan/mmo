@@ -35,12 +35,12 @@ fn npcs(bot: &Bot, kind: &str) -> Vec<u64> {
     bot.conn.db.entity().iter().filter(|e| e.kind == NPC_KIND && e.ref_id == wire).map(|e| e.id).collect()
 }
 
-fn alive(bot: &Bot, id: u64) -> bool {
+pub(crate) fn alive(bot: &Bot, id: u64) -> bool {
     vitals(bot, id).is_some_and(|v| v.dead_at.is_none())
 }
 
 /// Summon `kind` at (x, z) and return the new NPC once we see it.
-fn summon(bot: &Bot, kind: &str, x: f32, z: f32) -> Result<u64, String> {
+pub(crate) fn summon(bot: &Bot, kind: &str, x: f32, z: f32) -> Result<u64, String> {
     let before = npcs(bot, kind);
     call(bot, |tx| bot.conn.reducers.dev_spawn_npc_then(kind.into(), x, z, tx))?;
     let fresh = || npcs(bot, kind).into_iter().find(|id| !before.contains(id) && vitals(bot, *id).is_some());
@@ -48,12 +48,12 @@ fn summon(bot: &Bot, kind: &str, x: f32, z: f32) -> Result<u64, String> {
     fresh().ok_or_else(|| format!("the {kind} vanished"))
 }
 
-fn xp_of(bot: &Bot) -> (u8, u32) {
+pub(crate) fn xp_of(bot: &Bot) -> (u8, u32) {
     bot.conn.db.my_fighter().iter().next().map_or((0, 0), |f| (f.level, f.xp))
 }
 
 /// Hit `target` with A's blades until it dies, using whichever is ready.
-fn kill(bot: &Bot, target: u64) -> Check {
+pub(crate) fn kill(bot: &Bot, target: u64) -> Check {
     let started = Instant::now();
     while alive(bot, target) {
         if started.elapsed() > Duration::from_secs(40) {

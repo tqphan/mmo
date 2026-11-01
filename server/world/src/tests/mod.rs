@@ -21,6 +21,7 @@ mod labor;
 #[cfg(feature = "dev")]
 mod npc;
 mod party;
+mod quests;
 mod land;
 #[cfg(feature = "dev")]
 mod ships;

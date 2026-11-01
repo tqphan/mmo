@@ -12,7 +12,7 @@ pub const RUST_OUT: &str = "server/sim/src/content.rs";
 pub const CSHARP_OUT: &str = "client/content/Content.g.cs";
 
 /// Part of the hash, so a change in what the generator emits for the same data still changes it.
-const FORMAT: &str = "contentgen 13";
+const FORMAT: &str = "contentgen 14";
 /// Anything faster is a typo, not a design choice.
 const MAX_SPEED_LIMIT_MPS: f32 = 50.0;
 /// More cannons than this on one hull is a typo too.
@@ -57,6 +57,15 @@ const MAX_SKILL_WIRE: u16 = 999;
 const MAX_EFFECT: i32 = 100_000;
 const MAX_SKILL_MS: u32 = 60_000;
 const MAX_SKILL_RANGE_M: f32 = 60.0;
+/// What a quest objective counts, in wire order, fixed here like the item kinds (docs/design/quests.md).
+pub const QUEST_ACTS: [&str; 5] = ["kill", "gather", "craft", "harvest", "sell"];
+/// More objectives or rewards than this on one quest, a longer text, or a bigger count or
+/// experience is a typo.
+const MAX_OBJECTIVES: usize = 4;
+const MAX_REWARDS: usize = 4;
+const MAX_QUEST_TEXT: usize = 240;
+const MAX_QUEST_COUNT: u32 = 1000;
+const MAX_QUEST_XP: u32 = 1_000_000;
 
 /// The raw text of every content file.
 pub struct Sources {
@@ -72,6 +81,7 @@ pub struct Sources {
     pub combat: String,
     pub npcs: String,
     pub social: String,
+    pub quests: String,
 }
 
 impl Sources {
@@ -92,6 +102,7 @@ impl Sources {
             combat: read("combat.toml")?,
             npcs: read("npcs.toml")?,
             social: read("social.toml")?,
+            quests: read("quests.toml")?,
         })
     }
 }
@@ -342,6 +353,82 @@ pub struct ChatRulesDef {
     pub burst: u32,
     pub refill_ms: u32,
     pub inbox: u32,
+}
+
+/// `quests.toml`: quest givers and quests (docs/design/quests.md).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuestsFile {
+    quests: QuestRulesDef,
+    giver: Vec<GiverDef>,
+    quest: Vec<QuestDef>,
+}
+
+/// `[quests]` in `quests.toml`.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct QuestRulesDef {
+    pub log: u32,
+    pub reach_m: f32,
+    pub early_pct: u32,
+    pub over_pct: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GiverDef {
+    pub wire: u8,
+    pub id: String,
+    pub name: String,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct QuestDef {
+    pub wire: u16,
+    pub id: String,
+    pub name: String,
+    pub giver: String,
+    /// Who it's turned in to; the giver when left out.
+    #[serde(default)]
+    pub to: Option<String>,
+    pub level: u8,
+    /// Quest ids that must be turned in first.
+    #[serde(default)]
+    pub after: Vec<String>,
+    pub text: String,
+    #[serde(default)]
+    pub objectives: Vec<ObjectiveDef>,
+    pub xp: u32,
+    #[serde(default)]
+    pub rewards: Vec<RewardDef>,
+}
+
+impl QuestDef {
+    fn to(&self) -> &str {
+        self.to.as_deref().unwrap_or(&self.giver)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveDef {
+    /// One of `QUEST_ACTS`.
+    pub act: String,
+    /// An NPC kind for `kill`, otherwise an item.
+    pub target: String,
+    pub count: u32,
+    /// `sell` only: the post kind it must be sold at, or any.
+    #[serde(default)]
+    pub at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RewardDef {
+    pub item: String,
+    pub count: u32,
 }
 
 /// `items.toml`: item definitions and the bag (docs/design/items.md).
@@ -814,6 +901,11 @@ pub struct Content {
     pub npc_kinds: Vec<NpcKindDef>,
     pub party: PartyRulesDef,
     pub chat: ChatRulesDef,
+    pub quest_rules: QuestRulesDef,
+    /// Sorted by `wire`, like the modes.
+    pub givers: Vec<GiverDef>,
+    /// Sorted by `wire`, like the modes.
+    pub quests: Vec<QuestDef>,
     pub hash: u64,
 }
 
@@ -846,6 +938,28 @@ impl Content {
     fn station_wire(&self, id: &str) -> u8 {
         self.stations.iter().find(|s| s.id == id).map_or(0, |s| s.wire)
     }
+
+    /// The wire of a giver; parsing checked it exists.
+    fn giver_wire(&self, id: &str) -> u8 {
+        self.givers.iter().find(|g| g.id == id).map_or(0, |g| g.wire)
+    }
+
+    /// The wire of a quest; parsing checked it exists.
+    fn quest_wire(&self, id: &str) -> u16 {
+        self.quests.iter().find(|q| q.id == id).map_or(0, |q| q.wire)
+    }
+
+    /// An objective's act and target as wires; parsing checked both exist.
+    fn objective_wires(&self, o: &ObjectiveDef) -> (u8, u16) {
+        let act = QUEST_ACTS.iter().position(|a| *a == o.act).unwrap_or(0);
+        let target = if o.act == "kill" { self.npc_kinds.iter().find(|k| k.id == o.target).map_or(0, |k| u16::from(k.wire)) } else { self.item_wire(&o.target) };
+        (act as u8, target)
+    }
+
+    /// A `sell` objective's post kind, if it names one; parsing checked it exists.
+    fn objective_post(&self, o: &ObjectiveDef) -> Option<u8> {
+        o.at.as_ref().map(|id| self.posts.iter().find(|p| &p.id == id).map_or(0, |p| p.wire))
+    }
 }
 
 /// Parse and check everything, collecting every problem rather than stopping at the first.
@@ -863,10 +977,11 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     let combat: Result<CombatFile, _> = from_toml("combat.toml", &src.combat);
     let npcs: Result<NpcsFile, _> = from_toml("npcs.toml", &src.npcs);
     let social: Result<SocialFile, _> = from_toml("social.toml", &src.social);
-    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs, social) =
-        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs, social) {
-            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n), Ok(o)) => (m.mode, s, l, b, i, g, c, f, t, k, n, o),
-            (m, s, l, b, i, g, c, f, t, k, n, o) => {
+    let quests: Result<QuestsFile, _> = from_toml("quests.toml", &src.quests);
+    let (mut modes, mut hulls, mut land, labor, mut items, mut gathering, mut crafting, mut farming, mut trade, mut combat, mut npcs, social, mut quests) =
+        match (movement, ships, land, labor, items, gathering, crafting, farming, trade, combat, npcs, social, quests) {
+            (Ok(m), Ok(s), Ok(l), Ok(b), Ok(i), Ok(g), Ok(c), Ok(f), Ok(t), Ok(k), Ok(n), Ok(o), Ok(q)) => (m.mode, s, l, b, i, g, c, f, t, k, n, o, q),
+            (m, s, l, b, i, g, c, f, t, k, n, o, q) => {
                 let all = m
                     .err()
                     .into_iter()
@@ -880,7 +995,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
                     .chain(t.err())
                     .chain(k.err())
                     .chain(n.err())
-                    .chain(o.err());
+                    .chain(o.err())
+                    .chain(q.err());
                 return Err(all.flatten().collect());
             }
         };
@@ -903,6 +1019,8 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     combat.shrine.sort_by_key(|s| s.wire);
     combat.status.sort_by_key(|s| s.wire);
     npcs.kind.sort_by_key(|k| k.wire);
+    quests.giver.sort_by_key(|g| g.wire);
+    quests.quest.sort_by_key(|q| q.wire);
     check_move_modes(&modes, &mut errors);
     check_hulls(&hulls.hull, &items.item, &mut errors);
     check_vehicles(&hulls, &items.item, &mut errors);
@@ -916,6 +1034,7 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
     check_combat(&combat, &mut errors);
     check_npcs(&npcs, &combat, &items.item, &mut errors);
     check_social(&social, &mut errors);
+    check_quests(&quests, &Refs { items: &items.item, nodes: &gathering.node, recipes: &crafting.recipe, crops: &farming.crop, packs: &trade.pack, posts: &trade.post, npcs: &npcs.kind }, combat.progress.xp_to_next.len() + 1, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -946,6 +1065,9 @@ pub fn parse(src: &Sources) -> Result<Content, Vec<String>> {
         npc_kinds: npcs.kind,
         party: social.party,
         chat: social.chat,
+        quest_rules: quests.quests,
+        givers: quests.giver,
+        quests: quests.quest,
         hash: 0,
     };
     c.hash = hash(&canonical(&c));
@@ -1731,6 +1853,126 @@ fn check_social(o: &SocialFile, errors: &mut Vec<String>) {
     }
 }
 
+/// What quest objectives and rewards may name.
+struct Refs<'a> {
+    items: &'a [ItemDef],
+    nodes: &'a [NodeDef],
+    recipes: &'a [RecipeDef],
+    crops: &'a [CropDef],
+    packs: &'a [PackDef],
+    posts: &'a [PostDef],
+    npcs: &'a [NpcKindDef],
+}
+
+/// Safe to print as a string literal in both Rust and C# without escaping, and one line.
+fn is_quest_text(s: &str) -> bool {
+    !s.trim().is_empty() && s.len() <= MAX_QUEST_TEXT && s.chars().all(|c| c.is_ascii() && !c.is_ascii_control() && !matches!(c, '"' | '\\' | '{' | '}'))
+}
+
+fn check_quests(q: &QuestsFile, r: &Refs, level_max: usize, errors: &mut Vec<String>) {
+    let file = "quests.toml";
+    let rules = &q.quests;
+    if !(1..=200).contains(&rules.log) {
+        errors.push(format!("{file}: quests.log must be from 1 to 200"));
+    }
+    check_range(file, "quests.reach_m", rules.reach_m, 1.0, 20.0, errors);
+    if !(1..=100).contains(&rules.early_pct) {
+        errors.push(format!("{file}: quests.early_pct must be from 1 to 100"));
+    }
+    if !(100..=300).contains(&rules.over_pct) {
+        errors.push(format!("{file}: quests.over_pct must be from 100 to 300"));
+    }
+    check_ids(file, "giver", q.giver.iter().map(|g| (g.id.as_str(), usize::from(g.wire))), errors);
+    check_ids(file, "quest", q.quest.iter().map(|x| (x.id.as_str(), usize::from(x.wire))), errors);
+    for g in &q.giver {
+        if !is_item_name(&g.name) || !is_item_name(&g.title) {
+            errors.push(format!("{file}: giver {:?}: names and titles are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital", g.id));
+        }
+    }
+    let giver = |id: &str| q.giver.iter().any(|g| g.id == id);
+    let item = |id: &str| r.items.iter().find(|i| i.id == id);
+    let mut names = std::collections::HashSet::new();
+    for (n, x) in q.quest.iter().enumerate() {
+        let at = format!("{file}: quest {:?}", x.id);
+        if !is_item_name(&x.name) {
+            errors.push(format!("{at}: names are 1 to {MAX_ITEM_NAME} letters, digits, spaces, ' and -, starting with a capital"));
+        }
+        if !names.insert(x.name.as_str()) {
+            errors.push(format!("{at}: duplicate name {:?}", x.name));
+        }
+        if !is_quest_text(&x.text) {
+            errors.push(format!("{at}: text is 1 to {MAX_QUEST_TEXT} printable ASCII characters with no quotes, backslashes or braces"));
+        }
+        if !giver(&x.giver) {
+            errors.push(format!("{at}: no giver {:?}", x.giver));
+        }
+        if !giver(x.to()) {
+            errors.push(format!("{at}: no giver {:?} to turn it in to", x.to()));
+        }
+        if !(1..=level_max).contains(&usize::from(x.level)) {
+            errors.push(format!("{at}: level must be from 1 to {level_max}"));
+        }
+        if x.xp > MAX_QUEST_XP {
+            errors.push(format!("{at}: xp must be at most {MAX_QUEST_XP}"));
+        }
+        // Earlier in wire order, so the chain can't loop.
+        for a in &x.after {
+            if !q.quest[..n].iter().any(|e| &e.id == a) {
+                errors.push(format!("{at}: after {a:?} must be a quest with a lower wire"));
+            }
+        }
+        if x.objectives.is_empty() && x.to() == x.giver {
+            errors.push(format!("{at}: a quest with no objectives is an errand to another giver"));
+        }
+        if x.objectives.len() > MAX_OBJECTIVES {
+            errors.push(format!("{at}: at most {MAX_OBJECTIVES} objectives"));
+        }
+        for (k, o) in x.objectives.iter().enumerate() {
+            let what = format!("{at}: objective {k}");
+            if !(1..=MAX_QUEST_COUNT).contains(&o.count) {
+                errors.push(format!("{what}: count must be from 1 to {MAX_QUEST_COUNT}"));
+            }
+            let known = match o.act.as_str() {
+                "kill" => r.npcs.iter().any(|k| k.id == o.target),
+                "gather" => r.nodes.iter().any(|d| d.item == o.target),
+                "craft" => r.recipes.iter().any(|d| d.output == o.target),
+                "harvest" => r.crops.iter().any(|d| d.product == o.target),
+                "sell" => r.packs.iter().any(|d| d.item == o.target),
+                _ => {
+                    errors.push(format!("{what}: act must be one of {QUEST_ACTS:?}"));
+                    true
+                }
+            };
+            if !known {
+                errors.push(format!("{what}: nothing to {} called {:?}", o.act, o.target));
+            }
+            if let Some(post) = &o.at {
+                if o.act != "sell" {
+                    errors.push(format!("{what}: only sell objectives name a post"));
+                } else if !r.posts.iter().any(|p| &p.id == post) {
+                    errors.push(format!("{what}: no post {post:?}"));
+                }
+            }
+            if x.objectives[..k].iter().any(|e| e.act == o.act && e.target == o.target && e.at == o.at) {
+                errors.push(format!("{what}: the same as an earlier objective"));
+            }
+        }
+        if x.rewards.len() > MAX_REWARDS {
+            errors.push(format!("{at}: at most {MAX_REWARDS} rewards"));
+        }
+        for w in &x.rewards {
+            match item(&w.item) {
+                None => errors.push(format!("{at}: reward: no item {:?}", w.item)),
+                Some(i) if w.count < 1 || w.count > i.stack => errors.push(format!("{at}: reward {:?}: count must be from 1 to the item's stack", w.item)),
+                Some(_) => {}
+            }
+        }
+        if x.rewards.iter().enumerate().any(|(k, w)| x.rewards[..k].iter().any(|e| e.item == w.item)) {
+            errors.push(format!("{at}: each reward item once"));
+        }
+    }
+}
+
 fn check_npcs(n: &NpcsFile, k: &CombatFile, items: &[ItemDef], errors: &mut Vec<String>) {
     let file = "npcs.toml";
     let r = &n.npc;
@@ -2080,6 +2322,24 @@ fn canonical(c: &Content) -> String {
         )
         .unwrap();
     }
+    s += "quests";
+    for f in quest_fields(&c.quest_rules) {
+        write!(s, "\t{}", f.value.bits()).unwrap();
+    }
+    s += "\n";
+    for g in &c.givers {
+        writeln!(s, "giver\t{}\t{}\t{}\t{}", g.wire, g.id, g.name, g.title).unwrap();
+    }
+    for q in &c.quests {
+        write!(s, "quest\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{}\t{}", q.wire, q.id, q.name, q.giver, q.to(), q.level, q.after, q.text, q.xp).unwrap();
+        for o in &q.objectives {
+            write!(s, "\t{}:{}:{}:{}", o.act, o.target, o.count, o.at.as_deref().unwrap_or("-")).unwrap();
+        }
+        for w in &q.rewards {
+            write!(s, "\treward:{}:{}", w.item, w.count).unwrap();
+        }
+        s += "\n";
+    }
     s
 }
 
@@ -2288,6 +2548,18 @@ fn chat_fields(c: &ChatRulesDef) -> Vec<Field> {
         f("burst", "Messages a character may send at once.", i(c.burst)),
         f("refill_ms", "How often one more message is allowed after a burst, ms.", i(c.refill_ms)),
         f("inbox", "Party and whisper messages kept for each character.", i(c.inbox)),
+    ]
+}
+
+fn quest_fields(q: &QuestRulesDef) -> Vec<Field> {
+    use Value::*;
+    let f = |name, doc, value| Field { name, doc, value };
+    let i = |v: u32| I32(v as i32);
+    vec![
+        f("log", "The most quests a character may have open at once.", i(q.log)),
+        f("reach_m", "How close a character must stand to a giver, m.", F32(q.reach_m)),
+        f("early_pct", "Every objective this far along lets a quest be turned in early, for that share of the experience, %.", i(q.early_pct)),
+        f("over_pct", "Objectives of 2 or more count on to this share, for that much experience, %.", i(q.over_pct)),
     ]
 }
 
@@ -2987,7 +3259,66 @@ pub fn render_rust(c: &Content) -> String {
     s += "pub fn npc_kind(wire: u8) -> Option<&'static NpcKindData> {\n    NPC_KINDS.get(usize::from(wire))\n}\n\n";
     s += "/// The NPC kind with content id `id`.\n";
     s += "pub fn npc_kind_by_id(id: &str) -> Option<&'static NpcKindData> {\n    NPC_KINDS.iter().find(|d| d.id == id)\n}\n";
+    render_rust_quests(c, &mut s);
     s
+}
+
+fn render_rust_quests(c: &Content, s: &mut String) {
+    let rules = quest_fields(&c.quest_rules);
+    *s += "\n/// Quest rules (`[quests]` in `content/quests.toml`, docs/design/quests.md).\n#[derive(Debug, PartialEq)]\npub struct QuestRules {\n";
+    rust_struct_fields(s, &rules);
+    *s += "}\n\n";
+    writeln!(s, "pub static QUEST: QuestRules = QuestRules {{ {} }};\n", rust_values(&rules)).unwrap();
+    *s += "/// A quest giver (`content/quests.toml`). Its wire is stored in giver rows.\n#[derive(Debug, PartialEq)]\npub struct GiverData {\n    pub wire: u8,\n    pub id: &'static str,\n    /// What players see: a name and a title.\n    pub name: &'static str,\n    pub title: &'static str,\n}\n\n";
+    writeln!(s, "pub static GIVERS: [GiverData; {}] = [", c.givers.len()).unwrap();
+    for g in &c.givers {
+        writeln!(s, "    GiverData {{ wire: {}, id: {:?}, name: {:?}, title: {:?} }},", g.wire, g.id, g.name, g.title).unwrap();
+    }
+    *s += "];\n\n";
+    *s += "pub fn giver(wire: u8) -> Option<&'static GiverData> {\n    GIVERS.get(usize::from(wire))\n}\n\n";
+    *s += "pub fn giver_by_id(id: &str) -> Option<&'static GiverData> {\n    GIVERS.iter().find(|d| d.id == id)\n}\n\n";
+    *s += "/// What a quest objective counts. The discriminant is the wire value.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n#[repr(u8)]\npub enum QuestAct {\n";
+    for (w, a) in QUEST_ACTS.iter().enumerate() {
+        writeln!(s, "    {} = {w},", pascal(a)).unwrap();
+    }
+    *s += "}\n\n";
+    *s += "/// One objective: `act` on `target` (an NPC kind's wire for `Kill`, otherwise an item's), `count`\n/// times; a `Sell` with a `post` counts only at that post kind.\n#[derive(Debug, PartialEq)]\npub struct ObjectiveData {\n    pub act: QuestAct,\n    pub target: u16,\n    pub count: u32,\n    pub post: Option<u8>,\n}\n\n";
+    *s += "/// `count` of the item with wire `item`.\n#[derive(Debug, PartialEq)]\npub struct RewardData {\n    pub item: u16,\n    pub count: u32,\n}\n\n";
+    *s += "/// A quest (`content/quests.toml`). Its wire is stored in quest-log rows.\n#[derive(Debug, PartialEq)]\npub struct QuestData {\n    pub wire: u16,\n    pub id: &'static str,\n    pub name: &'static str,\n    /// The givers' wires: who gives it, and who it's turned in to.\n    pub giver: u8,\n    pub to: u8,\n    /// The level a character must be to take it.\n    pub level: u8,\n    /// Quests that must be turned in first, by wire.\n    pub after: &'static [u16],\n    pub text: &'static str,\n    /// None makes an errand, done on reaching `to`.\n    pub objectives: &'static [ObjectiveData],\n    pub xp: u32,\n    pub rewards: &'static [RewardData],\n}\n\n";
+    *s += "/// Every quest, sorted by wire, which is the index.\n";
+    writeln!(s, "pub static QUESTS: [QuestData; {}] = [", c.quests.len()).unwrap();
+    for q in &c.quests {
+        let after: Vec<String> = q.after.iter().map(|a| c.quest_wire(a).to_string()).collect();
+        let objectives: Vec<String> = q
+            .objectives
+            .iter()
+            .map(|o| {
+                let (act, target) = c.objective_wires(o);
+                let post = c.objective_post(o).map_or("None".to_string(), |p| format!("Some({p})"));
+                format!("ObjectiveData {{ act: QuestAct::{}, target: {target}, count: {}, post: {post} }}", pascal(QUEST_ACTS[usize::from(act)]), o.count)
+            })
+            .collect();
+        let rewards: Vec<String> = q.rewards.iter().map(|w| format!("RewardData {{ item: {}, count: {} }}", c.item_wire(&w.item), w.count)).collect();
+        writeln!(
+            s,
+            "    QuestData {{ wire: {}, id: {:?}, name: {:?}, giver: {}, to: {}, level: {}, after: &[{}], text: {:?}, objectives: &[{}], xp: {}, rewards: &[{}] }},",
+            q.wire,
+            q.id,
+            q.name,
+            c.giver_wire(&q.giver),
+            c.giver_wire(q.to()),
+            q.level,
+            after.join(", "),
+            q.text,
+            objectives.join(", "),
+            q.xp,
+            rewards.join(", ")
+        )
+        .unwrap();
+    }
+    *s += "];\n\n";
+    *s += "pub fn quest(wire: u16) -> Option<&'static QuestData> {\n    QUESTS.get(usize::from(wire))\n}\n\n";
+    *s += "pub fn quest_by_id(id: &str) -> Option<&'static QuestData> {\n    QUESTS.iter().find(|d| d.id == id)\n}\n";
 }
 
 pub fn render_csharp(c: &Content) -> String {
@@ -3191,6 +3522,28 @@ pub fn render_csharp(c: &Content) -> String {
     s += "    /// <param name=\"Color\">The placeholder body's colour, 0xRRGGBB; <paramref name=\"SizeM\"/> its height.</param>\n";
     s += "    /// <param name=\"Skills\">Skill wires, tried in order.</param>\n";
     s += "    public sealed record NpcKindData(byte Wire, string Id, string Name, byte Level, int Hp, float SpeedMps, float AggroM, float WanderM, uint RespawnS, float SizeM, uint Color, IReadOnlyList<ushort> Skills, IReadOnlyList<LootData> Loot);\n\n";
+    let quest = quest_fields(&c.quest_rules);
+    s += "    /// <summary>Quest rules ([quests] in content/quests.toml, docs/design/quests.md).</summary>\n";
+    csharp_param_docs(&mut s, &quest);
+    writeln!(s, "    public sealed record QuestRules({});\n", csharp_params(&quest)).unwrap();
+    s += "    /// <summary>A quest giver (content/quests.toml). Its wire is stored in giver rows.</summary>\n";
+    s += "    public sealed record GiverData(byte Wire, string Id, string Name, string Title);\n\n";
+    s += "    /// <summary>What a quest objective counts. The value is the wire value.</summary>\n";
+    s += "    public enum QuestAct : byte\n    {\n";
+    for (w, a) in QUEST_ACTS.iter().enumerate() {
+        writeln!(s, "        {} = {w},", pascal(a)).unwrap();
+    }
+    s += "    }\n\n";
+    s += "    /// <summary>One objective: <paramref name=\"Act\"/> on <paramref name=\"Target\"/> (an NPC kind's wire for Kill, otherwise an item's), <paramref name=\"Count\"/> times.</summary>\n";
+    s += "    /// <param name=\"Post\">A Sell counts only at this post kind, if it has one.</param>\n";
+    s += "    public sealed record ObjectiveData(QuestAct Act, ushort Target, uint Count, byte? Post);\n\n";
+    s += "    /// <summary><paramref name=\"Count\"/> of the item with wire <paramref name=\"Item\"/>.</summary>\n";
+    s += "    public sealed record RewardData(ushort Item, uint Count);\n\n";
+    s += "    /// <summary>A quest (content/quests.toml). Its wire is stored in quest-log rows.</summary>\n";
+    s += "    /// <param name=\"Giver\">Who gives it, by wire; <paramref name=\"To\"/> is who it's turned in to.</param>\n";
+    s += "    /// <param name=\"After\">Quests that must be turned in first, by wire.</param>\n";
+    s += "    /// <param name=\"Objectives\">None makes an errand, done on reaching <paramref name=\"To\"/>.</param>\n";
+    s += "    public sealed record QuestData(ushort Wire, string Id, string Name, byte Giver, byte To, byte Level, IReadOnlyList<ushort> After, string Text, IReadOnlyList<ObjectiveData> Objectives, uint Xp, IReadOnlyList<RewardData> Rewards);\n\n";
     s += "    /// <summary>Skills (content/combat.toml, docs/design/combat.md).</summary>\n";
     s += "    /// <param name=\"Wire\">Stored in casts and combat events.</param>\n";
     s += "    /// <param name=\"Skillset\">The skillset's wire.</param>\n";
@@ -3557,6 +3910,49 @@ pub fn render_csharp(c: &Content) -> String {
     s += "        };\n\n";
     s += "        /// <summary>The NPC kind stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
     s += "        public static NpcKindData? NpcKind(byte wire) => wire < NpcKinds.Count ? NpcKinds[wire] : null;\n";
+    writeln!(s, "\n        public static readonly QuestRules Quest = new({});\n", csharp_values(&quest_fields(&c.quest_rules))).unwrap();
+    s += "        /// <summary>Every quest giver, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<GiverData> Givers = new GiverData[]\n        {\n";
+    for g in &c.givers {
+        writeln!(s, "            new({}, {:?}, {:?}, {:?}),", g.wire, g.id, g.name, g.title).unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The giver stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static GiverData? Giver(byte wire) => wire < Givers.Count ? Givers[wire] : null;\n\n";
+    s += "        /// <summary>Every quest, sorted by wire, which is the index.</summary>\n";
+    s += "        public static readonly IReadOnlyList<QuestData> Quests = new QuestData[]\n        {\n";
+    for q in &c.quests {
+        let after: Vec<String> = q.after.iter().map(|a| c.quest_wire(a).to_string()).collect();
+        let objectives: Vec<String> = q
+            .objectives
+            .iter()
+            .map(|o| {
+                let (act, target) = c.objective_wires(o);
+                let post = c.objective_post(o).map_or("null".to_string(), |p| p.to_string());
+                format!("new(QuestAct.{}, {target}, {}u, {post})", pascal(QUEST_ACTS[usize::from(act)]), o.count)
+            })
+            .collect();
+        let rewards: Vec<String> = q.rewards.iter().map(|w| format!("new({}, {}u)", c.item_wire(&w.item), w.count)).collect();
+        writeln!(
+            s,
+            "            new({}, {:?}, {:?}, {}, {}, {}, new ushort[] {{ {} }}, {:?}, new ObjectiveData[] {{ {} }}, {}u, new RewardData[] {{ {} }}),",
+            q.wire,
+            q.id,
+            q.name,
+            c.giver_wire(&q.giver),
+            c.giver_wire(q.to()),
+            q.level,
+            after.join(", "),
+            q.text,
+            objectives.join(", "),
+            q.xp,
+            rewards.join(", ")
+        )
+        .unwrap();
+    }
+    s += "        };\n\n";
+    s += "        /// <summary>The quest stored as <paramref name=\"wire\"/>, if it exists.</summary>\n";
+    s += "        public static QuestData? QuestOf(ushort wire) => wire < Quests.Count ? Quests[wire] : null;\n";
     s += "    }\n}\n";
     s
 }
@@ -4121,6 +4517,59 @@ mod tests {
         inbox = 50
     "#;
 
+    const QUESTS: &str = r#"
+        [quests]
+        log = 50
+        reach_m = 5.0
+        early_pct = 50
+        over_pct = 150
+
+        [[giver]]
+        wire = 0
+        id = "reeve"
+        name = "Odda Fernwright"
+        title = "Reeve of Furrowdale"
+
+        [[giver]]
+        wire = 1
+        id = "warden"
+        name = "Brannoch Hale"
+        title = "Warden of Cairnwick"
+
+        [[quest]]
+        wire = 0
+        id = "crabs"
+        name = "Pinchers"
+        giver = "reeve"
+        level = 1
+        text = "Thin the crabs out, either side of town."
+        objectives = [{ act = "kill", target = "crab", count = 6 }, { act = "gather", target = "driftpine_log", count = 3 }]
+        xp = 120
+        rewards = [{ item = "driftpine_log", count = 2 }]
+
+        [[quest]]
+        wire = 1
+        id = "road"
+        name = "The Road"
+        giver = "reeve"
+        to = "warden"
+        level = 2
+        after = ["crabs"]
+        text = "See the warden."
+        xp = 100
+
+        [[quest]]
+        wire = 2
+        id = "bale"
+        name = "A Bale"
+        giver = "warden"
+        level = 1
+        after = ["crabs", "road"]
+        text = "Make a bale and sell it on the isle."
+        objectives = [{ act = "craft", target = "reedcutter_knife", count = 1 }, { act = "harvest", target = "driftpine_log", count = 2 }, { act = "sell", target = "bale", count = 1, at = "isle_post" }]
+        xp = 450
+    "#;
+
     fn sources() -> Sources {
         Sources {
             movement: MOVEMENT.into(),
@@ -4135,7 +4584,12 @@ mod tests {
             combat: COMBAT.into(),
             npcs: NPCS.into(),
             social: SOCIAL.into(),
+            quests: QUESTS.into(),
         }
+    }
+
+    fn parse_quests(quests: &str) -> Result<Content, Vec<String>> {
+        parse(&Sources { quests: quests.into(), ..sources() })
     }
 
     fn parse_npcs(npcs: &str) -> Result<Content, Vec<String>> {
@@ -4346,9 +4800,10 @@ mod tests {
             combat: "[combat\n".into(),
             npcs: "[npc\n".into(),
             social: "[party\n".into(),
+            quests: "[quests\n".into(),
         };
         let e = parse(&bad).unwrap_err().join("\n");
-        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml", "npcs.toml", "social.toml"] {
+        for file in ["movement.toml", "ships.toml", "land.toml", "labor.toml", "items.toml", "gathering.toml", "crafting.toml", "farming.toml", "trade.toml", "combat.toml", "npcs.toml", "social.toml", "quests.toml"] {
             assert!(e.contains(file), "{file} missing from:\n{e}");
         }
     }
@@ -4426,6 +4881,63 @@ mod tests {
 
     fn parse_social(social: &str) -> Result<Content, Vec<String>> {
         parse(&Sources { social: social.into(), ..sources() })
+    }
+
+    #[test]
+    fn quests_reach_both_outputs_and_the_hash() {
+        let c = parse_quests(QUESTS).unwrap();
+        let (rs, cs) = (render_rust(&c), render_csharp(&c));
+        assert!(rs.contains("pub static QUEST: QuestRules = QuestRules { log: 50, reach_m: 5.0, early_pct: 50, over_pct: 150 };"), "{rs}");
+        assert!(rs.contains("GiverData { wire: 1, id: \"warden\", name: \"Brannoch Hale\", title: \"Warden of Cairnwick\" },"), "{rs}");
+        // Kill targets are NPC kinds' wires; the others items'; errands go to another giver.
+        let log = c.item_wire("driftpine_log");
+        assert!(rs.contains(&format!("objectives: &[ObjectiveData {{ act: QuestAct::Kill, target: 0, count: 6, post: None }}, ObjectiveData {{ act: QuestAct::Gather, target: {log}, count: 3, post: None }}], xp: 120, rewards: &[RewardData {{ item: {log}, count: 2 }}]")), "{rs}");
+        assert!(rs.contains("QuestData { wire: 1, id: \"road\", name: \"The Road\", giver: 0, to: 1, level: 2, after: &[0], text: \"See the warden.\", objectives: &[], xp: 100, rewards: &[] },"), "{rs}");
+        assert!(rs.contains("post: Some(1) }], xp: 450"), "{rs}");
+        assert!(rs.contains("    Kill = 0,\n    Gather = 1,\n    Craft = 2,\n    Harvest = 3,\n    Sell = 4,\n"), "{rs}");
+        assert!(cs.contains("public static readonly QuestRules Quest = new(50, 5.0f, 50, 150);"), "{cs}");
+        assert!(cs.contains("new(1, \"road\", \"The Road\", 0, 1, 2, new ushort[] { 0 }, \"See the warden.\", new ObjectiveData[] {  }, 100u, new RewardData[] {  }),"), "{cs}");
+        assert!(cs.contains("new(QuestAct.Sell, "), "{cs}");
+        assert!(cs.contains(", 1u, 1)"), "{cs}");
+        let a = c.hash;
+        for changed in [QUESTS.replace("early_pct = 50", "early_pct = 40"), QUESTS.replace("count = 6", "count = 7"), QUESTS.replace("xp = 100", "xp = 101"), QUESTS.replace("See the warden.", "See the warden!")] {
+            assert_ne!(parse_quests(&changed).unwrap().hash, a, "{changed}");
+        }
+    }
+
+    #[test]
+    fn bad_quests_are_reported_together() {
+        let bad = QUESTS
+            .replace("log = 50", "log = 0")
+            .replace("over_pct = 150", "over_pct = 90")
+            .replace("title = \"Warden of Cairnwick\"", "title = \"warden\"")
+            .replace("target = \"crab\"", "target = \"dragon\"")
+            .replace("act = \"gather\", target = \"driftpine_log\", count = 3", "act = \"fish\", target = \"driftpine_log\", count = 0")
+            .replace("rewards = [{ item = \"driftpine_log\", count = 2 }]", "rewards = [{ item = \"gold\", count = 2 }]")
+            .replace("to = \"warden\"", "to = \"reeve\"")
+            .replace("after = [\"crabs\", \"road\"]", "after = [\"crabs\", \"later\"]")
+            .replace("act = \"craft\", target = \"reedcutter_knife\", count = 1", "act = \"craft\", target = \"reedcutter_knife\", count = 1, at = \"isle_post\"")
+            .replace("at = \"isle_post\" }]", "at = \"moon_post\" }]")
+            .replace("level = 2", "level = 99")
+            .replace("text = \"See the warden.\"", "text = \"Say \\\"hi\\\"\"");
+        let e = parse_quests(&bad).unwrap_err().join("\n");
+        for want in [
+            "quests.log must be from 1",
+            "quests.over_pct must be from 100",
+            "giver \"warden\": names and titles",
+            "nothing to kill called \"dragon\"",
+            "act must be one of",
+            "count must be from 1",
+            "reward: no item \"gold\"",
+            "a quest with no objectives is an errand",
+            "after \"later\" must be a quest with a lower wire",
+            "only sell objectives name a post",
+            "no post \"moon_post\"",
+            "level must be from 1 to",
+            "text is 1 to",
+        ] {
+            assert!(e.contains(want), "{want} missing from:\n{e}");
+        }
     }
 
     #[test]
@@ -4748,6 +5260,7 @@ mod tests {
                 land: LAND.replace(from, to),
                 farming: FARMING.replace(from, to),
                 npcs: NPCS.replace(from, to),
+                quests: QUESTS.replace(from, to),
                 ..sources()
             });
             assert_ne!(c.unwrap().hash, a, "{changed}");

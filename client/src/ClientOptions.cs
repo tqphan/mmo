@@ -22,6 +22,7 @@ namespace Mmo
     /// <item><c>--crime-demo</c>: dev builds, with <c>bot visitor</c> nearby; hit the nearest other character for a Bloodstain and the Bloodmarked status, try to report our own stain (refused), then become Sought by <c>dev_set_crime</c> (docs/design/crime.md).</item>
     /// <item><c>--party-demo</c>: with <c>bot visitor</c> nearby; invite it to a party, then talk to it aloud, in the party and in a whisper, and see its answers (docs/design/social.md).</item>
     /// <item><c>--npc-demo</c>: dev builds; on entering, go to level 5, put a Greymane Wolf ahead, let it come and bite, fight it down through the hotbar and loot the corpse (docs/design/npcs.md).</item>
+    /// <item><c>--quest-demo</c>: dev builds; on entering, walk to the nearest quest giver, take what it offers, cut down summoned Shore Skitters until Pinchers on the Strand is done, turn it in and open the log (docs/design/quests.md).</item>
     /// <item><c>--land-demo</c>: dev builds; on entering, teleport beside the nearest housing site, place a garden through the placement mode, pay its tax, make it public, then move the dev clock past its demolition (docs/design/land.md).</item>
     /// <item><c>--craft-demo</c>: dev builds; on entering, teleport to the Cookhearth, grant logs and ore, craft Charcoal, then a Rustiron Bar at the Bloomery (docs/design/crafting.md).</item>
     /// <item><c>--walk</c>: walk instead of run.</item>
@@ -63,6 +64,7 @@ namespace Mmo
         public bool CrimeDemo;
         public bool PartyDemo;
         public bool NpcDemo;
+        public bool QuestDemo;
         public bool Walk;
         public float CamYawDeg;
         public float CamDistance = 8.0f;
@@ -116,6 +118,7 @@ namespace Mmo
                     case "--crime-demo": o.CrimeDemo = true; break;
                     case "--party-demo": o.PartyDemo = true; break;
                     case "--npc-demo": o.NpcDemo = true; break;
+                    case "--quest-demo": o.QuestDemo = true; break;
                     case "--labor": o.Labor = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--spawn-ship": o.SpawnShip = Triple(Next()); break;
                     case "--trace": o.Trace = true; break;

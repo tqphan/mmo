@@ -195,6 +195,7 @@ pub fn upload_world(args: &Args, ta: &TerrainArgs) -> Check {
     upload_stations(&admin, &worldtool::stations::load(std::path::Path::new(&ta.world))?)?;
     upload_posts(&admin, &worldtool::posts::load(std::path::Path::new(&ta.world))?)?;
     upload_shrines(&admin, &worldtool::shrines::load(std::path::Path::new(&ta.world))?)?;
+    upload_givers(&admin, &worldtool::givers::load(std::path::Path::new(&ta.world))?)?;
     upload_spawns(&admin, &worldtool::spawns::load(std::path::Path::new(&ta.world))?)?;
     admin.conn.disconnect().map_err(|e| e.to_string())
 }
@@ -328,6 +329,32 @@ fn upload_shrines(admin: &Bot, shrines: &[worldtool::shrines::Placement]) -> Che
         return Err(format!("the server has {got} Wayshrines, expected {}", shrines.len()));
     }
     println!("uploaded {got} Wayshrines");
+    Ok(())
+}
+
+/// Replace every quest giver on the server with `givers`, and check the count.
+fn upload_givers(admin: &Bot, givers: &[worldtool::givers::Placement]) -> Check {
+    outcome(|tx| admin.conn.reducers.admin_clear_givers_then(move |_, r| drop(tx.send(flatten(r)))))?;
+    let rows: Vec<GiverPlacement> = givers
+        .iter()
+        .map(|g| GiverPlacement { kind: g.kind.wire, x: g.x, y: g.y, z: g.z, yaw: sim::ship::yaw_to_u16(f32::from(g.yaw_deg).to_radians()) })
+        .collect();
+    outcome(|tx| admin.conn.reducers.admin_put_givers_then(rows, move |_, r| drop(tx.send(flatten(r)))))?;
+    let (tx, rx) = mpsc::channel();
+    admin
+        .conn
+        .subscription_builder()
+        .on_applied(move |_| {
+            let _ = tx.send(());
+        })
+        .on_error(|_, e| eprintln!("subscription error: {e}"))
+        .subscribe(["SELECT * FROM quest_giver"]);
+    rx.recv_timeout(WAIT).map_err(|_| "no reply to the quest giver subscription".to_string())?;
+    let got = admin.conn.db.quest_giver().count() as usize;
+    if got != givers.len() {
+        return Err(format!("the server has {got} quest givers, expected {}", givers.len()));
+    }
+    println!("uploaded {got} quest givers");
     Ok(())
 }
 

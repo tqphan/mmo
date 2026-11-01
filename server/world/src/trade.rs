@@ -3,6 +3,7 @@
 //! `sim::trade`; nothing is ticked.
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
+use sim::content::QuestAct;
 use sim::movement::MoveMode;
 use sim::trade::{FULL, Quote, after_sale, demand_key, demand_now, fresh_permille, in_reach, post, quote};
 
@@ -284,6 +285,7 @@ pub fn sell_pack(ctx: &ReducerContext, post_id: u64) -> Result<(), String> {
     let p = on_foot(ctx, "can't sell from a ship", "can't sell while swimming")?;
     let (pk, tp, q) = offer(ctx, &p, post_id)?;
     take_off(ctx, &p);
+    crate::quests::count(ctx, p.char_id, QuestAct::Sell, pk.def, Some(tp.kind), 1);
     let at = now(ctx);
     let key = demand_key(tp.kind, pk.def);
     let row = TradeDemand { key, permille: u16::try_from(after_sale(q.demand)).unwrap_or(0), at };

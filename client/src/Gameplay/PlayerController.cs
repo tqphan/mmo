@@ -86,6 +86,9 @@ namespace Mmo.Gameplay
         /// <summary>Crafting at stations; set by <see cref="Main"/>. F on land uses a station when there's nothing to gather.</summary>
         public Crafting? Crafting { get; set; }
 
+        /// <summary>Quests; set by <see cref="Main"/>. F on land talks to a giver before anything else.</summary>
+        public Quests? Quests { get; set; }
+
         /// <summary>Placing a plot; set by <see cref="Main"/>. While placing, F places and does nothing else.</summary>
         public Placement? Placement { get; set; }
 
@@ -190,7 +193,7 @@ namespace Mmo.Gameplay
             var order = options.Autopilot?.Drive(View(now, ship)) ?? new PilotOrder(System.Numerics.Vector2.Zero);
             bool interact = options.Autopilot is null && GameInput.JustPressed("interact");
             if (interact && Parent == 0
-                && (Placement?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Vehicles?.Interact() == true
+                && (Placement?.Interact() == true || Quests?.Interact() == true || Farming?.Interact() == true || Looting?.Interact() == true || Vehicles?.Interact() == true
                     || Shipyards?.Interact() == true || Trade?.Interact() == true || Gathering?.Interact() == true || Crafting?.Interact() == true || Plots?.Interact() == true))
                 interact = false;
             // Aboard, a pack slot takes F unless we stand at the helm or a cannon, or are working one.

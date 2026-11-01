@@ -132,6 +132,15 @@ pub const SHRINES: [(&str, f32, f32, u16); 4] = [
     ("redfen_wayshrine", -3940.0, 1260.0, 0),
 ];
 
+/// Quest givers: (giver, x, z, yaw in degrees), a few steps from each town's Wayshrine
+/// (docs/design/quests.md).
+pub const GIVERS: [(&str, f32, f32, u16); 4] = [
+    ("odda_fernwright", -3326.0, 372.0, 90),
+    ("brannoch_hale", -4616.0, -1052.0, 90),
+    ("yeva_mossgrove", -3946.0, 1252.0, 0),
+    ("quill_ambry", 6.0, -12.0, 270),
+];
+
 /// NPC camps: (kind, centre x, z, radius, spawn points), rising in level away from Furrowdale.
 pub const CAMPS: [(&str, f32, f32, f32, usize); 13] = [
     // Level 1, on the beaches either side of Furrowdale, and on Gullhaven's.

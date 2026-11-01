@@ -297,6 +297,47 @@ namespace Mmo.Tests
             Assert.True(n >= 50, $"{n} vectors");
         }
 
+        private static uint[] Counts(string s) => s == "-" ? System.Array.Empty<uint>() : s.Split(',').Select(uint.Parse).ToArray();
+
+        [Fact]
+        public void QuestScores()
+        {
+            int n = 0;
+            var seen = new HashSet<QuestStanding>();
+            foreach (var v in Lines("quest"))
+            {
+                var q = GameContent.QuestOf(ushort.Parse(v[1]))!;
+                var done = Counts(v[2]);
+                uint score = Quest.Score(q.Objectives, done);
+                Assert.Equal(uint.Parse(v[3]), score);
+                Assert.Equal(v[4] == "1", Quest.Ready(score));
+                Assert.Equal(uint.Parse(v[5]), Quest.XpFor(q.Xp, score));
+                var standing = Quest.Standing(q.Objectives, done);
+                Assert.Equal((QuestStanding)byte.Parse(v[6]), standing);
+                seen.Add(standing);
+                n++;
+            }
+            Assert.True(n >= 100 && seen.Count == 5, $"{n} vectors, {seen.Count} standings");
+            foreach (var v in Lines("quest_tally"))
+                Assert.Equal(uint.Parse(v[4]), Quest.Tally(uint.Parse(v[1]), uint.Parse(v[2]), uint.Parse(v[3])));
+        }
+
+        [Fact]
+        public void QuestTaking()
+        {
+            int n = 0, ok = 0;
+            foreach (var v in Lines("quest_take"))
+            {
+                var q = GameContent.QuestOf(ushort.Parse(v[1]))!;
+                var done = v[3] == "-" ? new List<ushort>() : v[3].Split(',').Select(ushort.Parse).ToList();
+                var got = Quest.Refusal(q, byte.Parse(v[2]), done);
+                Assert.Equal(v[4], got ?? "ok");
+                ok += got is null ? 1 : 0;
+                n++;
+            }
+            Assert.True(n >= 40 && ok > 5 && ok < n, $"{n} vectors, {ok} ok");
+        }
+
         [Fact]
         public void CraftReach()
         {

@@ -217,7 +217,7 @@ fn place_station(bot: &Bot, x: f32, y: f32, z: f32) -> Result<u64, String> {
 }
 
 /// A post of kind `id`, as an admin; returns its id once we see it.
-fn place_post(bot: &Bot, id: &str, x: f32, y: f32, z: f32) -> Result<u64, String> {
+pub(crate) fn place_post(bot: &Bot, id: &str, x: f32, y: f32, z: f32) -> Result<u64, String> {
     let kind = post_by_id(id).ok_or_else(|| format!("no post {id}"))?;
     let p = PostPlacement { kind: kind.wire, x, y, z, yaw: 0 };
     call(bot, |tx| bot.conn.reducers.admin_put_posts_then(vec![p], tx))?;

@@ -118,6 +118,11 @@ Names are added as systems need them. Places come with the M1 coast zone.
 | Item: pack | Timber Bundle, Ironwork Crate, Sailcloth Bale | Shipbuilding materials carried to a shipyard (`timber_bundle`, `ironwork_crate`, `sailcloth_bale`) |
 | Item: consumable | Hullmender's Kit | Planks, nails and rope for mending wrecks and patching hulls (`hullmenders_kit`) |
 | Shipyard stage | Keel and Frames, Ironwork, Rigging, Fitting Out I–III | The Swiftgull Shipyard's stages |
+| NPC: giver | Odda Fernwright | Reeve of Furrowdale; gives the first quests (`odda_fernwright`, `content/quests.toml`) |
+| NPC: giver | Brannoch Hale | Warden of Cairnwick, who keeps the road over the downs (`brannoch_hale`) |
+| NPC: giver | Yeva Mossgrove | Fenkeeper of Redfen (`yeva_mossgrove`) |
+| NPC: giver | Quill Ambry | Harbourmaster of Gullhaven (`quill_ambry`) |
+| Quest | Pinchers on the Strand, First Furrows, Reed and Twine, The Cairnwick Road, Bristle Downs Boars, Wolves in Greymane Wood, Croakers in the Fen, The Hexers of the Tarn, A Bale for Market, Across the Water | Hearthshore's ten quests (docs/design/quests.md) |
 | Dev target | Straw Dummy | A practice target on a post, dev builds only |
 
 Placeholder names in code and tests (`Mira`, `Tobin`, `Bot…`) aren't world names.

@@ -3,6 +3,7 @@
 
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp, ViewContext};
 use sim::craft::{CRAFT_MAX_COUNT, RecipeData, craft_micros, in_reach, moved_off, recipe, station};
+use sim::content::QuestAct;
 use sim::movement::MoveMode;
 
 use crate::session::{presence, require_admin};
@@ -205,8 +206,10 @@ fn finish(ctx: &ReducerContext, job: &CraftJob) -> Result<&'static RecipeData, S
         }
         crate::items::take(ctx, p.char_id, &takes(r))?;
         crate::trade::made(ctx, &p, r.output, [s.x, s.y, s.z]);
+        crate::quests::count(ctx, p.char_id, QuestAct::Craft, r.output, None, 1);
     } else {
         crate::items::exchange(ctx, p.char_id, &takes(r), (r.output, r.output_count))?;
+        crate::quests::count(ctx, p.char_id, QuestAct::Craft, r.output, None, r.output_count);
     }
     crate::labor::spend(ctx, job.identity, r.labor)?;
     Ok(r)
