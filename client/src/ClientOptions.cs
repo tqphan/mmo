@@ -77,6 +77,8 @@ namespace Mmo
         public string Shot = "follow";
         public string? WorldTest;
         public string Route = "sail";
+        /// <summary>World test: a fixed camera at X, Z, a height above the ground (or sea), yaw and pitch in degrees, instead of a route.</summary>
+        public float[]? View;
         public bool NoVsync;
         public double Secs;
 
@@ -129,6 +131,7 @@ namespace Mmo
                     case "--shot": o.Shot = OneOf(Next(), "follow", "wide"); break;
                     case "--world-test": o.WorldTest = Next(); break;
                     case "--route": o.Route = OneOf(Next(), "sail", "cross", "walk", "high"); break;
+                    case "--view": o.View = Floats(Next(), 5, "X,Z,HEIGHT,YAW,PITCH"); break;
                     case "--no-vsync": o.NoVsync = true; break;
                     case "--secs": o.Secs = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                     case "--cam-yaw": o.CamYawDeg = float.Parse(Next(), CultureInfo.InvariantCulture); break;
@@ -162,6 +165,14 @@ namespace Mmo
                 throw new ArgumentException($"{value}: expected X,Z,YAW");
             float N(int i) => float.Parse(nums[i], CultureInfo.InvariantCulture);
             return (N(0), N(1), N(2));
+        }
+
+        private static float[] Floats(string value, int count, string expected)
+        {
+            var nums = value.Split(',');
+            if (nums.Length != count || !nums.All(n => float.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out _)))
+                throw new ArgumentException($"{value}: expected {expected}");
+            return nums.Select(n => float.Parse(n, CultureInfo.InvariantCulture)).ToArray();
         }
 
         private static string OneOf(string value, params string[] allowed) =>

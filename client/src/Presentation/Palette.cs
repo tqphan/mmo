@@ -18,12 +18,8 @@ namespace Mmo.Presentation
         public Color Leaves = new(0.30f, 0.62f, 0.27f);
         public Color LeavesAutumn = new(0.90f, 0.62f, 0.20f);
         public Color Pine = new(0.18f, 0.45f, 0.30f);
-        public Color WaterShallow = new(0.25f, 0.85f, 0.80f);
-        public Color WaterDeep = new(0.07f, 0.35f, 0.60f);
-        /// <summary>Land-use tints on the world's terrain (docs/design/world.md): placeholders, to see the areas.</summary>
-        public Color Housing = new(0.95f, 0.78f, 0.35f);
-        public Color Town = new(0.86f, 0.80f, 0.74f);
-        public Color Road = new(0.62f, 0.48f, 0.34f);
+        public Color WaterShallow = new(0.16f, 0.72f, 0.70f);
+        public Color WaterDeep = new(0.04f, 0.22f, 0.42f);
 
         public Color Ground(float height, float up, bool banded)
         {

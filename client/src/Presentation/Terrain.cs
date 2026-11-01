@@ -13,8 +13,8 @@ namespace Mmo.Presentation
     /// (docs/design/worldstream.md, ADR 0017). <see cref="TerrainPlan"/> picks each tile's level
     /// from the distance to <see cref="Focus"/>; meshes are built on worker threads in batches, nearest first,
     /// and swapped in on the main thread within <see cref="ApplyBudgetMs"/> a frame. A tile keeps its
-    /// old mesh until the new one is in. Placeholder colours only (ADR 0004), tinted by land use
-    /// (docs/design/world.md).
+    /// old mesh until the new one is in. <c>shaders/terrain.gdshader</c> colours the ground from
+    /// height, slope and <see cref="GroundMasks"/> (docs/design/art.md).
     /// </summary>
     public partial class Terrain : Node3D
     {
@@ -28,17 +28,9 @@ namespace Mmo.Presentation
         public Vector3 Focus;
         public readonly TerrainPlan Plan;
         private readonly HeightMap map;
-        private readonly LandRaster? land;
-        private readonly Palette palette = new();
-        private readonly StandardMaterial3D material = new()
-        {
-            VertexColorUseAsAlbedo = true,
-            VertexColorIsSrgb = true,
-            Roughness = 1.0f,
-            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-            // Skirts face either way.
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        };
+        private readonly ShaderMaterial material;
+        /// <summary>The ground masks as a texture, shared with the sea's shader (<see cref="Water"/>).</summary>
+        public readonly Texture2D Masks;
         private readonly Dictionary<int, MeshInstance3D> shown = new();
         private readonly Dictionary<int, int> shownLevel = new();
         private readonly Dictionary<int, long> shownBytes = new();
@@ -55,14 +47,21 @@ namespace Mmo.Presentation
         /// <summary>Vertex and index data of the meshes on screen, as uploaded to the GPU.</summary>
         public long MeshBytes { get; private set; }
 
-        private sealed record TileMesh(int Tile, int Level, Vector3[] Vertices, Vector3[] Normals, Color[] Colors, int[] Indices);
+        private sealed record TileMesh(int Tile, int Level, Vector3[] Vertices, Vector3[] Normals, int[] Indices);
 
         public Terrain(HeightMap map, LandRaster? land = null)
         {
             this.map = map;
-            this.land = land;
             Plan = new TerrainPlan(map);
             Name = "Terrain";
+            var clock = Stopwatch.StartNew();
+            var image = Image.CreateFromData(GroundMasks.Side, GroundMasks.Side, false, Image.Format.Rgba8, GroundMasks.Build(map, land));
+            image.GenerateMipmaps();
+            Masks = ImageTexture.CreateFromImage(image);
+            GD.Print($"terrain: ground masks built in {clock.ElapsedMilliseconds} ms");
+            material = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/terrain.gdshader") };
+            material.SetShaderParameter("masks", Masks);
+            material.SetShaderParameter("world_half", HeightMap.WorldHalf);
         }
 
         public int[] TilesPerLevel()
@@ -157,7 +156,6 @@ namespace Mmo.Presentation
                 arrays.Resize((int)Mesh.ArrayType.Max);
                 arrays[(int)Mesh.ArrayType.Vertex] = b.Vertices;
                 arrays[(int)Mesh.ArrayType.Normal] = b.Normals;
-                arrays[(int)Mesh.ArrayType.Color] = b.Colors;
                 arrays[(int)Mesh.ArrayType.Index] = b.Indices;
                 var mesh = new ArrayMesh();
                 mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
@@ -176,8 +174,8 @@ namespace Mmo.Presentation
                 node.Mesh = mesh;
                 node.CastShadow = b.Level <= ShadowLevels ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
                 shownLevel[b.Tile] = b.Level;
-                // Position, normal and colour per vertex (Godot packs normals smaller; this is an upper bound).
-                long bytes = b.Vertices.Length * (12L + 12 + 16) + b.Indices.Length * 4L;
+                // Position and normal per vertex (Godot packs normals smaller; this is an upper bound).
+                long bytes = b.Vertices.Length * (12L + 12) + b.Indices.Length * 4L;
                 MeshBytes += bytes - shownBytes.GetValueOrDefault(b.Tile);
                 shownBytes[b.Tile] = bytes;
                 Built++;
@@ -198,7 +196,6 @@ namespace Mmo.Presentation
             int grid = (n + 1) * (n + 1);
             var vertices = new Vector3[grid + 4 * (n + 1)];
             var normals = new Vector3[vertices.Length];
-            var colors = new Color[vertices.Length];
             var indices = new List<int>(n * n * 6 + 4 * n * 6);
             float H(int i, int j) => map.Sample(i0 + i * step, j0 + j * step);
             for (int b = 0; b <= n; b++)
@@ -209,7 +206,6 @@ namespace Mmo.Presentation
                     float h = H(a, b);
                     vertices[v] = new Vector3(a * spacing, h, b * spacing);
                     normals[v] = new Vector3(H(a - 1, b) - H(a + 1, b), 2 * spacing, H(a, b - 1) - H(a, b + 1)).Normalized();
-                    colors[v] = Ground(h, normals[v].Y, map.X0 + (i0 + a * step) * HeightMap.Spacing, map.Z0 + (j0 + b * step) * HeightMap.Spacing);
                 }
             }
             for (int b = 0; b < n; b++)
@@ -234,7 +230,6 @@ namespace Mmo.Presentation
                     int v = edge(t);
                     vertices[k] = vertices[v] - new Vector3(0, skirt, 0);
                     normals[k] = normals[v];
-                    colors[k] = colors[v];
                 }
                 for (int t = 0; t < n; t++)
                     indices.AddRange(new[] { edge(t), edge(t + 1), first + t + 1, edge(t), first + t + 1, first + t });
@@ -243,36 +238,7 @@ namespace Mmo.Presentation
             Skirt(t => n * (n + 1) + t);
             Skirt(t => t * (n + 1));
             Skirt(t => t * (n + 1) + n);
-            return new TileMesh(tile, level, vertices, normals, colors, indices.ToArray());
-        }
-
-        /// <summary>
-        /// Placeholder ground colours: sea floor, sand at the waterline, grass, rock when steep or high;
-        /// above the waterline, housing land, towns and roads are tinted.
-        /// </summary>
-        private Color Ground(float height, float up, float x, float z)
-        {
-            var natural = Natural(height, up);
-            if (land is null || height < 0.5f)
-                return natural;
-            var tint = LandRaster.Use(land.At(x, z)) switch
-            {
-                Content.LandUse.Housing => palette.Housing,
-                Content.LandUse.Town => palette.Town,
-                Content.LandUse.Road => palette.Road,
-                _ => natural,
-            };
-            return natural.Lerp(tint, 0.55f);
-        }
-
-        private Color Natural(float height, float up)
-        {
-            var low = palette.SeaFloor.Lerp(palette.Sand, Mathf.SmoothStep(-3.0f, -0.5f, height));
-            var grass = palette.GrassLow.Lerp(palette.GrassHigh, Mathf.SmoothStep(20, 120, height));
-            var c = low.Lerp(grass, Mathf.SmoothStep(1.0f, 3.0f, height));
-            float rocky = Mathf.Max(Mathf.SmoothStep(0.80f, 0.68f, up), Mathf.SmoothStep(160, 260, height));
-            var rock = palette.Rock.Lerp(palette.RockLight, Mathf.SmoothStep(150, 350, height));
-            return c.Lerp(rock, rocky);
+            return new TileMesh(tile, level, vertices, normals, indices.ToArray());
         }
     }
 }

@@ -1,0 +1,21 @@
+# 0040: The ground and the sea get their look before the playtest, from shaders and ground masks
+
+- **Status:** Accepted, 2026-11-01 (user: "i need the water and the terrain to look good" before the M1 playtest). Amends ADR 0004 for terrain and water only.
+- **Context:**
+  - ADR 0004 kept everything placeholder until the systems were built. With M1's systems done, the user wanted the ground and the sea to look good before playing the evening loop.
+  - The terrain was coloured per vertex from height and slope, with land use tinted in. The colours were pale, with no detail, and the town was a jagged disc. Croaker Fen read as beach sand, the crags had almost no rock, and the sea was one flat blue with a repeating pattern (`docs/captures/2026-11-01-look-before-*.png`).
+- **Decision:**
+  - **The ground is coloured by `shaders/terrain.gdshader`**, not by vertex colours. It works from world height, slope and the **ground masks** (`GroundMasks.cs`), with world-space value noise for patches, strata and grain, and a small bump from the same noise.
+  - **The ground masks are one RGBA8 texture**, a texel per 4 m over the whole map (the land raster's grid). R is road; G is town or housing; B is inland water nearby; A is open sea nearby. Open sea is water joined to the map's edge, so beaches go only where the sea is, and mud only round inland pools. The client builds the masks from `world/` at load, which takes about 1.3 s on the laptop.
+  - **The sea** (`shaders/water.gdshader`) reads the same masks:
+    - waves die down over the last tens of metres before the shore, and inland pools lie calm
+    - the seabed shows through shallow water, read from the screen texture
+    - sky is mixed in at grazing angles
+    - foam laps at the waterline, measured by distance from the mask rather than by depth (beaches are too flat for depth), with streaks on the crests
+  - **One setup for the world's light** (`Landscape.cs`): terrain, sea, sun and environment, shared by the game and the world test.
+  - The look is gradient low-poly, the M0 style test's option. Characters, props, buildings and vehicles stay placeholders under ADR 0004.
+- **Consequences:**
+  - The world test's GPU time went from 1.35 to 1.76 ms walking and from 1.05 to 1.43 ms sailing on the RTX 5070 Ti Mobile (about +0.4 ms). The masks take 64 MB of video memory, plus mipmaps.
+  - The vertex colours are gone, so terrain meshes are 16 bytes a vertex smaller.
+  - Roads come from the masks at full resolution, so they stay whole at a distance, with the 4 m raster's stair-step edge.
+  - Climate doesn't tint the ground yet (Hearthshore is all temperate).

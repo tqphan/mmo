@@ -41,10 +41,10 @@ Only the player-facing result matters: no loading screens in the open world, and
 - Measured: while on the floor, the body's origin stays within 0.01 m of the heightmap's bilinear height.
 
 ### The sea
-- The sea is the existing water shader (`shaders/water.gdshader`): waves near the camera inside a flat ring out to the horizon. It **follows the camera**, snapped to its 4 m grid so wave vertices don't slide, and the waves calm towards the edge of the moving square.
+- The sea is the water shader (`shaders/water.gdshader`): waves near the camera inside a flat ring out to the horizon. Since ADR 0040 it and the ground's shader read the ground masks (docs/design/art.md). It **follows the camera**, snapped to its 4 m grid so wave vertices don't slide, and the waves calm towards the edge of the moving square.
 
 ### The world test scene
-`cargo xtask client --world-test world --route cross|sail|walk|high [--no-vsync] [--secs S]` runs offline, with no server:
+`cargo xtask client --world-test world --route cross|sail|walk|high [--no-vsync] [--secs S]` runs offline, with no server. `--view X,Z,HEIGHT,YAW,PITCH` holds the camera still instead, HEIGHT metres above the ground or the sea, for before-and-after captures (docs/design/art.md).
 
 | Route | What it tests |
 |---|---|

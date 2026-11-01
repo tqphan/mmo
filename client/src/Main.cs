@@ -50,20 +50,7 @@ namespace Mmo
 
             var session = new Session(options, world.TerrainHash);
             AddChild(session);
-            var terrain = new Presentation.Terrain(map, world.Land);
-            AddChild(terrain);
-            var water = Presentation.Water.Create(faceted: false, new Presentation.Palette(), horizon: 80000.0f);
-            AddChild(water);
-            AddChild(new DirectionalLight3D
-            {
-                Name = "Sun",
-                RotationDegrees = new Vector3(-42, -35, 0),
-                LightColor = new Color(1.0f, 0.95f, 0.86f),
-                LightEnergy = 1.15f,
-                ShadowEnabled = true,
-                DirectionalShadowMaxDistance = 200,
-            });
-            AddChild(new WorldEnvironment { Environment = Presentation.StyleTest.Environment(fog: 0.00012f) });
+            var (terrain, water) = Presentation.Landscape.Add(this, map, world.Land);
             var entities = new EntityRegistry(session, options.Trace, map);
             AddChild(entities);
             var ground = new TerrainCollision(map);

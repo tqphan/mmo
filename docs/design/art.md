@@ -1,8 +1,10 @@
 # Art pipeline and style test
 
-Status: v0.1, 2026-10-26. M0 style test. Code: `client/src/Presentation/`, `client/shaders/water.gdshader`, assets in `client/assets/`. Decisions: ADR 0004 (the look, deferred) and ADR 0016 (where assets live).
+Status: v0.2, 2026-11-01. M0 style test, and the world's ground and sea (§2, "The world's ground and sea"). Code: `client/src/Presentation/`, `client/shaders/`, `client/src/World/GroundMasks.cs`, assets in `client/assets/`. Decisions: ADR 0004 (the look, deferred), ADR 0016 (where assets live) and ADR 0040 (the ground and sea before the playtest).
 
-> **2026-10-26: the look is deferred** (ADR 0004). After seeing this test, the user chose simple placeholder geometry until the game systems are built. The style test stays as a reference for that later decision; nothing below is the game's look yet.
+> **2026-10-26: the look is deferred** (ADR 0004). After seeing this test, the user chose simple placeholder geometry until the game systems are built. The style test stays as a reference for that later decision.
+>
+> **2026-11-01: the ground and the sea get their look** (ADR 0040), in the style test's gradient low-poly. The user wanted them to look good before the M1 playtest. Characters, props and buildings are still placeholders.
 
 ## 1. How the original worked
 
@@ -26,7 +28,7 @@ Nothing about the original's art carries over (CLAUDE.md, PLAN §1.3). The only 
 - **Island** (`Island.cs`): a procedural island about 300 m across, on the server's 2 m terrain grid. Gentle near the coast and ridged inland, with a sea floor 7 m down. The diagonals alternate so facets don't line up in stripes.
 - **Palette** (`Palette.cs`): a short list of bright colours. Ground colour comes from height and slope (sand, two grasses, two rocks, sea floor) with a little low-frequency tint so wide areas aren't one flat tone.
 - **Props** (`Props.cs`): procedural pines, broadleaf trees (green and autumn) and rocks, made from cones, prisms and lumpy icospheres with vertex colours. They're scattered in noisy clumps on gentle grass and drawn with one `MultiMesh` per kind.
-- **Water** (`Water.cs`, `water.gdshader`): a 1 km square subdivided every 4 m with three Gerstner waves (22, 13 and 9 m long, about 0.7 m high in total). Its colour runs from turquoise to deep blue with the depth of water behind it, read from the depth buffer, and there's a wobbling foam line where that depth is under about 0.7 m. The waves calm towards the square's edge, and a flat ring of the same material carries the sea out to 6 km.
+- **Water** (`Water.cs`, `water.gdshader`; as first built, since reworked for the world, below): a 1 km square subdivided every 4 m with three Gerstner waves (22, 13 and 9 m long, about 0.7 m high in total). Its colour runs from turquoise to deep blue with the depth of water behind it, read from the depth buffer, and there's a wobbling foam line where that depth is under about 0.7 m. The waves calm towards the square's edge, and a flat ring of the same material carries the sea out to 6 km.
 - **Characters** (`CharacterModel.cs`): KayKit Adventurers (CC0). A knight walks a 6 m circle at walk speed (2.0 m/s), a rogue runs an 11 m circle at run speed (5.4 m/s), and another rogue stands idle. Each keeps only the props named for its hands, since the files come holding every weapon in the pack. Models are turned to face -z, like the rest of the client.
 - **Light:** a warm sun with shadows to 140 m, sky ambient light, a filmic tonemap, light distance fog and a little glow.
 - **Camera:** `follow` starts inland behind the knight looking out to sea and orbits slowly. `wide` circles the whole island from 85 m up.
@@ -43,12 +45,45 @@ Nothing about the original's art carries over (CLAUDE.md, PLAN §1.3). The only 
 
 Hand-painted, the other option in ADR 0004, can't be shown with the tools we have. It needs painted textures and models made for them (PLAN §7). If the user picks it, that becomes its own task.
 
+### The world's ground and sea (ADR 0040)
+`Landscape.Add` puts the terrain, the sea, the sun and the environment in both the game and the world test.
+
+**Ground masks** (`World/GroundMasks.cs`): one RGBA8 texture with a texel per 4 m over the whole map, on the land raster's grid, built from `world/` when the client loads (about 1.3 s).
+
+| Channel | Holds |
+|---|---|
+| R | road land (255) |
+| G | town (255) or housing (100) land |
+| B | inland water nearby: texels below sea level that the open sea doesn't reach, spread by two 13-texel box blurs (about 50 m) |
+| A | open sea nearby: texels below sea level joined side to side to the map's edge, spread the same way. About 0.5 at the waterline and 1 some 50 m out |
+
+**Ground** (`shaders/terrain.gdshader`), in order:
+- **Noise:** world-space value noise at four scales: wide drifts (80 m), patches (14 m), detail (1.25 m) and grain (25 cm). The finer layers fade out once a pixel covers more than they do, so the distance doesn't shimmer.
+- **Grass:** lush and light drifts, darker hollows, cooler above 25–90 m, and the detail and grain for texture.
+- **Rock:** where the slope passes about 25°, and on gentle ground above 110–170 m. It has soft strata that follow the contour.
+- **Sand:** where the open sea is near and the ground is under about 1.8 m (ragged), and in a band about 20 m back from the waterline, with a crisp edge however gently the beach rises. Wet sand at the waterline, turning to weedy seabed below 1.5–6 m.
+- **Marsh:** mud and reeds on flats under about 1.3 m more than 50 m from the sea, and round inland pools.
+- **Land use:** roads in dirt from the full-resolution mask level (a smaller level smears them); towns as trodden grass worn to earth in patches; housing land slightly warmer.
+- **Bump:** the normal is tilted by the detail noise (bump mapping without tangents), more on rock.
+
+**Sea** (`shaders/water.gdshader`):
+- **Waves:** four Gerstner waves of 31, 17, 11 and 6.5 m, which die down from about 40 m out to the waterline (the A mask from 0.95 to 0.62). Pools away from the open sea lie flat.
+- **Ripples:** two scrolling noise layers tilt the normal, fading out by 400 m. The sky's reflection uses a calmer normal, because full ripples flare in rings at grazing angles.
+- **Colour:** the seabed comes through from the screen texture, bent a little by the surface. Red is absorbed first, then green, so shallows turn turquoise and fade into the deep colour by depth. Water a few centimetres deep reads as wet sand.
+- **Sky:** Schlick fresnel to a sky tint, up to half. The engine's own specular fades past 300 m, where the flat far sea would otherwise mirror the pale horizon and wash out.
+- **Foam:** lapping bands within about 12 m of the waterline, measured by the A mask (beaches here fall about 2 cm a metre, so foam by depth spread over tens of metres), skipped on the thinnest film of water; streaks on the highest crests out at sea.
+
+**Light** (`Landscape.cs`): sun at 38° in warm light, sky ambient 0.55, Filmic tonemap, thin fog with aerial perspective, a little glow, and saturation 1.12 and contrast 1.05.
+
 ## 3. Deviations and not yet done
 - **Assets live in `client/assets/`, not `assets/`** (ADR 0016). The ledger stays at `assets/LEDGER.md`.
 - **The characters are chibi-proportioned**, because that's what KayKit makes. The character style is part of the decision; Quaternius's CC0 characters have more realistic proportions but aren't on a host the xtask can fetch from.
 - **The style test is a dev scene.** The game client still draws capsules on a flat checkerboard. Real terrain comes with spike 4 (our own tiles, ADR 0017); everything stays placeholder until the art pass (ADR 0004).
 - **No foot-sliding fix.** Animations play at their authored speed, so feet may slide a little at run speed.
 - **No day/night cycle, sky dome art or foliage wind** yet (PLAN §6.3).
+- **The world has no trees, grass tufts or rocks as props yet**; the style test's `Props.cs` isn't used in the game. The ground's colour carries everything.
+- **Climate doesn't tint the ground** yet. Hearthshore is all temperate.
+- **Roads have stair-stepped edges** from the 4 m land raster.
 
 ## 4. Test plan
 | What | How | Result, 2026-10-26 |
@@ -59,3 +94,14 @@ Hand-painted, the other option in ADR 0004, can't be shown with the tools we hav
 | Characters animate and face the way they move | look at frames a few apart in a `follow` capture | walking and running poses change between frames; the runner faces its direction of travel |
 | Water: depth colour, shore foam, no seam at the edge of the waves, no mesh edge at the horizon | the `wide` captures | turquoise shallows, white foam line, no seam |
 | Cost | Movie Maker's GPU time per frame on the laptop | about 1 ms per frame on the RTX 5070 Ti Mobile; measuring a mid-range budget is spike 4 |
+
+### The world's ground and sea, 2026-11-01
+| What | How | Result |
+|---|---|---|
+| Ground masks: open sea joined to the edge, an enclosed pool isn't sea, the sea fades inland, land use in R and G | xUnit, `GroundMasksTests.cs` | passes |
+| No shader errors, in the game, the world test and the style test | capture logs | clean |
+| Before and after from the same five views (town, beach, fen, crags, sea) | `cargo xtask capture <name> 90 --world-test world --view X,Z,HEIGHT,YAW,PITCH`; the views are in docs/captures/2026-11-01-look-*.png | pale, flat ground and one flat sea before; patches, beaches, marsh, rock and a see-through sea after |
+| Shallows on a near-level beach: no foam sheets or rings | the `shallows` view (−3100, 330, 6 m up) | seabed through clear water, foam only at the waterline |
+| In the game | `cargo xtask capture` with a new profile at the Furrowdale Wayshrine | `2026-11-01-look-game-start.png` |
+| Cost | the world test's `walk` and `sail` routes with `--no-vsync`, laptop RTX 5070 Ti Mobile | GPU p50 1.35 → 1.76 ms walking, 1.05 → 1.43 ms sailing |
+

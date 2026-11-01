@@ -5,11 +5,12 @@ namespace Mmo.Presentation
     /// <summary>
     /// The sea at y = 0, drawn by <c>shaders/water.gdshader</c>: a finely subdivided square with
     /// waves, inside a flat ring that carries the sea out to the horizon. <see cref="Follow"/>
-    /// keeps it centred under a moving camera.
+    /// keeps it centred under a moving camera. Given the ground masks (<see cref="Terrain.Masks"/>),
+    /// waves and foam keep to the open sea and inland pools lie calm.
     /// </summary>
     public static class Water
     {
-        public static Node3D Create(bool faceted, Palette palette, float size = 1000.0f, int subdivisions = 250, float horizon = 12000.0f)
+        public static Node3D Create(bool faceted, Palette palette, float size = 1000.0f, int subdivisions = 250, float horizon = 12000.0f, Texture2D? masks = null)
         {
             var root = new Node3D { Name = "Water" };
             var shader = GD.Load<Shader>("res://shaders/water.gdshader");
@@ -21,6 +22,12 @@ namespace Mmo.Presentation
                 m.SetShaderParameter("fade", new Vector2(size * 0.3f, size * 0.5f));
                 m.SetShaderParameter("shallow", palette.WaterShallow);
                 m.SetShaderParameter("deep", palette.WaterDeep);
+                if (masks != null)
+                {
+                    m.SetShaderParameter("masks", masks);
+                    m.SetShaderParameter("has_masks", true);
+                    m.SetShaderParameter("world_half", World.HeightMap.WorldHalf);
+                }
                 return m;
             }
             root.AddChild(new MeshInstance3D

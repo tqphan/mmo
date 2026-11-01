@@ -50,22 +50,8 @@ namespace Mmo.Presentation
             }
             map = world.Heights;
             var clock = Stopwatch.StartNew();
-            terrain = new Terrain(map, world.Land);
-            GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned in {clock.ElapsedMilliseconds} ms");
-            AddChild(terrain);
-
-            AddChild(new WorldEnvironment { Environment = StyleTest.Environment(fog: 0.00012f) });
-            AddChild(new DirectionalLight3D
-            {
-                Name = "Sun",
-                RotationDegrees = new Vector3(-42, -35, 0),
-                LightColor = new Color(1.0f, 0.95f, 0.86f),
-                LightEnergy = 1.15f,
-                ShadowEnabled = true,
-                DirectionalShadowMaxDistance = 200,
-            });
-            water = Water.Create(faceted: false, new Palette(), horizon: 80000.0f);
-            AddChild(water);
+            (terrain, water) = Landscape.Add(this, map, world.Land);
+            GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned and ground masks built in {clock.ElapsedMilliseconds} ms");
             camera = new Camera3D { Name = "Camera", Fov = 60, Near = 0.2f, Far = 40000 };
             AddChild(camera);
             Place();
@@ -96,6 +82,16 @@ namespace Mmo.Presentation
         {
             float t = (float)time;
             Vector3 eye, ahead;
+            if (options.View is { } v)
+            {
+                // A fixed view, for before-and-after captures (docs/design/art.md).
+                eye = new Vector3(v[0], Mathf.Max(map.Height(v[0], v[1]), 0) + v[2], v[1]);
+                ahead = Basis.FromEuler(new Vector3(Mathf.DegToRad(v[4]), Mathf.DegToRad(v[3]), 0)) * Vector3.Forward;
+                camera.LookAtFromPosition(eye, eye + ahead, Vector3.Up);
+                terrain.Focus = eye;
+                Water.Follow(water, eye);
+                return;
+            }
             switch (options.Route)
             {
                 case "cross":

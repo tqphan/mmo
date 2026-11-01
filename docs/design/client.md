@@ -80,6 +80,7 @@ The client's controls and feel are public, but nothing here is tuned to them yet
 | `--teleport X,Z` | Dev builds: a second after entering, go to (X, Z) by dev teleport (docs/design/coast.md) |
 | `--trace` | Log where each other entity is drawn every frame, to measure smoothness |
 | `--test-cheat` | 3 s after entering, jump 30 m in one frame, to check that the correction snaps us back |
+| `--world-test DIR` | Show the offline world test instead of connecting; `--route cross\|sail\|walk\|high`, `--view X,Z,HEIGHT,YAW,PITCH` and `--no-vsync` go with it (docs/design/worldstream.md) |
 | `--style-test flat\|gradient` | Show the offline art style test instead of connecting; `--outline` and `--shot follow\|wide` go with it (docs/design/art.md) |
 
 Controls: WASD or arrows to move, Q/E or right-drag to turn the camera, wheel to zoom, Space to jump, F to climb aboard or use the helm or a cannon (docs/design/ships.md). Dev builds: F9 spawns a clipper 30 m ahead, F10 removes the nearest ship, F8 spends 100 labor. The HUD shows the account's labor, computed every frame from `my_labor` and the public `game_clock` (docs/design/labor.md).

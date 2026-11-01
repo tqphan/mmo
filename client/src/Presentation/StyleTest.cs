@@ -163,8 +163,8 @@ namespace Mmo.Presentation
             }
         }
 
-        /// <summary>Sky, ambient light, tonemap, fog and glow; the world test reuses it with thinner fog.</summary>
-        internal static Godot.Environment Environment(float fog = 0.0008f)
+        /// <summary>Sky, ambient light, tonemap, fog and glow for the style test; the world has its own (<see cref="Landscape"/>).</summary>
+        private static Godot.Environment Environment(float fog = 0.0008f)
         {
             var horizon = new Color(0.78f, 0.89f, 0.96f);
             return new Godot.Environment
