@@ -130,7 +130,7 @@ Measured on the Radeon 610M, 20 s per run, GPU p50 in ms. The levers were set th
 ### Conclusion
 **Terrain3D can't be brought within spike 4's budgets as the players' renderer** for the whole map at 2 m. As an **editor**, it passed everything: a lossless round trip, edits to the sample, and land use that survives painting.
 
-Two ways on, for the user (BACKLOG):
+Two ways on; **the user chose 2** (2026-10-31, ADR 0038 amended):
 1. **Terrain3D as the editor only:** our tiles stay the players' renderer and collision. Texture painting and foliage would then need exporting into our own formats.
 2. **Terrain3D as the renderer too:** accept about 1.2 GB of video memory, about 3 GB of RAM, and 25–33 fps on integrated GPUs (mid-range estimated at 2.5–4.5 ms a frame). Ship its region files so colour maps can be compressed.
 

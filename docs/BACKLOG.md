@@ -12,7 +12,7 @@ Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<syst
 
 ## M2: "Two Continents" (PLAN §11)
 Broken down when M1 closes. Fixed so far:
-- **[needs OK]** Terrain3D's role (docs/spikes/terrain3d.md, "Levers tried"): the levers can't bring it within spike 4's budgets. Either use it as the **editor only**, with our tiles staying the players' renderer, or make it the **renderer too** and accept about 1.2 GB of video memory, about 3 GB of RAM and 25–33 fps on integrated GPUs. M2's world-building tasks follow from the answer.
+- **Terrain3D as the renderer** (ADR 0038, amended: the user chose it as editor and renderer, 2026-10-31). After the M1 playtest: make Terrain3D the client's terrain and collision by default, remove `Presentation/Terrain`, `TerrainPlan`, `TerrainCollision`'s shapes and the `--terrain3d` flag, with their tests; keep the start-up height check. Acceptance: `cargo xtask check` passes, the four world-test routes and a 10-minute walk with 0 corrections, captures of the playtest's places.
 
 ## Research backlog
 Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without them, M1 tunes by feel.

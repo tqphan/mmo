@@ -1,6 +1,6 @@
 # 0038: Terrain3D is opt-in behind `--terrain3d` with our own shader; our tiles stay the default; its Linux and Windows libraries are committed
 
-- **Status:** Accepted, 2026-10-31. Amended the same day: the user chose to commit the libraries.
+- **Status:** Accepted, 2026-10-31. Amended the same day: the user chose to commit the libraries, and, after the levers (docs/spikes/terrain3d.md), chose **Terrain3D as the renderer too**, accepting its cost.
 - **Context:**
   - M2's Terrain3D spike (docs/spikes/terrain3d.md, ADR 0032) passed its functional checks: a byte-identical round trip, edits that come back to the sample, land use that survives texture painting, and 10 minutes of walking with zero corrections.
   - It missed spike 4's budgets: 1.15 GB of video memory against 300 MB, 2.5–3 GB resident against 1.2 GB, and 25–33 fps on the Radeon 610M against 36–60 for our tiles.
@@ -16,3 +16,4 @@
   - Two terrain paths in the client until the tiles go: `Presentation/Terrain` and `TerrainCollision` (default), and `Terrain3DWorld` with Terrain3D's collision.
   - Gotcha: a `Terrain3D` node's region size must be set after it enters the tree, or its data keeps the default 256 px. A height check at start catches it.
   - The repository carries 16 MB of native code per Terrain3D version in its history.
+- **Amendment, 2026-10-31 (user's call after the levers):** Terrain3D is the editor **and** the players' renderer and collision, at about 1.2 GB of video memory, about 3 GB of RAM and 25–33 fps on integrated GPUs; spike 4's budgets are replaced by these figures. M1 keeps our tiles (ADR 0032), so the playtest isn't disturbed. The switch is M2's next task: Terrain3D by default, our tiles, `TerrainPlan` and `TerrainCollision`'s shapes removed with their tests, and colour maps compressed by shipping editor-made region files if memory needs it later.
