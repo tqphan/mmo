@@ -8,7 +8,7 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 ## M1: "One Coast" (PLAN §11)
 Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<system>.md`). PLAN Q3 is still open; it can reorder later tasks, not these first ones.
 
-1. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit): a new character from Furrowdale through the ten quests to Gullhaven. Notes go in `docs/playtests/`; what it turns up becomes M1's last tasks.
+1. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit): a new character from Furrowdale through the ten quests to Gullhaven. Follow and fill in `docs/playtests/2026-11-m1.md` (setup, the route with paper times, note blanks); what it turns up becomes M1's last tasks.
 
 ## M2: "Two Continents" (PLAN §11)
 Broken down when M1 closes. Fixed so far:
