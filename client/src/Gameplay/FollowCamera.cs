@@ -4,8 +4,9 @@ using Mmo.World;
 namespace Mmo.Gameplay
 {
     /// <summary>
-    /// A third-person camera behind the player. Q and E, or dragging with the right mouse button,
-    /// turn it; the wheel zooms. It stays above the ground, turns with the ship we're aboard, and
+    /// A third-person camera behind the player. Q and E, or dragging with either mouse button, turn
+    /// it; the wheel zooms. While a button is held in the world the cursor is hidden and held, and
+    /// both together run forward (<see cref="GameInput.MouseRun"/>). It stays above the ground, turns with the ship we're aboard, and
     /// looks along the cannon we're manning.
     /// </summary>
     public partial class FollowCamera : Camera3D
@@ -24,6 +25,8 @@ namespace Mmo.Gameplay
         private readonly float pitch;
         private float distance = 8.0f;
         private ulong lastFrame;
+        /// <summary>Where the cursor was when a drag began, to put it back.</summary>
+        private Vector2 dragFrom;
         private float lastFrameYaw;
 
         public FollowCamera(PlayerController player, float yawDeg, HeightMap map, float distance = 8.0f, float pitchDeg = -20.0f)
@@ -40,7 +43,7 @@ namespace Mmo.Gameplay
 
         public override void _UnhandledInput(InputEvent e)
         {
-            if (e is InputEventMouseMotion m && Input.IsMouseButtonPressed(MouseButton.Right))
+            if (e is InputEventMouseMotion m && Input.MouseMode == Input.MouseModeEnum.Captured)
                 yaw -= m.Relative.X * MouseTurn;
             else if (e is InputEventMouseButton { Pressed: true } b)
             {
@@ -48,11 +51,24 @@ namespace Mmo.Gameplay
                     distance = Mathf.Max(3.0f, distance - 1.0f);
                 else if (b.ButtonIndex == MouseButton.WheelDown)
                     distance = Mathf.Min(30.0f, distance + 1.0f);
+                else if (b.ButtonIndex is MouseButton.Left or MouseButton.Right && Input.MouseMode != Input.MouseModeEnum.Captured)
+                {
+                    // A press in the world (windows take their own clicks first) starts a drag.
+                    dragFrom = b.Position;
+                    Input.MouseMode = Input.MouseModeEnum.Captured;
+                }
             }
         }
 
         public override void _Process(double delta)
         {
+            // Let the cursor go once both buttons are up, where the drag began.
+            if (Input.MouseMode == Input.MouseModeEnum.Captured
+                && !Input.IsMouseButtonPressed(MouseButton.Left) && !Input.IsMouseButtonPressed(MouseButton.Right))
+            {
+                Input.MouseMode = Input.MouseModeEnum.Visible;
+                Input.WarpMouse(dragFrom);
+            }
             yaw += (GameInput.Strength("turn_left") - GameInput.Strength("turn_right")) * TurnSpeed * (float)delta;
             // Aboard, the view turns with the ship.
             float frameYaw = player.FrameYaw;

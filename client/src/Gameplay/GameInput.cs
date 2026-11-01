@@ -20,5 +20,13 @@ namespace Mmo.Gameplay
 
         public static Vector2 Vector(StringName left, StringName right, StringName up, StringName down) =>
             Typing ? Vector2.Zero : Input.GetVector(left, right, up, down);
+
+        /// <summary>
+        /// Both mouse buttons held: run forward, the way the camera faces, as in most MMOs. Only
+        /// while the game has the mouse (<see cref="FollowCamera"/> captures it on a press in the
+        /// world, not over a window).
+        /// </summary>
+        public static bool MouseRun => Input.MouseMode == Input.MouseModeEnum.Captured
+                                       && Input.IsMouseButtonPressed(MouseButton.Left) && Input.IsMouseButtonPressed(MouseButton.Right);
     }
 }

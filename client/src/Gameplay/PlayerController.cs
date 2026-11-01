@@ -393,6 +393,9 @@ namespace Mmo.Gameplay
                 return new Vector2(dir.X, dir.Z);
             }
             var input = GameInput.Vector("left", "right", "forward", "back");
+            // Both mouse buttons run forward; S still wins.
+            if (GameInput.MouseRun && !GameInput.Pressed("back"))
+                input.Y = -1;
             // Rotate the input from camera space into the world: forward is the camera's -z.
             return input.Rotated(-CameraYaw).LimitLength(1.0f);
         }
