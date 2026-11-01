@@ -16,7 +16,7 @@ If it passes, the client's own tiles (`Presentation/Terrain.cs`, `TerrainPlan`) 
 
 ## What was built
 
-- **The addon:** `client/addons/terrain_3d/` from the release zip (MIT, `assets/LEDGER.md`), without the demo. Its C# bindings compile as generated code (`client/addons/.editorconfig`), so our nullable warnings-as-errors leave them alone. The native libraries (`bin/`) aren't committed (ADR 0038).
+- **The addon:** `client/addons/terrain_3d/` from the release zip (MIT, `assets/LEDGER.md`), without the demo. Its C# bindings compile as generated code (`client/addons/.editorconfig`), so our nullable warnings-as-errors leave them alone. Only its Linux and Windows x86_64 libraries are committed (ADR 0038).
 - **Layout** (`client/src/World/Terrain3DLayout.cs`, xUnit `Terrain3DLayoutTests`):
   - Regions are 1024 px at 2 m spacing (2,048 m). The 8 × 8 regions at locations −4 … 3 cover −8,192 … 8,192 m.
   - World sample *i* is pixel *i* − 4000. Pixels off the map repeat the edge.
