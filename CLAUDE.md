@@ -66,7 +66,7 @@ Gotchas:
 
 ## Environment (checked 2026-10-25)
 Development happens on two machines, so keep everything cross-platform (ADR 0008). Details are in `docs/STATUS.md`.
-- **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 and Godot 4.7.2 .NET in `~/.local/bin` (not on PATH; the xtask finds them). .NET SDKs from pacman. No Blender.
+- **Linux laptop (Arch):** Rust 1.99.1 with the wasm32 target, SpacetimeDB CLI 2.13.0 and Godot 4.7.2 .NET in `~/.local/bin` (not on PATH; the xtask finds them). .NET SDKs from pacman. Blender 5.2.3 (`/usr/bin/blender`; character meshes, `tools/blender/`).
 - **Windows PC:** Rust 1.90 (needs the wasm32 target), .NET SDK 7.0 and 10.0, SpacetimeDB CLI 1.10 (needs upgrading to 2.13.0). No Godot or Blender. The xtask looks for Godot in `$GODOT`, on PATH, or in `%LOCALAPPDATA%\Godot\godot.exe`.
 
 ## Standing approvals

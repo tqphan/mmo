@@ -1,6 +1,6 @@
 # Status
 
-**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-11-01 (the ground, the sea and now flora got their look before the M1 playtest, ADRs 0040 and 0041; characters next, waiting on Blender access).
+**Milestone:** M1, "One Coast" (M0 closed 2026-10-26). **Updated:** 2026-11-01 (the ground, the sea and now flora got their look before the M1 playtest, ADRs 0040 and 0041; character base meshes done; clothing and hair next).
 
 ## Where things stand
 - **Server, working end to end on a local SpacetimeDB 2.13.0:**
@@ -160,7 +160,8 @@
   - The light is retuned and shared by the game and the world test (`Landscape.cs`). The world test's `--view X,Z,HEIGHT,YAW,PITCH` holds a camera still for before-and-after shots.
   - Cost on the RTX: GPU p50 1.35 → 1.76 ms walking, 1.05 → 1.43 ms sailing. Captures: `docs/captures/2026-11-01-look-{before,after}-*.png`, `-look-after-{shallows,roads}.png` and `-look-game-start.png`.
   - **Flora** (ADR 0041): cosmetic trees (pine, oak, birch, autumn, dead), bushes, boulders, rocks, driftwood, grass tufts, flowers, reeds and pebbles, placed by the client from `world/` by the same rules as the ground. Greymane Wood is a forest, the fen has reeds, the beaches have driftwood, and the crags have boulders. They sway, cast shadows and don't collide. GPU p50 while walking is 2.41 ms. Captures: `docs/captures/2026-11-01-flora-*.png`.
-  - Characters, buildings and vehicles are still placeholders.
+  - **Character base meshes** (ADR 0042, docs/design/characters.md): Body A (male, 1.85 m) and Body B (female, 1.70 m), built by `tools/blender/bodies.py` in Blender 5.2 from MakeHuman's CC0 base mesh and targets (vendored), about 27k triangles each, with eyes, brows, lips and underwear in vertex colours. They're exported but not in the game yet. Clothing and hair are next, then the rig, animations and the client. Renders: `docs/captures/2026-11-01-bodies-*.png`.
+  - Buildings and vehicles are still placeholders, and characters are still capsules in game.
 - **Art otherwise deferred.** The user chose simple placeholder geometry until the game systems are built (ADR 0004, 2026-10-26). The style test scene stays as a reference (docs/design/art.md, ADR 0016):
   - `cargo xtask client --style-test flat` (or `gradient`) runs offline. It shows a procedural island, Gerstner water with turquoise shallows and a foam line, procedural low-poly trees and rocks, and three KayKit Adventurers characters (CC0) walking, running and idling.
   - `--outline` outlines the characters, and `--shot wide` circles the island instead of following the knight.
@@ -192,7 +193,7 @@
 | SpacetimeDB CLI | 2.13.0 (`~/.local/bin`, not on PATH) | 1.10, needs upgrading |
 | .NET | SDK 8.0.132 and 10.0.113 (pacman, `/usr/share/dotnet`) | 7 and 10 |
 | Godot | 4.7.2 .NET (`~/.local/opt`, linked as `~/.local/bin/godot`). Mesa RADV (`vulkan-radeon`) for the Radeon 610M: run with `--display-driver wayland --gpu-index 1` | none |
-| Blender | none | none |
+| Blender | 5.2.3 (`/usr/bin/blender`) | none |
 
 ## Next
 1. **M1 playtest** (BACKLOG, now first; the ground and sea look done first, at the user's request): play the whole loop in one evening, a new character from Furrowdale through the ten quests to Gullhaven (PLAN §11, M1 exit). The sheet is `docs/playtests/2026-11-m1.md`: setup on a prod build, the route with paper times (about 2½ hours) and blanks for notes.

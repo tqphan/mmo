@@ -8,7 +8,7 @@ In order. Each task should fit in one session and has acceptance criteria. Tasks
 ## M1: "One Coast" (PLAN §11)
 Order confirmed 2026-10-26. Each system starts with its spec (`docs/design/<system>.md`). PLAN Q3 is still open; it can reorder later tasks, not these first ones.
 
-1. **Characters in a stylized semi-realistic look** (user, 2026-11-01, before the playtest): original player characters with a realistic build and stylized faces and hair, modelled, rigged and animated in Blender (the user's reference is a commercial pack, used for the look only). It needs Claude Code permission to run `blender`. Spec first (`docs/design/characters.md`): body types, the rig and animations needed (idle, walk, run, jump, swim, attack, cast, gather, death), export to glTF, and the client swapping capsules for the model.
+1. **Characters: clothing and hair** (user's order: bases, then clothing): an outfit or two per body and hair (short with a pompadour and beard for A, an updo with loose strands for B, as in the user's reference), fitted to the MakeHuman topology, vertex-coloured or simply textured; renders front and back. Then the rig (MakeHuman's CC0 game-engine skeleton and weights), animations, and the client swapping capsules for the bodies (docs/design/characters.md §3).
 2. **Playtest**: the user plays the whole loop in one evening (PLAN §11, M1 exit): a new character from Furrowdale through the ten quests to Gullhaven. Follow and fill in `docs/playtests/2026-11-m1.md` (setup, the route with paper times, note blanks); what it turns up becomes M1's last tasks.
 
 ## M2: "Two Continents" (PLAN §11)
@@ -30,6 +30,7 @@ Searched 2026-10-26 (RESEARCH §2A.4); these are what's still unknown. Without t
 - Ship acceleration and turn rates, and the stock clipper cannon's range, damage and reload (docs/design/ships.md §1). An add-on clipper cannon is known: 48 m, 700 damage, 3 s.
 
 ## Done
+- 2026-11-01 **Characters: base meshes** (user): Body A (1.85 m) and Body B (1.70 m) from MakeHuman's CC0 base mesh and targets through our own Blender script; eyes, brows, lips and underwear; `.glb` in `client/assets/characters/`; renders `docs/captures/2026-11-01-bodies-*.png` (docs/design/characters.md, ADR 0042).
 - 2026-11-01 **Flora** (user: "trees. rocks. variety."; ADR 0041): 13 procedural kinds with 3 variants each, placed by the client from `world/` (forests by area and noise, beaches, marsh, steep ground), two streamed MultiMesh layers, swaying; captures `docs/captures/2026-11-01-flora-*.png` (docs/design/art.md).
 - 2026-11-01 **The ground and the sea look good** (user, before the playtest; ADR 0040): terrain shader on height, slope and 4 m ground masks (road, town or housing, inland water, open sea); a sea with calming shallows, a visible seabed, fresnel and lapping foam; shared light; the world test's `--view`; before and after captures `docs/captures/2026-11-01-look-*.png` (docs/design/art.md).
 - 2026-10-31 **Terrain3D removed** (user): the addon, its libraries, `--terrain3d` and its modes, `Terrain3DLayout`, the shader and `worldtool apply-terrain3d`; the client is back to its own tiles only (ADR 0039; the spike stays as a record).
