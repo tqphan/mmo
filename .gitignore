@@ -6,8 +6,3 @@ bin/
 obj/
 # Godot's script ids for generated code; it recreates them (client/src keeps its own)
 *.g.cs.uid
-
-# Terrain3D region files written by the client for the Godot editor; world/ is the source (ADR 0032)
-/client/terrain3d/
-# Terrain3D ships its native libraries in bin/ (ADR 0038: committed, user 2026-10-31)
-!/client/addons/terrain_3d/bin/

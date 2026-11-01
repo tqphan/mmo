@@ -138,7 +138,7 @@ The target is "everything the game had in June 2024" (R§2, R§2A). Content volu
 | Client | Godot 4.7.x .NET, C#, with the official `SpacetimeDB.ClientSDK.Godot` | The official SDK is C#. | — |
 | Shared rules | A pure Rust `sim` crate. C# tests check the client's copies of its formulas against generated test vectors. | One source of truth for the few formulas the client predicts: movement speed, ship motion, cannon arcs. | Keeping the copies in sync gets painful. Then build `sim` as a native library and call it from C#. |
 | Art | Stylized low-poly with a bright palette and readable silhouettes. Uses CC0 kits plus procedurally generated props (§7). | Achievable by Claude and free to use. Light on the GPU. | The user picks a hand-painted direction (Q1) |
-| Terrain | M0–M1: our own LOD tile meshes, drawn from the server's `.mmoh` heightmap (ADR 0017). From M2: Terrain3D v1.1.0, imported from and exported to `world/`, which stays the server's source; the whole map is loaded at once (ADR 0032) | Terrain3D's sculpting, painting and foliage tools for building the M2 world; one heightmap for client and server | The M2 spike finds the whole map too big for the integrated GPU, even with max regions, compressed colour and wider spacing far away |
+| Terrain | Our own LOD tile meshes, drawn from `world/`, the server's heightmap (ADR 0017); Terrain3D was tried and dropped (ADR 0039) | One heightmap for client and server, within spike 4's budgets, no native third-party code | Building the M2 world needs editing tools of our own |
 | Water | A stylized Gerstner-wave shader. Cosmetic buoyancy samples the same function. | Matches the art style, simpler than FFT waves, and gameplay ignores waves anyway | — |
 | World scale | 16×16 km, origin at the center, single precision | Precision problems start 10–40 km from the origin | — |
 | Physics | Jolt (Godot's default), client only | The server uses simple motion math, a heightmap and obstacle outlines. | — |
@@ -739,7 +739,7 @@ Relative sizes: M0 medium · M1 large · M2 very large · M3 large · M4 very la
 - **Exit:** a user playtest where the whole loop (gather, farm, craft a pack, carry it, sail it, sell it) fits in one evening, and being robbed at sea feels tense, not tedious.
 
 ### M2: "Two Continents"
-**World:** built in Terrain3D v1.1.0 (ADR 0032). Both continents and the sea between them fit in the 16 × 16 km world. The first task is a spike: the whole map loaded at once, measured on both GPUs, with an import and export round trip to `world/`.
+**World:** both continents and the sea between them fit in the 16 × 16 km world, built in `world/` with editing tools of our own (ADR 0039; Terrain3D was tried and dropped).
 
 **Players and combat:**
 - 2 factions and 4 races

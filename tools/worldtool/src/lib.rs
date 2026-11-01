@@ -127,31 +127,6 @@ impl World {
         self.land_chunks().iter().fold(0u64, |h, (cell, t)| h.wrapping_add(sim::land::land_chunk_hash(*cell, t)))
     }
 
-    /// Take back what the client's Terrain3D export wrote (ADR 0032, docs/spikes/terrain3d.md): the
-    /// whole map's heights, and one land use class per texel, `LAND_SIDE²` bytes in rows of
-    /// increasing z. Terrain3D doesn't hold the climate, so each texel keeps the one it had. Returns
-    /// how many samples and texels changed.
-    pub fn apply_terrain3d(&mut self, heights: HeightFile, uses: &[u8]) -> Result<(usize, usize), String> {
-        if (heights.cell_x, heights.cell_z, heights.cells_x, heights.cells_z) != (0, 0, CELLS_PER_SIDE, CELLS_PER_SIDE) {
-            return Err("the height file doesn't cover the whole map".into());
-        }
-        if uses.len() != LAND_SIDE * LAND_SIDE {
-            return Err(format!("{} land use bytes, expected {}", uses.len(), LAND_SIDE * LAND_SIDE));
-        }
-        if let Some(k) = uses.iter().position(|&u| LandUse::from_u8(u).is_none()) {
-            return Err(format!("texel ({}, {}) has land use class {}, which content/land.toml doesn't define", k % LAND_SIDE, k / LAND_SIDE, uses[k]));
-        }
-        let samples = self.heights.samples.iter().zip(&heights.samples).filter(|(a, b)| a != b).count();
-        self.heights = heights;
-        let mut texels = 0;
-        for (t, &u) in self.land.iter_mut().zip(uses) {
-            let next = (*t & !0x0f) | u;
-            texels += usize::from(next != *t);
-            *t = next;
-        }
-        Ok((samples, texels))
-    }
-
     /// Region `(rx, rz)` cut out of the map.
     fn region(&self, rx: u16, rz: u16) -> Region {
         let (w, _) = self.heights.size();
@@ -396,27 +371,6 @@ mod tests {
         let t = texel(LandUse::Road, Climate::Subarctic);
         assert_eq!((texel_use(t), texel_climate(t)), (Some(LandUse::Road), Some(Climate::Subarctic)));
         assert_eq!(texel_use(0x0f), None);
-    }
-
-    #[test]
-    fn a_terrain3d_export_replaces_heights_and_uses_and_keeps_climates() {
-        let mut w = sample_world();
-        let mut heights = w.heights.clone();
-        heights.samples[17] = encode(3.0);
-        let mut uses: Vec<u8> = w.land.iter().map(|t| t & 0x0f).collect();
-        uses[0] = LandUse::Wild as u8;
-        uses[5] = LandUse::Housing as u8;
-        assert_eq!(w.apply_terrain3d(heights.clone(), &uses), Ok((1, 2)));
-        assert_eq!(w.heights, heights);
-        assert_eq!(w.land[0], texel(LandUse::Wild, Climate::Arid), "the climate stays");
-        assert_eq!(w.land[5], texel(LandUse::Housing, Climate::Temperate));
-        // The same again changes nothing.
-        assert_eq!(w.apply_terrain3d(heights.clone(), &uses), Ok((0, 0)));
-        uses[9] = 15;
-        assert!(w.apply_terrain3d(heights.clone(), &uses).unwrap_err().contains("class 15"));
-        assert!(w.apply_terrain3d(heights.clone(), &uses[1..]).is_err());
-        let part = HeightFile { cells_x: 1, ..heights };
-        assert!(w.apply_terrain3d(part, &uses).unwrap_err().contains("whole map"));
     }
 
     /// The world in the repo loads, matches its manifest, and has what spawn expects.

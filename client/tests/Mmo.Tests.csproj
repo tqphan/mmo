@@ -15,7 +15,6 @@
     <Compile Include="../src/World/WorldFiles.cs" Link="Client/World/WorldFiles.cs" />
     <Compile Include="../src/World/Areas.cs" Link="Client/World/Areas.cs" />
     <Compile Include="../src/World/TerrainPlan.cs" Link="Client/World/TerrainPlan.cs" />
-    <Compile Include="../src/World/Terrain3DLayout.cs" Link="Client/World/Terrain3DLayout.cs" />
     <Compile Include="../src/Gameplay/MoveSender.cs" Link="Client/Gameplay/MoveSender.cs" />
     <Compile Include="../src/Gameplay/Autopilot.cs" Link="Client/Gameplay/Autopilot.cs" />
     <Compile Include="../src/Gameplay/Boarding.cs" Link="Client/Gameplay/Boarding.cs" />

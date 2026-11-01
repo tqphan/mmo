@@ -20,8 +20,7 @@ namespace Mmo.Presentation
 
         private readonly ClientOptions options;
         private HeightMap map = null!;
-        /// <summary>Our own tiles, or null with <c>--terrain3d</c> (ADR 0032).</summary>
-        private Terrain? terrain;
+        private Terrain terrain = null!;
         private Node3D water = null!;
         private Camera3D camera = null!;
         private Rid viewport;
@@ -50,20 +49,10 @@ namespace Mmo.Presentation
                 return;
             }
             map = world.Heights;
-            camera = new Camera3D { Name = "Camera", Fov = 60, Near = 0.2f, Far = 40000 };
-            if (options.Terrain3D)
-            {
-                AddChild(camera);
-                Terrain3DWorld.Create(this, world, camera, collide: false);
-            }
-            else
-            {
-                var clock = Stopwatch.StartNew();
-                terrain = new Terrain(map, world.Land);
-                GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned in {clock.ElapsedMilliseconds} ms");
-                AddChild(terrain);
-                AddChild(camera);
-            }
+            var clock = Stopwatch.StartNew();
+            terrain = new Terrain(map, world.Land);
+            GD.Print($"world: {terrain.Plan.Count} tiles, {terrain.Plan.DeepCount} in deep water, planned in {clock.ElapsedMilliseconds} ms");
+            AddChild(terrain);
 
             AddChild(new WorldEnvironment { Environment = StyleTest.Environment(fog: 0.00012f) });
             AddChild(new DirectionalLight3D
@@ -77,6 +66,8 @@ namespace Mmo.Presentation
             });
             water = Water.Create(faceted: false, new Palette(), horizon: 80000.0f);
             AddChild(water);
+            camera = new Camera3D { Name = "Camera", Fov = 60, Near = 0.2f, Far = 40000 };
+            AddChild(camera);
             Place();
 
             viewport = GetViewport().GetViewportRid();
@@ -131,8 +122,7 @@ namespace Mmo.Presentation
                     break;
             }
             camera.LookAtFromPosition(eye, eye + ahead, Vector3.Up);
-            if (terrain != null)
-                terrain.Focus = eye;
+            terrain.Focus = eye;
             Water.Follow(water, eye);
         }
 
@@ -158,33 +148,33 @@ namespace Mmo.Presentation
             double draws = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
             double vram = Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / 1048576.0;
 
-            if (initialLoadS < 0 && time > 0.5 && (terrain?.Queued ?? 0) == 0)
+            if (initialLoadS < 0 && time > 0.5 && terrain.Queued == 0)
             {
                 initialLoadS = time;
-                GD.Print($"world: first tiles all in after {initialLoadS:F1} s ({terrain?.Built ?? 0} built)");
+                GD.Print($"world: first tiles all in after {initialLoadS:F1} s ({terrain.Built} built)");
             }
             second.Frames.Add(ms);
-            second.MaxApplyMs = Math.Max(second.MaxApplyMs, terrain?.LastApplyMs ?? 0);
+            second.MaxApplyMs = Math.Max(second.MaxApplyMs, terrain.LastApplyMs);
             if (time >= WarmupS)
             {
                 frameMs.Add(ms);
                 gpuMs.Add(gpu);
                 totals.Over33 += ms > 33.3 ? 1 : 0;
-                totals.MaxApplyMs = Math.Max(totals.MaxApplyMs, terrain?.LastApplyMs ?? 0);
+                totals.MaxApplyMs = Math.Max(totals.MaxApplyMs, terrain.LastApplyMs);
                 totals.MaxVramMb = Math.Max(totals.MaxVramMb, vram);
                 totals.MaxPrims = Math.Max(totals.MaxPrims, prims);
                 totals.MaxDraws = Math.Max(totals.MaxDraws, draws);
-                totals.MaxQueued = Math.Max(totals.MaxQueued, terrain?.Queued ?? 0);
-                totals.MaxMeshMb = Math.Max(totals.MaxMeshMb, (terrain?.MeshBytes ?? 0) / 1048576.0);
+                totals.MaxQueued = Math.Max(totals.MaxQueued, terrain.Queued);
+                totals.MaxMeshMb = Math.Max(totals.MaxMeshMb, terrain.MeshBytes / 1048576.0);
             }
             if (time - second.Start < 1.0)
                 return;
             var f = second.Frames;
             f.Sort();
-            var levels = terrain is null ? "terrain3d" : string.Join("/", terrain.TilesPerLevel());
+            var levels = string.Join("/", terrain.TilesPerLevel());
             GD.Print($"world t={time:F0}s fps={f.Count / (time - second.Start):F0} frame p50={f[f.Count / 2]:F1} max={f[^1]:F1} ms gpu={gpu:F2} ms " +
-                     $"tris={prims / 1e6:F2}M draws={draws:F0} vram={vram:F0}MB meshes={(terrain?.MeshBytes ?? 0) / 1048576}MB managed={GC.GetTotalMemory(false) / 1048576}MB " +
-                     $"rss={System.Environment.WorkingSet / 1048576}MB tiles={levels} queued={terrain?.Queued ?? 0} built={terrain?.Built ?? 0} apply-max={second.MaxApplyMs:F1}ms");
+                     $"tris={prims / 1e6:F2}M draws={draws:F0} vram={vram:F0}MB meshes={terrain.MeshBytes / 1048576}MB managed={GC.GetTotalMemory(false) / 1048576}MB " +
+                     $"rss={System.Environment.WorkingSet / 1048576}MB tiles={levels} queued={terrain.Queued} built={terrain.Built} apply-max={second.MaxApplyMs:F1}ms");
             second.Start = time;
             second.Frames.Clear();
             second.MaxApplyMs = 0;
@@ -199,12 +189,12 @@ namespace Mmo.Presentation
                 var s = v.OrderBy(x => x).ToList();
                 return $"p50 {s[s.Count / 2]:F2}  p99 {s[(int)(s.Count * 0.99)]:F2}  max {s[^1]:F2} ms";
             }
-            GD.Print($"world summary ({options.Route}{(options.Terrain3D ? ", terrain3d" : "")}, {frameMs.Count} frames after {WarmupS:F0} s, vsync {(options.NoVsync ? "off" : "on")}, " +
+            GD.Print($"world summary ({options.Route}, {frameMs.Count} frames after {WarmupS:F0} s, vsync {(options.NoVsync ? "off" : "on")}, " +
                      $"{RenderingServer.GetVideoAdapterName()}):");
             GD.Print($"  frame  {Stats(frameMs)}  over 33 ms: {totals.Over33}");
             GD.Print($"  gpu    {Stats(gpuMs)}");
             GD.Print($"  peak   {totals.MaxPrims / 1e6:F2}M triangles  {totals.MaxDraws:F0} draw calls  {totals.MaxVramMb:F0} MB video memory, {totals.MaxMeshMb:F0} MB of it terrain meshes");
-            GD.Print($"  stream first tiles in {initialLoadS:F1} s  {terrain?.Built ?? 0} meshes built  longest apply {totals.MaxApplyMs:F1} ms  most queued {totals.MaxQueued}");
+            GD.Print($"  stream first tiles in {initialLoadS:F1} s  {terrain.Built} meshes built  longest apply {totals.MaxApplyMs:F1} ms  most queued {totals.MaxQueued}");
         }
     }
 }

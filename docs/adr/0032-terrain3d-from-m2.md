@@ -1,6 +1,6 @@
 # 0032: From M2, the world is built and drawn with Terrain3D v1.1.0; `world/` stays the server's source
 
-- **Status:** Accepted, 2026-10-31 (user's call). Supersedes ADR 0017 from M2 on; M1 keeps its own tiles.
+- **Status:** Superseded by ADR 0039 (2026-10-31: Terrain3D dropped). Was: Accepted, 2026-10-31 (user's call). Supersedes ADR 0017 from M2 on; M1 keeps its own tiles.
 - **Context:**
   - ADR 0017 dropped Terrain3D in spike 4 for two reasons: it is native third-party code, and adding or removing a region rebuilds every loaded region's texture arrays.
   - M2 builds a much bigger world ("Two Continents"). Sculpting, texture painting and foliage are the tools ADR 0017 left us to write ourselves. The user wants the M2 world built with Terrain3D v1.1.0, which accepts the native code.

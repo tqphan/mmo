@@ -1,6 +1,6 @@
 # Spike: Terrain3D for the whole map
 
-Status: **done**, 2026-10-31; levers tried the same day (below). PLAN §11, M2's first task (BACKLOG). Decisions: ADR 0032, ADR 0038. Compared against: docs/spikes/world-scale.md (spike 4).
+Status: **done**, 2026-10-31; levers tried the same day (below). **Terrain3D was then dropped (ADR 0039)**: none of the code described here is in the repository any more; this is the record. PLAN §11, M2's first task (BACKLOG). Decisions: ADR 0032, ADR 0038. Compared against: docs/spikes/world-scale.md (spike 4).
 
 ## Question
 
@@ -98,7 +98,7 @@ If it passes, the client's own tiles (`Presentation/Terrain.cs`, `TerrainPlan`) 
 - **1,234 moves, 0 corrections**, standing at most **0.01 m** off the server's heightmap.
 
 ### Captures
-`docs/captures/2026-10-31-terrain3d-walk.png` (with `-walk-tiles.png`, the same frame from our tiles: they look the same), `-high.png` (the whole map from 3 km) and `-furrowdale.png` (the game client at the start, with the town tint, the beach and the sea).
+Taken of the walk route (alike with our tiles), the whole map from 3 km and the game client at Furrowdale; removed with Terrain3D (ADR 0039).
 
 ## Verdict
 

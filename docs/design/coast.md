@@ -86,7 +86,7 @@ Levels rise with distance from Furrowdale; `worldtool spawns` places each camp's
 - Client: `--teleport X,Z` (dev builds) goes there a second after entering, and `--cam-pitch DEG` with `--cam-distance` up to 400 m frames a landmark from above (docs/design/client.md).
 
 ## 3. Deviations and not yet done
-- **The layout is code, not an editor's files.** Changing the zone means editing `coast.rs` and regenerating; M2 builds the world in Terrain3D (ADR 0032), and the layout moves into its regions then.
+- **The layout is code, not an editor's files.** Changing the zone means editing `coast.rs` and regenerating; M2 brings editing tools of our own for `world/` (ADR 0039), and the layout may move into their files then.
 - **No buildings, docks or props.** Towns are flat tinted pads with their stations and Wayshrine. Ships are summoned in deep water off the beach as before.
 - **The rest of the map stays placeholder:** the other continent, the north and the other islands keep scattered nodes and no camps.
 - **Seed merchants** don't exist yet; the starting bag stands in for them (docs/design/farming.md §3).

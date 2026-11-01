@@ -1,4 +1,0 @@
-# Third-party addons (ADR 0032): compiled as generated code, so our nullable warnings-as-errors
-# leave their sources alone.
-[*.cs]
-generated_code = true

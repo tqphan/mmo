@@ -1,6 +1,6 @@
 # 0038: Terrain3D is opt-in behind `--terrain3d` with our own shader; our tiles stay the default; its Linux and Windows libraries are committed
 
-- **Status:** Accepted, 2026-10-31. Amended the same day: the user chose to commit the libraries, and, after the levers (docs/spikes/terrain3d.md), chose **Terrain3D as the renderer too**, accepting its cost.
+- **Status:** Superseded by ADR 0039 (2026-10-31: Terrain3D removed). Was: Accepted, 2026-10-31. Amended the same day: the user chose to commit the libraries, and, after the levers (docs/spikes/terrain3d.md), chose **Terrain3D as the renderer too**, accepting its cost.
 - **Context:**
   - M2's Terrain3D spike (docs/spikes/terrain3d.md, ADR 0032) passed its functional checks: a byte-identical round trip, edits that come back to the sample, land use that survives texture painting, and 10 minutes of walking with zero corrections.
   - It missed spike 4's budgets: 1.15 GB of video memory against 300 MB, 2.5–3 GB resident against 1.2 GB, and 25–33 fps on the Radeon 610M against 36–60 for our tiles.
