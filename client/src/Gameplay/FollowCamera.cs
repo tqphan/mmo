@@ -5,8 +5,7 @@ namespace Mmo.Gameplay
 {
     /// <summary>
     /// A third-person camera behind the player. Q and E, or dragging with either mouse button, turn
-    /// it; the wheel zooms. While a button is held in the world the cursor is hidden and held, and
-    /// both together run forward (<see cref="GameInput.MouseRun"/>). It stays above the ground, turns with the ship we're aboard, and
+    /// it; the wheel zooms. Both buttons held together run forward (<see cref="GameInput.MouseRun"/>). It stays above the ground, turns with the ship we're aboard, and
     /// looks along the cannon we're manning.
     /// </summary>
     public partial class FollowCamera : Camera3D
@@ -25,8 +24,6 @@ namespace Mmo.Gameplay
         private readonly float pitch;
         private float distance = 8.0f;
         private ulong lastFrame;
-        /// <summary>Where the cursor was when a drag began, to put it back.</summary>
-        private Vector2 dragFrom;
         private float lastFrameYaw;
 
         public FollowCamera(PlayerController player, float yawDeg, HeightMap map, float distance = 8.0f, float pitchDeg = -20.0f)
@@ -41,34 +38,42 @@ namespace Mmo.Gameplay
             Far = 20000;
         }
 
+        /// <summary>A drag ends when its button comes up, wherever the cursor is, windows included.</summary>
+        public override void _Input(InputEvent e)
+        {
+            if (e is not InputEventMouseButton { Pressed: false } b)
+                return;
+            if (b.ButtonIndex == MouseButton.Left)
+                GameInput.LeftDrag = false;
+            else if (b.ButtonIndex == MouseButton.Right)
+                GameInput.RightDrag = false;
+        }
+
         public override void _UnhandledInput(InputEvent e)
         {
-            if (e is InputEventMouseMotion m && Input.MouseMode == Input.MouseModeEnum.Captured)
-                yaw -= m.Relative.X * MouseTurn;
+            if (e is InputEventMouseMotion m && (GameInput.LeftDrag || GameInput.RightDrag))
+                // A jump of more than a few hundred pixels is the cursor being warped, not the hand.
+                yaw -= Mathf.Clamp(m.Relative.X, -200, 200) * MouseTurn;
             else if (e is InputEventMouseButton { Pressed: true } b)
             {
                 if (b.ButtonIndex == MouseButton.WheelUp)
                     distance = Mathf.Max(3.0f, distance - 1.0f);
                 else if (b.ButtonIndex == MouseButton.WheelDown)
                     distance = Mathf.Min(30.0f, distance + 1.0f);
-                else if (b.ButtonIndex is MouseButton.Left or MouseButton.Right && Input.MouseMode != Input.MouseModeEnum.Captured)
+                else if (b.ButtonIndex is MouseButton.Left or MouseButton.Right)
                 {
-                    // A press in the world (windows take their own clicks first) starts a drag.
-                    dragFrom = b.Position;
-                    Input.MouseMode = Input.MouseModeEnum.Captured;
+                    // A press in the world (windows take their own clicks first) starts a drag. The
+                    // mouse isn't captured: capture didn't work on the user's desktop (2026-11-01).
+                    if (b.ButtonIndex == MouseButton.Left)
+                        GameInput.LeftDrag = true;
+                    else
+                        GameInput.RightDrag = true;
                 }
             }
         }
 
         public override void _Process(double delta)
         {
-            // Let the cursor go once both buttons are up, where the drag began.
-            if (Input.MouseMode == Input.MouseModeEnum.Captured
-                && !Input.IsMouseButtonPressed(MouseButton.Left) && !Input.IsMouseButtonPressed(MouseButton.Right))
-            {
-                Input.MouseMode = Input.MouseModeEnum.Visible;
-                Input.WarpMouse(dragFrom);
-            }
             yaw += (GameInput.Strength("turn_left") - GameInput.Strength("turn_right")) * TurnSpeed * (float)delta;
             // Aboard, the view turns with the ship.
             float frameYaw = player.FrameYaw;

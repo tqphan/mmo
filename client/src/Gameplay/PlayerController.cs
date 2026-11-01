@@ -248,6 +248,9 @@ namespace Mmo.Gameplay
             float speed = new Vector2(Velocity.X, Velocity.Z).Length();
             if (speed > MoveSender.StillMps)
                 heading = Yaw.Of(Velocity.X, Velocity.Z) - FrameYaw;
+            else if (GameInput.RightDrag && options.Autopilot is null)
+                // Standing with the right button held: face the way the camera looks.
+                heading = CameraYaw - FrameYaw;
 
             if ((interact && Parent == 0) || order.Action == PilotAction.Climb)
                 climbUntil = now + ClimbWaitS;
